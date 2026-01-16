@@ -40,8 +40,8 @@ OpenViz is an AI-powered design application that transforms hand-sketched drawin
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/Sander-HR/openvizcom.git
-   cd openvizcom
+   git clone https://github.com/Sander-HR/openviz.git
+   cd openviz
    ```
 
 2. **Install dependencies:**
