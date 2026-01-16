@@ -1,5 +1,7 @@
 # OpenViz 🎨
 
+![OpenViz Interface](public/images/interface.png)
+
 OpenViz is an AI-powered design application that transforms hand-sketched drawings and imported images into photorealistic renders using advanced text-to-image models. Optimized for designers, architects, and product creators, OpenViz provides a fast, intuitive workflow to explore design iterations visually in seconds.
 
 ## ✨ Key Features
