@@ -13,7 +13,7 @@ const AnimateNode: React.FC<AnimateNodeProps> = ({ node, selected, updateNode })
         <div
             className={`w-[320px] bg-[#1a1a1a] rounded-2xl p-4 shadow-2xl border transition-colors pointer-events-none ${selected ? 'border-primary' : 'border-[#333]'}`}
         >
-            <div className="flex items-center justify-between mb-4 pointer-events-auto">
+            <div className="flex items-center justify-between mb-4">
                 <h3 className="text-white font-medium text-lg">Animate</h3>
             </div>
 

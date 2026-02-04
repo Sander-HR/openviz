@@ -19,6 +19,7 @@ interface AppState {
     workbenchNodes: WorkbenchNode[];
     connections: Connection[];
     activeNodeId: string | null;
+    clipboard: WorkbenchNode | null;
 
     history: Project[];
     historyIndex: number;
@@ -74,6 +75,11 @@ interface AppState {
     addConnection: (fromId: string, toId: string) => void;
     removeConnection: (id: string) => void;
     updateWorkbenchNode: (id: string, updates: Partial<WorkbenchNode>) => void;
+    removeWorkbenchNode: (id: string) => void;
+    duplicateWorkbenchNode: (id: string) => void;
+    reorderWorkbenchNode: (id: string, direction: 'front' | 'back') => void;
+    copyToClipboard: (id: string) => void;
+    pasteFromClipboard: (pos: { x: number, y: number }) => void;
     saveCurrentToWorkbench: (thumbnail: string) => void;
     openNodeInStudio: (id: string) => void;
     createNewSketch: () => void;
@@ -170,6 +176,7 @@ export const useStore = create<AppState>()(
             workbenchNodes: [],
             connections: [],
             activeNodeId: 'default',
+            clipboard: null,
 
 
             history: [INITIAL_PROJECT],
@@ -508,6 +515,67 @@ export const useStore = create<AppState>()(
             updateWorkbenchNode: (id, updates) => set((state) => ({
                 workbenchNodes: state.workbenchNodes.map(n => n.id === id ? { ...n, ...updates } as WorkbenchNode : n)
             })),
+
+            removeWorkbenchNode: (id) => set((state) => ({
+                workbenchNodes: state.workbenchNodes.filter(n => n.id !== id),
+                connections: state.connections.filter(c => c.from !== id && c.to !== id)
+            })),
+
+            duplicateWorkbenchNode: (id) => set((state) => {
+                const node = state.workbenchNodes.find(n => n.id === id);
+                if (!node) return state;
+
+                const newId = Math.random().toString(36).substr(2, 9);
+                const newNode: WorkbenchNode = JSON.parse(JSON.stringify(node));
+                newNode.id = newId;
+                newNode.x += 40;
+                newNode.y += 40;
+                if (newNode.type === 'image') {
+                    newNode.project.id = newId;
+                }
+
+                return {
+                    workbenchNodes: [...state.workbenchNodes, newNode]
+                };
+            }),
+
+            reorderWorkbenchNode: (id, direction) => set((state) => {
+                const index = state.workbenchNodes.findIndex(n => n.id === id);
+                if (index === -1) return state;
+
+                const nodes = [...state.workbenchNodes];
+                const [node] = nodes.splice(index, 1);
+                if (direction === 'front') {
+                    nodes.push(node);
+                } else {
+                    nodes.unshift(node);
+                }
+
+                return { workbenchNodes: nodes };
+            }),
+
+            copyToClipboard: (id) => set((state) => {
+                const node = state.workbenchNodes.find(n => n.id === id);
+                if (!node) return state;
+                return { clipboard: JSON.parse(JSON.stringify(node)) };
+            }),
+
+            pasteFromClipboard: (pos) => set((state) => {
+                if (!state.clipboard) return state;
+
+                const newId = Math.random().toString(36).substr(2, 9);
+                const newNode = JSON.parse(JSON.stringify(state.clipboard)) as WorkbenchNode;
+                newNode.id = newId;
+                newNode.x = pos.x;
+                newNode.y = pos.y;
+                if (newNode.type === 'image') {
+                    newNode.project.id = newId;
+                }
+
+                return {
+                    workbenchNodes: [...state.workbenchNodes, newNode]
+                };
+            }),
 
             saveCurrentToWorkbench: (thumbnail) => {
                 const state = get();

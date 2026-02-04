@@ -5,6 +5,7 @@ import useImage from 'use-image';
 import { Plus } from 'lucide-react';
 import AnimateNode from './nodes/AnimateNode';
 import BasicBlocksMenu from './nodes/BasicBlocksMenu';
+import ContextMenu from './ContextMenu';
 import { ImageNode, AnimateNode as AnimateNodeType } from '../types';
 
 
@@ -48,6 +49,16 @@ const Workbench: React.FC = () => {
     const [gridPattern, setGridPattern] = useState<HTMLImageElement | null>(null);
     const [activeMenuNodeId, setActiveMenuNodeId] = useState<string | null>(null);
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, nodeId: string } | null>(null);
+
+    const {
+        removeWorkbenchNode,
+        duplicateWorkbenchNode,
+        reorderWorkbenchNode,
+        copyToClipboard,
+        pasteFromClipboard,
+        clipboard
+    } = useStore();
 
     const imageNodes = workbenchNodes.filter(n => n.type === 'image') as ImageNode[];
     const animateNodes = workbenchNodes.filter(n => n.type === 'animate') as AnimateNodeType[];
@@ -66,7 +77,7 @@ const Workbench: React.FC = () => {
 
         // Colors from user edit
         const majorColor = "#c5c5c5ff";
-        const minorColor = "#e4e4e4ff";
+        const minorColor = "#dcdcdcff";
 
         // Draw major dot
         ctx.fillStyle = majorColor;
@@ -222,6 +233,91 @@ const Workbench: React.FC = () => {
         }
     };
 
+    const handleContextMenu = (e: any, nodeId: string) => {
+        if (e.evt) e.evt.preventDefault();
+        else e.preventDefault();
+
+        // e.evt is present for Konva events, for HTML events use e
+        const event = e.evt || e;
+        setContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            nodeId
+        });
+        setSelectedNodeId(nodeId);
+    };
+
+    // Keyboard shortcuts
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only handle if no input is focused
+            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedNodeId) removeWorkbenchNode(selectedNodeId);
+            } else if (e.key === ']') {
+                if (selectedNodeId) reorderWorkbenchNode(selectedNodeId, 'front');
+            } else if (e.key === '[') {
+                if (selectedNodeId) reorderWorkbenchNode(selectedNodeId, 'back');
+            } else if (e.ctrlKey || e.metaKey) {
+                switch (e.key.toLowerCase()) {
+                    case 'c':
+                        if (selectedNodeId) copyToClipboard(selectedNodeId);
+                        break;
+                    case 'v':
+                        if (clipboard) {
+                            // Paste at cursor or center
+                            const stage = stageRef.current;
+                            if (stage) {
+                                const pointer = stage.getPointerPosition() || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+                                const pos = {
+                                    x: (pointer.x - position.x) / scale,
+                                    y: (pointer.y - position.y) / scale
+                                };
+                                pasteFromClipboard(pos);
+                            }
+                        }
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        if (selectedNodeId) duplicateWorkbenchNode(selectedNodeId);
+                        break;
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedNodeId, clipboard, scale, position, removeWorkbenchNode, duplicateWorkbenchNode, reorderWorkbenchNode, copyToClipboard, pasteFromClipboard]);
+
+    const contextMenuActions = contextMenu ? [
+        { label: 'Wrap in section', onClick: () => console.log('Wrap in section'), divider: true },
+        { label: 'Bring to front', shortcut: ']', onClick: () => reorderWorkbenchNode(contextMenu.nodeId, 'front') },
+        { label: 'Send to back', shortcut: '[', onClick: () => reorderWorkbenchNode(contextMenu.nodeId, 'back'), divider: true },
+        {
+            label: 'Copy link to selection', shortcut: 'Ctrl+L', onClick: () => {
+                // Just copy current URL for now as placeholder
+                navigator.clipboard.writeText(window.location.href);
+            }, divider: true
+        },
+        { label: 'Copy', shortcut: 'Ctrl+C', onClick: () => copyToClipboard(contextMenu.nodeId) },
+        {
+            label: 'Paste', shortcut: 'Ctrl+V', onClick: () => {
+                const stage = stageRef.current;
+                if (stage) {
+                    const pointer = stage.getPointerPosition() || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+                    const pos = {
+                        x: (pointer.x - position.x) / scale,
+                        y: (pointer.y - position.y) / scale
+                    };
+                    pasteFromClipboard(pos);
+                }
+            }
+        },
+        { label: 'Duplicate', shortcut: 'Ctrl+D', onClick: () => duplicateWorkbenchNode(contextMenu.nodeId), divider: true },
+        { label: 'Delete', shortcut: 'Del', onClick: () => removeWorkbenchNode(contextMenu.nodeId), type: 'danger' as const },
+    ] : [];
+
     const renderConnections = () => {
         return connections.map(conn => {
             const fromNode = workbenchNodes.find(n => n.id === conn.from);
@@ -302,6 +398,7 @@ const Workbench: React.FC = () => {
                             draggable
                             onDragMove={(e) => handleDragMove(node.id, e)}
                             onDragEnd={(e) => handleDragMove(node.id, e)}
+                            onContextMenu={(e) => handleContextMenu(e, node.id)}
                             onDblClick={() => openNodeInStudio(node.id)}
                             onTap={() => {
                                 setSelectedNodeId(node.id);
@@ -312,9 +409,9 @@ const Workbench: React.FC = () => {
                             onMouseDown={() => setSelectedNodeId(node.id)}
                             onMouseEnter={(e) => {
                                 setHoveredNodeId(node.id);
-                                if (selectedNodeId === node.id) {
-                                    const container = e.target.getStage()?.container();
-                                    if (container) container.style.cursor = 'move';
+                                const container = e.target.getStage()?.container();
+                                if (container && (selectedNodeId === node.id || hoveredNodeId === node.id)) {
+                                    container.style.cursor = 'move';
                                 }
                             }}
                             onMouseLeave={(e) => {
@@ -329,7 +426,7 @@ const Workbench: React.FC = () => {
                                 height={node.height}
                                 fill="white"
                                 stroke={(selectedNodeId === node.id || hoveredNodeId === node.id) ? "#3b82f6" : "transparent"}
-                                strokeWidth={(hoveredNodeId === node.id) ? 4 / scale : 2 / scale}
+                                strokeWidth={(hoveredNodeId === node.id) ? 6 / scale : 2 / scale}
                                 shadowBlur={15}
                                 shadowColor="rgba(0,0,0,0.1)"
                                 shadowOffset={{ x: 0, y: 5 }}
@@ -413,6 +510,7 @@ const Workbench: React.FC = () => {
                             draggable
                             onDragMove={(e) => handleDragMove(node.id, e)}
                             onDragEnd={(e) => handleDragMove(node.id, e)}
+                            onContextMenu={(e) => handleContextMenu(e, node.id)}
                             onClick={() => setSelectedNodeId(node.id)}
                             onMouseDown={() => setSelectedNodeId(node.id)}
                             onMouseEnter={(e) => {
@@ -446,7 +544,7 @@ const Workbench: React.FC = () => {
                 {animateNodes.map(node => (
                     <div
                         key={node.id}
-                        className="absolute pointer-events-auto"
+                        className="absolute pointer-events-none"
                         style={{
                             left: node.x,
                             top: node.y,
@@ -485,6 +583,15 @@ const Workbench: React.FC = () => {
                     New Sketch
                 </button>
             </div>
+
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    actions={contextMenuActions}
+                />
+            )}
         </div >
     );
 };
