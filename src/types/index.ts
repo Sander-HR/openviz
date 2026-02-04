@@ -50,14 +50,43 @@ export interface Project {
     thumbnail?: string;
 }
 
-export interface WorkbenchNode {
+export type NodeType = 'image' | 'animate';
+
+export interface BaseNode {
     id: string;
-    name: string;
     x: number;
     y: number;
     width: number;
     height: number;
+}
+
+export interface ImageNode extends BaseNode {
+    type: 'image';
+    name: string;
     project: Project;
+}
+
+export interface AnimateNode extends BaseNode {
+    type: 'animate';
+    data: {
+        prompt: string;
+        frames: {
+            start?: string; // image id or url
+            end?: string;
+        };
+        settings: {
+            model: string;
+            duration: string;
+        };
+    };
+}
+
+export type WorkbenchNode = ImageNode | AnimateNode;
+
+export interface Connection {
+    id: string;
+    from: string; // Node ID
+    to: string;   // Node ID
 }
 
 export interface ToolSettings {

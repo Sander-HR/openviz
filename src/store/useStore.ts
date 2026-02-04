@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 
-import { Project, ToolSettings, Layer, ToolType, AspectRatio, RenderSettings, RenderGroup, ViewMode, WorkbenchNode } from '../types';
+import { Project, ToolSettings, Layer, ToolType, AspectRatio, RenderSettings, RenderGroup, ViewMode, WorkbenchNode, Connection, ImageNode } from '../types';
 
 interface AppState {
     project: Project;
@@ -17,6 +17,7 @@ interface AppState {
     // Workbench State
     viewMode: ViewMode;
     workbenchNodes: WorkbenchNode[];
+    connections: Connection[];
     activeNodeId: string | null;
 
     history: Project[];
@@ -70,6 +71,8 @@ interface AppState {
     // Workbench Actions
     setViewMode: (mode: ViewMode) => void;
     addWorkbenchNode: (node: WorkbenchNode) => void;
+    addConnection: (fromId: string, toId: string) => void;
+    removeConnection: (id: string) => void;
     updateWorkbenchNode: (id: string, updates: Partial<WorkbenchNode>) => void;
     saveCurrentToWorkbench: (thumbnail: string) => void;
     openNodeInStudio: (id: string) => void;
@@ -165,6 +168,7 @@ export const useStore = create<AppState>()(
 
             viewMode: 'STUDIO',
             workbenchNodes: [],
+            connections: [],
             activeNodeId: 'default',
 
 
@@ -371,8 +375,9 @@ export const useStore = create<AppState>()(
                         lastModifiedAt: Date.now()
                     };
 
-                    const newNode: WorkbenchNode = {
+                    const newNode: ImageNode = {
                         id,
+                        type: 'image',
                         name: promptTitle,
                         x: currentX,
                         y: currentY,
@@ -488,8 +493,20 @@ export const useStore = create<AppState>()(
                 workbenchNodes: [...state.workbenchNodes, node]
             })),
 
+            addConnection: (fromId, toId) => set((state) => ({
+                connections: [...state.connections, {
+                    id: Math.random().toString(36).substr(2, 9),
+                    from: fromId,
+                    to: toId
+                }]
+            })),
+
+            removeConnection: (id) => set((state) => ({
+                connections: state.connections.filter(c => c.id !== id)
+            })),
+
             updateWorkbenchNode: (id, updates) => set((state) => ({
-                workbenchNodes: state.workbenchNodes.map(n => n.id === id ? { ...n, ...updates } : n)
+                workbenchNodes: state.workbenchNodes.map(n => n.id === id ? { ...n, ...updates } as WorkbenchNode : n)
             })),
 
             saveCurrentToWorkbench: (thumbnail) => {
@@ -505,8 +522,9 @@ export const useStore = create<AppState>()(
                         )
                     });
                 } else {
-                    const newNode: WorkbenchNode = {
+                    const newNode: ImageNode = {
                         id: currentProject.id,
+                        type: 'image',
                         name: currentProject.name,
                         x: 100,
                         y: 100,
@@ -526,7 +544,7 @@ export const useStore = create<AppState>()(
 
             openNodeInStudio: (id) => set((state) => {
                 const node = state.workbenchNodes.find(n => n.id === id);
-                if (!node) return state;
+                if (!node || node.type !== 'image') return state;
 
                 return {
                     project: node.project,
@@ -547,8 +565,9 @@ export const useStore = create<AppState>()(
                     lastModifiedAt: Date.now()
                 };
 
-                const newNode: WorkbenchNode = {
+                const newNode: ImageNode = {
                     id,
+                    type: 'image',
                     name: newProject.name,
                     x: window.innerWidth / 2 - 125, // Centered-ish
                     y: window.innerHeight / 2 - 100,
@@ -571,12 +590,10 @@ export const useStore = create<AppState>()(
             name: 'openviz-storage-idb', // Change name to avoid conflicts with localStorage
             storage: createJSONStorage(() => storage),
             partialize: (state) => ({
-                project: state.project,
-                activeLayerId: state.activeLayerId,
-                resultsPanelOpen: state.resultsPanelOpen,
                 renderSettings: state.renderSettings,
                 viewMode: state.viewMode,
                 workbenchNodes: state.workbenchNodes,
+                connections: state.connections,
                 activeNodeId: state.activeNodeId
             }),
         }
