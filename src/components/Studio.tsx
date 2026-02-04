@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import Toolbar from './Toolbar';
-import SidebarLeft from './SidebarLeft';
 import SidebarRight from './SidebarRight';
+import LayerPanel from './LayerPanel';
 import CanvasViewport from './CanvasViewport';
 import BottomRightControls from './BottomRightControls';
 import BottomLeftControls from './BottomLeftControls';
@@ -47,7 +47,7 @@ const Studio: React.FC = () => {
                 {/* Main Workspace Area (Sidelines) */}
                 <div className="flex flex-1 justify-between p-4 pointer-events-none">
                     <div className="pointer-events-auto flex flex-col gap-4">
-                        <SidebarLeft />
+                        <LayerPanel />
                     </div>
                     <div className="pointer-events-auto flex flex-col gap-4 fixed top-4 right-4 bottom-4 z-50 w-80">
                         <SidebarRight />

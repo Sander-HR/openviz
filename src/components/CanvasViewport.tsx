@@ -58,17 +58,47 @@ const CanvasViewport = () => {
     const getFlattenedCanvas = useCallback(() => {
         if (!stageRef.current) return "";
 
-        // Find the background layer to use as base for dimensions
-        const bgLayer = stageRef.current.findOne('.bg-rect');
-        if (!bgLayer) return stageRef.current.toDataURL();
+        const stage = stageRef.current;
 
-        return stageRef.current.toDataURL({
-            x: canvas.panX,
-            y: canvas.panY,
-            width: canvas.width * canvas.zoomLevel,
-            height: canvas.height * canvas.zoomLevel,
-            pixelRatio: 1 / canvas.zoomLevel // Normalize to original size
-        });
+        // 1. Save current transform to restore later
+        const oldAttrs = {
+            x: stage.x(),
+            y: stage.y(),
+            scaleX: stage.scaleX(),
+            scaleY: stage.scaleY()
+        };
+
+        try {
+            // 2. Reset stage to identity to capture the full canvas area correctly
+            // This bypasses any viewport clipping or panning offsets
+            stage.setAttrs({
+                x: 0,
+                y: 0,
+                scaleX: 1,
+                scaleY: 1
+            });
+
+            // Force a synchronous draw of all layers
+            stage.draw();
+
+            // 3. Capture the project area at a reasonable thumbnail resolution
+            const dataURL = stage.toDataURL({
+                x: 0,
+                y: 0,
+                width: canvas.width,
+                height: canvas.height,
+                pixelRatio: 256 / canvas.width // Downscale to ~256px width for performance
+            });
+
+            return dataURL;
+        } catch (error) {
+            console.error("Critical: Failed to generate thumbnail", error);
+            return "";
+        } finally {
+            // 4. Restore the user's view immediately
+            stage.setAttrs(oldAttrs);
+            stage.batchDraw();
+        }
     }, [canvas.width, canvas.height, canvas.panX, canvas.panY, canvas.zoomLevel]);
 
     // Expose functions to window for other components to call
@@ -91,23 +121,18 @@ const CanvasViewport = () => {
                     const layers = stageRef.current?.getLayers();
                     const layerNode = layers?.find(l => l.id() === layer.id);
                     if (layerNode) {
-                        const size = Math.min(canvas.width, canvas.height);
-                        const offsetX = (canvas.width - size) / 2;
-                        const offsetY = (canvas.height - size) / 2;
-
-                        // Calculate stage-relative coordinates (accounting for pan/zoom)
-                        const x = canvas.panX + offsetX * canvas.zoomLevel;
-                        const y = canvas.panY + offsetY * canvas.zoomLevel;
-                        const viewSize = size * canvas.zoomLevel;
-
-                        const thumb = layerNode.toDataURL({
-                            x,
-                            y,
-                            width: viewSize,
-                            height: viewSize,
-                            pixelRatio: 120 / viewSize
-                        });
-                        updateLayer(layer.id, { thumbnail: thumb });
+                        try {
+                            const thumb = layerNode.toDataURL({
+                                x: 0,
+                                y: 0,
+                                width: canvas.width,
+                                height: canvas.height,
+                                pixelRatio: 120 / Math.max(canvas.width, canvas.height)
+                            });
+                            updateLayer(layer.id, { thumbnail: thumb });
+                        } catch (e) {
+                            console.warn('Failed to generate thumbnail for layer', layer.id, e);
+                        }
                     }
                 }
             });
@@ -116,7 +141,7 @@ const CanvasViewport = () => {
         // Delay to allow images to load
         const timer = setTimeout(updateAllThumbnails, 1000);
         return () => clearTimeout(timer);
-    }, [project.layers.length]); // Re-run when layer count changes
+    }, [project.layers.length, updateLayer, canvas.width, canvas.height]);
 
 
     const handleMouseDown = (e: any) => {
@@ -238,26 +263,21 @@ const CanvasViewport = () => {
                     const layers = stageRef.current.getLayers();
                     const layerNode = layers.find(l => l.id() === activeLayerId);
                     if (layerNode) {
-                        const size = Math.min(canvas.width, canvas.height);
-                        const offsetX = (canvas.width - size) / 2;
-                        const offsetY = (canvas.height - size) / 2;
-
-                        // Calculate stage-relative coordinates (accounting for pan/zoom)
-                        const x = canvas.panX + offsetX * canvas.zoomLevel;
-                        const y = canvas.panY + offsetY * canvas.zoomLevel;
-                        const viewSize = size * canvas.zoomLevel;
-
-                        const thumb = layerNode.toDataURL({
-                            x,
-                            y,
-                            width: viewSize,
-                            height: viewSize,
-                            pixelRatio: 120 / viewSize
-                        });
-                        updateLayer(activeLayerId, { thumbnail: thumb });
+                        try {
+                            const thumb = layerNode.toDataURL({
+                                x: 0,
+                                y: 0,
+                                width: canvas.width,
+                                height: canvas.height,
+                                pixelRatio: 120 / Math.max(canvas.width, canvas.height)
+                            });
+                            updateLayer(activeLayerId, { thumbnail: thumb });
+                        } catch (e) {
+                            console.warn('Failed to update thumbnail for layer', activeLayerId, e);
+                        }
                     }
                 }
-            }, 50); // Small delay to ensure Konva has rendered the last stroke
+            }, 100); // Slightly more delay for performance
         }
     };
 

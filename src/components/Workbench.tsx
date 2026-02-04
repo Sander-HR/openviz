@@ -121,8 +121,6 @@ const Workbench: React.FC = () => {
         const node = workbenchNodes.find(n => n.id === id);
         if (!node) return;
 
-        const stage = e.target.getStage();
-        const transform = e.target.getParent().getAbsoluteTransform().copy().invert();
         const pos = e.target.position();
 
         let newX = node.x;
@@ -258,13 +256,12 @@ const Workbench: React.FC = () => {
                                 cornerRadius={4}
                             />
                             {/* Project Content / Thumbnail */}
-                            <Group clipX={0} clipY={0} clipWidth={node.width} clipHeight={node.height}>
-                                <NodeImage
-                                    src={node.project.thumbnail}
-                                    width={node.width}
-                                    height={node.height}
-                                />
-                            </Group>
+                            <NodeImage
+                                key={node.project.thumbnail}
+                                src={node.project.thumbnail}
+                                width={node.width}
+                                height={node.height}
+                            />
                             {/* Label */}
                             <Text
                                 text={node.name}

@@ -284,6 +284,7 @@ export const useStore = create<AppState>()(
                     blendMode: 'normal',
                     strokes: [],
                     image,
+                    thumbnail: image,
                     order: state.project.layers.length,
                     created: Date.now(),
                     modified: Date.now(),

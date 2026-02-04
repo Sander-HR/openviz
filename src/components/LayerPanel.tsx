@@ -15,7 +15,7 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-const SidebarLeft: React.FC = () => {
+const LayerPanel: React.FC = () => {
     const { project, activeLayerId, addLayer, setActiveLayer, updateLayer } = useStore();
 
     return (
@@ -111,4 +111,4 @@ const SidebarLeft: React.FC = () => {
     );
 };
 
-export default SidebarLeft;
+export default LayerPanel;
