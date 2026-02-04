@@ -6,7 +6,7 @@ import useImage from 'use-image';
 import ToolContextMenu from './ToolContextMenu';
 
 const URLImage = ({ src, x, y, width, height }: any) => {
-    const [image] = useImage(src);
+    const [image] = useImage(src, "anonymous");
     return <KonvaImage image={image} x={x} y={y} width={width} height={height} />;
 };
 
@@ -102,38 +102,70 @@ const CanvasViewport = () => {
     }, [canvas.width, canvas.height, canvas.panX, canvas.panY, canvas.zoomLevel]);
 
     // Expose functions to window for other components to call
+    const updateLayerThumbnail = useCallback((layerId: string) => {
+        if (!stageRef.current) return;
+        const stage = stageRef.current;
+        const layers = stage.getLayers();
+        const layerNode = layers.find(l => l.id() === layerId);
+
+        if (layerNode) {
+            // Save current stage state
+            const oldAttrs = {
+                x: stage.x(),
+                y: stage.y(),
+                scaleX: stage.scaleX(),
+                scaleY: stage.scaleY()
+            };
+
+            try {
+                // Reset stage for capture to ensure we get the full canvas area at 1:1 local scale
+                // This prevents zoom/pan from affecting the thumbnail capture
+                stage.setAttrs({
+                    x: 0,
+                    y: 0,
+                    scaleX: 1,
+                    scaleY: 1
+                });
+
+                // Force a draw of the specific layer to ensure it's up to date
+                layerNode.draw();
+
+                const thumb = layerNode.toDataURL({
+                    x: 0,
+                    y: 0,
+                    width: canvas.width,
+                    height: canvas.height,
+                    pixelRatio: 256 / Math.max(canvas.width, canvas.height)
+                });
+                updateLayer(layerId, { thumbnail: thumb });
+            } catch (e) {
+                console.warn('Failed to update thumbnail for layer', layerId, e);
+            } finally {
+                // Restore stage state
+                stage.setAttrs(oldAttrs);
+                stage.batchDraw();
+            }
+        }
+    }, [canvas.width, canvas.height, updateLayer]);
+
     useEffect(() => {
         (window as any).fitToScreen = fitToScreen;
         (window as any).getFlattenedCanvas = getFlattenedCanvas;
+        (window as any).updateLayerThumbnail = updateLayerThumbnail;
         return () => {
             delete (window as any).fitToScreen;
             delete (window as any).getFlattenedCanvas;
+            delete (window as any).updateLayerThumbnail;
         };
-    }, [fitToScreen, getFlattenedCanvas]);
+    }, [fitToScreen, getFlattenedCanvas, updateLayerThumbnail]);
 
     // Update thumbnails for layers that don't have them
     useEffect(() => {
         const updateAllThumbnails = async () => {
             if (!stageRef.current) return;
-
             project.layers.forEach(layer => {
                 if (!layer.thumbnail) {
-                    const layers = stageRef.current?.getLayers();
-                    const layerNode = layers?.find(l => l.id() === layer.id);
-                    if (layerNode) {
-                        try {
-                            const thumb = layerNode.toDataURL({
-                                x: 0,
-                                y: 0,
-                                width: canvas.width,
-                                height: canvas.height,
-                                pixelRatio: 120 / Math.max(canvas.width, canvas.height)
-                            });
-                            updateLayer(layer.id, { thumbnail: thumb });
-                        } catch (e) {
-                            console.warn('Failed to generate thumbnail for layer', layer.id, e);
-                        }
-                    }
+                    updateLayerThumbnail(layer.id);
                 }
             });
         };
@@ -141,7 +173,7 @@ const CanvasViewport = () => {
         // Delay to allow images to load
         const timer = setTimeout(updateAllThumbnails, 1000);
         return () => clearTimeout(timer);
-    }, [project.layers.length, updateLayer, canvas.width, canvas.height]);
+    }, [project.layers.length, updateLayerThumbnail]);
 
 
     const handleMouseDown = (e: any) => {
@@ -207,6 +239,8 @@ const CanvasViewport = () => {
                     strokes: [...activeLayer.strokes, fillRect]
                 });
                 pushHistory();
+                // Update thumbnail after fill
+                setTimeout(() => updateLayerThumbnail(activeLayerId), 10);
             }
         }
     };
@@ -259,23 +293,8 @@ const CanvasViewport = () => {
 
             // Generate thumbnail for active layer
             setTimeout(() => {
-                if (activeLayerId && stageRef.current) {
-                    const layers = stageRef.current.getLayers();
-                    const layerNode = layers.find(l => l.id() === activeLayerId);
-                    if (layerNode) {
-                        try {
-                            const thumb = layerNode.toDataURL({
-                                x: 0,
-                                y: 0,
-                                width: canvas.width,
-                                height: canvas.height,
-                                pixelRatio: 120 / Math.max(canvas.width, canvas.height)
-                            });
-                            updateLayer(activeLayerId, { thumbnail: thumb });
-                        } catch (e) {
-                            console.warn('Failed to update thumbnail for layer', activeLayerId, e);
-                        }
-                    }
+                if (activeLayerId) {
+                    updateLayerThumbnail(activeLayerId);
                 }
             }, 100); // Slightly more delay for performance
         }
