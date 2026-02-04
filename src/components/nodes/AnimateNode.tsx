@@ -11,7 +11,7 @@ interface AnimateNodeProps {
 const AnimateNode: React.FC<AnimateNodeProps> = ({ node, selected, updateNode }) => {
     return (
         <div
-            className={`w-[320px] bg-[#1a1a1a] rounded-2xl p-4 shadow-2xl border transition-colors pointer-events-none ${selected ? 'border-primary' : 'border-[#333]'}`}
+            className={`w-[320px] bg-[#1a1a1a] rounded-2xl p-4 shadow-2xl border transition-colors pointer-events-none ${selected ? 'border-primary' : 'border-[#333]'}`} // add thicker border
         >
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-white font-medium text-lg">Animate</h3>

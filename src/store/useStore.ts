@@ -20,6 +20,7 @@ interface AppState {
     connections: Connection[];
     activeNodeId: string | null;
     clipboard: WorkbenchNode | null;
+    isExitingStudio: boolean;
 
     history: Project[];
     historyIndex: number;
@@ -83,6 +84,7 @@ interface AppState {
     saveCurrentToWorkbench: (thumbnail: string) => void;
     openNodeInStudio: (id: string) => void;
     createNewSketch: () => void;
+    setExitingStudio: (exiting: boolean) => void;
 }
 
 const INITIAL_PROJECT: Project = {
@@ -177,6 +179,7 @@ export const useStore = create<AppState>()(
             connections: [],
             activeNodeId: 'default',
             clipboard: null,
+            isExitingStudio: false,
 
 
             history: [INITIAL_PROJECT],
@@ -652,7 +655,9 @@ export const useStore = create<AppState>()(
                     history: [newProject],
                     historyIndex: 0
                 }));
-            }
+            },
+
+            setExitingStudio: (isExitingStudio) => set({ isExitingStudio }),
         }),
         {
             name: 'openviz-storage-idb', // Change name to avoid conflicts with localStorage

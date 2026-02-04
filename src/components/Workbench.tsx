@@ -290,6 +290,32 @@ const Workbench: React.FC = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedNodeId, clipboard, scale, position, removeWorkbenchNode, duplicateWorkbenchNode, reorderWorkbenchNode, copyToClipboard, pasteFromClipboard]);
 
+    // Center on active node when entering workbench
+    const { viewMode, activeNodeId } = useStore();
+    const hasCentered = useRef(false);
+
+    React.useEffect(() => {
+        if (viewMode === 'WORKBENCH' && activeNodeId && !hasCentered.current) {
+            const node = workbenchNodes.find(n => n.id === activeNodeId);
+            if (node) {
+                const cx = window.innerWidth / 2;
+                const cy = window.innerHeight / 2;
+                const nx = node.x + node.width / 2;
+                const ny = node.y + node.height / 2;
+
+                const newPos = {
+                    x: cx - nx * scale,
+                    y: cy - ny * scale
+                };
+                setPosition(newPos);
+                setSelectedNodeId(activeNodeId);
+                hasCentered.current = true;
+            }
+        } else if (viewMode === 'STUDIO') {
+            hasCentered.current = false;
+        }
+    }, [viewMode, activeNodeId, workbenchNodes, scale]);
+
     const contextMenuActions = contextMenu ? [
         { label: 'Wrap in section', onClick: () => console.log('Wrap in section'), divider: true },
         { label: 'Bring to front', shortcut: ']', onClick: () => reorderWorkbenchNode(contextMenu.nodeId, 'front') },
