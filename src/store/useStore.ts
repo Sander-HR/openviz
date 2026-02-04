@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { Project, ToolSettings, Layer, ToolType, AspectRatio, RenderSettings, RenderGroup } from '../types';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
+import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
+
+import { Project, ToolSettings, Layer, ToolType, AspectRatio, RenderSettings, RenderGroup, ViewMode, WorkbenchNode } from '../types';
 
 interface AppState {
     project: Project;
@@ -11,6 +13,11 @@ interface AppState {
     isRendering: boolean;
     resultsPanelOpen: boolean;
     activeLayerId: string | null;
+
+    // Workbench State
+    viewMode: ViewMode;
+    workbenchNodes: WorkbenchNode[];
+    activeNodeId: string | null;
 
     history: Project[];
     historyIndex: number;
@@ -46,18 +53,27 @@ interface AppState {
     reorderLayers: (startIndex: number, endIndex: number) => void;
 
     // Render Results Actions
-    addRenderResultGroup: (prompt: string, style: string, images: string[]) => void;
+    addRenderResultGroup: (settings: RenderSettings, images: string[]) => void;
+    loadRenderSettings: (settings: RenderSettings) => void;
     clearRenderResults: () => void;
     setPreviewingRender: (image: string | null) => void;
     setRendering: (loading: boolean) => void;
     setResultsPanelOpen: (open: boolean) => void;
+    addGroupToWorkbench: (group: RenderGroup) => void;
     addResultAsLayer: (image: string) => void;
 
     // History Actions
-
     undo: () => void;
     redo: () => void;
     pushHistory: () => void;
+
+    // Workbench Actions
+    setViewMode: (mode: ViewMode) => void;
+    addWorkbenchNode: (node: WorkbenchNode) => void;
+    updateWorkbenchNode: (id: string, updates: Partial<WorkbenchNode>) => void;
+    saveCurrentToWorkbench: (thumbnail: string) => void;
+    openNodeInStudio: (id: string) => void;
+    createNewSketch: () => void;
 }
 
 const INITIAL_PROJECT: Project = {
@@ -104,6 +120,21 @@ const INITIAL_PROJECT: Project = {
     ],
 };
 
+// Custom storage object for IndexedDB
+const storage: StateStorage = {
+    getItem: async (name: string): Promise<string | null> => {
+        console.log('Loading state from IndexedDB:', name);
+        return (await idbGet(name)) || null;
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+        console.log('Saving state to IndexedDB:', name);
+        await idbSet(name, value);
+    },
+    removeItem: async (name: string): Promise<void> => {
+        await idbDel(name);
+    },
+};
+
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
@@ -131,6 +162,10 @@ export const useStore = create<AppState>()(
             isRendering: false,
             resultsPanelOpen: false,
             activeLayerId: 'layer-1',
+
+            viewMode: 'STUDIO',
+            workbenchNodes: [],
+            activeNodeId: 'default',
 
 
             history: [INITIAL_PROJECT],
@@ -210,18 +245,23 @@ export const useStore = create<AppState>()(
                 renderSettings: { ...state.renderSettings, referenceImage }
             })),
 
-            addRenderResultGroup: (prompt, style, images) => set((state) => ({
+            addRenderResultGroup: (settings, images) => set((state) => ({
                 renderResults: [
                     {
                         id: Math.random().toString(36).substr(2, 9),
-                        prompt,
-                        style,
+                        prompt: settings.prompt,
+                        style: settings.stylePreset,
+                        settings: { ...settings },
                         images,
                         timestamp: Date.now()
                     },
                     ...state.renderResults
                 ],
                 resultsPanelOpen: true
+            })),
+
+            loadRenderSettings: (settings) => set((state) => ({
+                renderSettings: settings ? { ...state.renderSettings, ...settings } : state.renderSettings
             })),
 
             clearRenderResults: () => set({ renderResults: [] }),
@@ -256,6 +296,96 @@ export const useStore = create<AppState>()(
                     },
                     activeLayerId: newLayer.id,
                     previewingRender: null // Clear preview after adding
+                };
+            }),
+
+            addGroupToWorkbench: (group) => set((state) => {
+                const nodes = [...state.workbenchNodes];
+                const activeNode = nodes.find(n => n.id === state.activeNodeId);
+
+                let startX = activeNode ? activeNode.x + activeNode.width + 50 : 100;
+                let startY = activeNode ? activeNode.y : 100;
+
+                const nodeWidth = 250;
+                const nodeHeight = 200;
+
+                const promptTitle = group.prompt.length > 50 ? group.prompt.substring(0, 50) + '...' : group.prompt;
+
+                const newNodes: WorkbenchNode[] = [];
+
+                group.images.forEach((image) => {
+                    const id = Math.random().toString(36).substr(2, 9);
+
+                    // Find non-overlapping position
+                    let currentX = startX;
+                    let currentY = startY;
+                    let foundPos = false;
+
+                    while (!foundPos) {
+                        const overlap = [...nodes, ...newNodes].some(n =>
+                            currentX < n.x + n.width + 20 &&
+                            currentX + nodeWidth + 20 > n.x &&
+                            currentY < n.y + n.height + 20 &&
+                            currentY + nodeHeight + 20 > n.y
+                        );
+
+                        if (overlap) {
+                            currentY += nodeHeight + 50;
+                            // If we've gone too far down, move right and reset Y
+                            if (currentY > startY + (nodeHeight + 50) * 3) {
+                                currentY = startY;
+                                currentX += nodeWidth + 50;
+                            }
+                        } else {
+                            foundPos = true;
+                        }
+                    }
+
+                    const newProject: Project = {
+                        ...INITIAL_PROJECT,
+                        id,
+                        name: promptTitle,
+                        thumbnail: image,
+                        layers: [
+                            {
+                                ...INITIAL_PROJECT.layers[0],
+                                id: 'bg-layer',
+                                order: 0,
+                            },
+                            {
+                                id: 'render-layer',
+                                name: 'Render',
+                                type: 'render',
+                                visible: true,
+                                locked: false,
+                                opacity: 100,
+                                blendMode: 'normal',
+                                strokes: [],
+                                image,
+                                order: 1,
+                                created: Date.now(),
+                                modified: Date.now(),
+                            }
+                        ],
+                        createdAt: Date.now(),
+                        lastModifiedAt: Date.now()
+                    };
+
+                    const newNode: WorkbenchNode = {
+                        id,
+                        name: promptTitle,
+                        x: currentX,
+                        y: currentY,
+                        width: nodeWidth,
+                        height: nodeHeight,
+                        project: newProject
+                    };
+
+                    newNodes.push(newNode);
+                });
+
+                return {
+                    workbenchNodes: [...state.workbenchNodes, ...newNodes]
                 };
             }),
 
@@ -350,16 +480,104 @@ export const useStore = create<AppState>()(
                     history: newHistory,
                     historyIndex: newHistory.length - 1
                 });
+            },
+
+            setViewMode: (viewMode) => set({ viewMode }),
+
+            addWorkbenchNode: (node) => set((state) => ({
+                workbenchNodes: [...state.workbenchNodes, node]
+            })),
+
+            updateWorkbenchNode: (id, updates) => set((state) => ({
+                workbenchNodes: state.workbenchNodes.map(n => n.id === id ? { ...n, ...updates } : n)
+            })),
+
+            saveCurrentToWorkbench: (thumbnail) => {
+                const state = get();
+                const currentProject = { ...state.project, thumbnail, lastModifiedAt: Date.now() };
+                const existingNode = state.workbenchNodes.find(n => n.id === state.activeNodeId);
+
+                if (existingNode) {
+                    set({
+                        project: currentProject,
+                        workbenchNodes: state.workbenchNodes.map(n =>
+                            n.id === state.activeNodeId ? { ...n, project: currentProject } : n
+                        )
+                    });
+                } else {
+                    const newNode: WorkbenchNode = {
+                        id: currentProject.id,
+                        name: currentProject.name,
+                        x: 100,
+                        y: 100,
+                        width: currentProject.canvas.width / 4,
+                        height: currentProject.canvas.height / 4,
+                        project: currentProject
+                    };
+                    set({
+                        project: currentProject,
+                        workbenchNodes: [...state.workbenchNodes, newNode],
+                        activeNodeId: newNode.id
+                    });
+                }
+            },
+
+            // ... (rest of the actions)
+
+            openNodeInStudio: (id) => set((state) => {
+                const node = state.workbenchNodes.find(n => n.id === id);
+                if (!node) return state;
+
+                return {
+                    project: node.project,
+                    activeNodeId: id,
+                    viewMode: 'STUDIO',
+                    history: [node.project],
+                    historyIndex: 0
+                };
+            }),
+
+            createNewSketch: () => {
+                const id = Math.random().toString(36).substr(2, 9);
+                const newProject: Project = {
+                    ...INITIAL_PROJECT,
+                    id,
+                    name: `Untitled ${get().workbenchNodes.length + 1}`,
+                    createdAt: Date.now(),
+                    lastModifiedAt: Date.now()
+                };
+
+                const newNode: WorkbenchNode = {
+                    id,
+                    name: newProject.name,
+                    x: window.innerWidth / 2 - 125, // Centered-ish
+                    y: window.innerHeight / 2 - 100,
+                    width: 250,
+                    height: 200,
+                    project: newProject
+                };
+
+                set((state) => ({
+                    workbenchNodes: [...state.workbenchNodes, newNode],
+                    project: newProject,
+                    activeNodeId: id,
+                    viewMode: 'STUDIO',
+                    history: [newProject],
+                    historyIndex: 0
+                }));
             }
         }),
         {
-            name: 'openviz-storage',
+            name: 'openviz-storage-idb', // Change name to avoid conflicts with localStorage
+            storage: createJSONStorage(() => storage),
             partialize: (state) => ({
                 project: state.project,
                 activeLayerId: state.activeLayerId,
-                renderResults: state.renderResults,
                 resultsPanelOpen: state.resultsPanelOpen,
-                renderSettings: state.renderSettings
+                renderSettings: state.renderSettings,
+                viewMode: state.viewMode,
+                workbenchNodes: state.workbenchNodes,
+                activeNodeId: state.activeNodeId
             }),
         }
     )

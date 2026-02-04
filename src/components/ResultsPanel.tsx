@@ -1,8 +1,11 @@
 import React from 'react';
 import { useStore } from '../store/useStore';
-import { ChevronDown, MoreHorizontal, RotateCcw, Eye, Download, ArrowLeft, ArrowRight } from 'lucide-react';
+import { ChevronDown, MoreHorizontal, RotateCcw, Eye, Download, ArrowLeft, ArrowRight, Archive, PlusSquare } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { motion, AnimatePresence } from 'framer-motion';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -16,10 +19,38 @@ const ResultsPanel: React.FC = () => {
         previewingRender,
         setPreviewingRender,
         addResultAsLayer,
+        loadRenderSettings,
+        addGroupToWorkbench,
         isRendering
     } = useStore();
 
+    const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
+    const [isExporting, setIsExporting] = React.useState<string | null>(null);
+
     if (renderResults.length === 0 && !isRendering) return null;
+
+    const handleExportZip = async (group: any) => {
+        setIsExporting(group.id);
+        const zip = new JSZip();
+
+        try {
+            const promises = group.images.map(async (url: string, index: number) => {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const extension = url.split('.').pop()?.split('?')[0] || 'png';
+                zip.file(`render_${index + 1}.${extension}`, blob);
+            });
+
+            await Promise.all(promises);
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, `renders_${group.id.substring(0, 5)}_${Date.now()}.zip`);
+        } catch (error) {
+            console.error("Failed to export zip", error);
+        } finally {
+            setIsExporting(null);
+            setOpenMenuId(null);
+        }
+    };
 
     return (
         <div className={cn(
@@ -54,7 +85,7 @@ const ResultsPanel: React.FC = () => {
                                 </div>
                                 <div className="grid grid-cols-4 gap-1.5">
                                     {[1, 2, 3, 4].map((i) => (
-                                        <div key={i} className="aspect-square bg-neutral-800 rounded-lg" />
+                                        <div key={i} className="aspect-square bg-neutral-700 rounded-lg" />
                                     ))}
                                 </div>
                             </div>
@@ -71,19 +102,75 @@ const ResultsPanel: React.FC = () => {
                                         <div className="bg-primary/20 text-blue-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
                                             {group.style.includes('Modify') ? 'Modify' : 'Render'}
                                         </div>
-                                        <div className="flex items-center gap-1 opacity-40">
-                                            <button className="p-1 hover:bg-white/10 rounded transition-colors">
+                                        <div className="flex items-center gap-1 relative">
+                                            {/* pressing the rotate ccw button reloads the same prompt with the same seed in the render panel */}
+                                            <button
+                                                onClick={() => loadRenderSettings(group.settings || { prompt: group.prompt, stylePreset: group.style } as any)}
+                                                title="Reload prompt and settings"
+                                                className="p-1 hover:bg-white/10 rounded transition-colors text-white/40 hover:text-white"
+                                            >
                                                 <RotateCcw size={14} />
                                             </button>
-                                            <button className="p-1 hover:bg-white/10 rounded transition-colors">
+                                            {/* pressing the more horizontal button opens a menu with the options add the group to the infinite canvas (workbench), export the group as a zip */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setOpenMenuId(openMenuId === group.id ? null : group.id);
+                                                }}
+                                                className={cn(
+                                                    "p-1 hover:bg-white/10 rounded transition-colors text-white/40 hover:text-white",
+                                                    openMenuId === group.id && "bg-white/10 text-white"
+                                                )}
+                                            >
                                                 <MoreHorizontal size={14} />
                                             </button>
+
+                                            <AnimatePresence>
+                                                {openMenuId === group.id && (
+                                                    <>
+                                                        <div
+                                                            className="fixed inset-0 z-[60]"
+                                                            onClick={() => setOpenMenuId(null)}
+                                                        />
+                                                        <motion.div
+                                                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                            className="absolute right-0 top-full mt-1 w-48 bg-neutral-900 border border-panel-border rounded-xl shadow-2xl z-[70] overflow-hidden py-1.5"
+                                                        >
+                                                            <button
+                                                                onClick={() => {
+                                                                    addGroupToWorkbench(group);
+                                                                    setOpenMenuId(null);
+                                                                }}
+                                                                className="w-full px-3 py-2 text-left text-xs hover:bg-primary/20 flex items-center gap-2 transition-colors"
+                                                            >
+                                                                <PlusSquare size={14} className="text-primary" />
+                                                                Add all to Workbench
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleExportZip(group)}
+                                                                disabled={isExporting === group.id}
+                                                                className="w-full px-3 py-2 text-left text-xs hover:bg-primary/20 flex items-center gap-2 transition-colors disabled:opacity-50"
+                                                            >
+                                                                {isExporting === group.id ? (
+                                                                    <div className="animate-spin rounded-full h-3 w-3 border border-white/20 border-t-white" />
+                                                                ) : (
+                                                                    <Archive size={14} className="text-primary" />
+                                                                )}
+                                                                Export as ZIP
+                                                            </button>
+                                                        </motion.div>
+                                                    </>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
                                     </div>
 
                                     {/* Prompt Label */}
                                     <div className="text-[11px] font-medium opacity-40 lowercase">
-                                        {group.prompt || 'art'}
+                                        {/* Show only first 50 characters with ... in the en    d */}
+                                        {group.prompt.length > 50 ? group.prompt.substring(0, 50) + '...' : group.prompt}
                                     </div>
 
                                     {/* Image Grid */}
@@ -139,9 +226,9 @@ const ResultsPanel: React.FC = () => {
                             Add
                         </button>
                     </div>
-                </div>
+                </div >
             )}
-        </div>
+        </div >
     );
 };
 

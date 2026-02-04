@@ -36,7 +36,23 @@ OpenViz is an AI-powered design application that transforms hand-sketched drawin
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18+)
-- [ComfyUI](https://github.com/comfyanonymous/ComfyUI) (Running locally for rendering features)
+### ComfyUI Configuration
+
+OpenViz uses ComfyUI as its background rendering engine. To ensure a smooth connection:
+
+1.  **Launch ComfyUI** with the following flags to allow the Vite proxy to communicate with it:
+    ```bash
+    python main.py --listen --port 7821
+    ```
+    *(Note: If you use the default port 8188, update `targetUrl` in `vite.config.ts` accordingly).*
+
+2.  **Required Models**: The default workflow expects the following models in your `ComfyUI/models` directory:
+    - **Checkpoints**: `sd3.5_large_fp8_scaled.safetensors` (in `checkpoints/`)
+    - **ControlNet**: `sd3.5_large_controlnet_canny.safetensors` (in `controlnet/`)
+
+3.  **WSL Users**: If you are running OpenViz in WSL and ComfyUI on Windows:
+    - The `vite.config.ts` is pre-configured to automatically find your Windows host IP.
+    - Ensure your Windows Firewall allows inbound connections on the ComfyUI port (7821).
 
 ### Installation
 
@@ -51,10 +67,7 @@ OpenViz is an AI-powered design application that transforms hand-sketched drawin
    npm install
    ```
 
-3. **Configure ComfyUI:**
-   Ensure your ComfyUI instance is running with the `--listen` flag if you're connecting from a different machine or WSL.
-
-4. **Start the development server:**
+3. **Start the development server:**
    ```bash
    npm run dev
    ```
@@ -76,7 +89,7 @@ OpenViz is an AI-powered design application that transforms hand-sketched drawin
 - [ ] **Workflow Presets:** Save and load custom ComfyUI workflows within the UI.
 
 ### 🚀 Phase 3 (Future)
-- [ ] **Workbench Collaboration:** Real-time multi-user editing via WebSockets.
+- [ ] **Workbench** switch working on a larger canvas with multiple images and render modes.  
 - [ ] **AI Prompt Generator:** Semi-automated prompt crafting based on sketch contents.
 - [ ] **Mobile Optimization:** Touch-optimized UI for tablets and styluses.
 - [ ] **Cloud Sync:** Cross-device project synchronization.

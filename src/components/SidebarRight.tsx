@@ -36,7 +36,7 @@ const SidebarRight: React.FC = () => {
     ];
 
     const handleGenerate = async () => {
-        if (!renderSettings.prompt.trim()) return;
+        if (!renderSettings?.prompt?.trim()) return;
         setRendering(true);
 
         try {
@@ -48,7 +48,7 @@ const SidebarRight: React.FC = () => {
             });
 
             if (response.success && response.images.length > 0) {
-                addRenderResultGroup(renderSettings.prompt, renderSettings.stylePreset, response.images);
+                addRenderResultGroup(renderSettings, response.images);
                 setResultsPanelOpen(true);
             }
 
@@ -71,7 +71,7 @@ const SidebarRight: React.FC = () => {
     };
 
     return (
-        <div className="w-full flex-shrink-0 flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl h-fit max-h-[60vh] backdrop-blur-md bg-opacity-95 text-white overflow-hidden">
+        <div className="w-80 flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl overflow-hidden h-fit max-h-[calc(100vh-120px)] backdrop-blur-md bg-opacity-95 text-white">
             {/* Tabs */}
             <div className="flex border-b border-panel-border">
                 <button className="flex-1 py-3 text-sm font-bold border-b-2 border-primary bg-primary/5">RENDER</button>
@@ -95,7 +95,7 @@ const SidebarRight: React.FC = () => {
                     />
                     <div className="flex justify-between items-center text-[10px] opacity-40">
                         <span>START WITH DESCRIPTOR...</span>
-                        <span>{renderSettings.prompt.length}/2000</span>
+                        <span>{(renderSettings?.prompt || "").length}/2000</span>
                     </div>
                 </div>
 
@@ -226,7 +226,7 @@ const SidebarRight: React.FC = () => {
 
                 <button
                     onClick={handleGenerate}
-                    disabled={isRendering || !renderSettings.prompt.trim()}
+                    disabled={isRendering || !renderSettings?.prompt?.trim()}
                     className={cn(
                         "flex-1 py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all relative overflow-hidden group",
                         isRendering

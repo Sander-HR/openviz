@@ -2,6 +2,7 @@ export type AspectRatio = 'square' | 'landscape' | 'portrait';
 export type ToolType = 'select' | 'brush' | 'eraser' | 'circle' | 'rectangle' | 'line' | 'paintbucket' | 'transform';
 export type LayerType = 'sketch' | 'image' | 'render';
 export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay';
+export type ViewMode = 'STUDIO' | 'WORKBENCH';
 
 export interface CanvasState {
     width: number;
@@ -46,6 +47,17 @@ export interface Project {
     lastModifiedAt: number;
     canvas: CanvasState;
     layers: Layer[];
+    thumbnail?: string;
+}
+
+export interface WorkbenchNode {
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    project: Project;
 }
 
 export interface ToolSettings {
@@ -72,6 +84,7 @@ export interface RenderGroup {
     id: string;
     prompt: string;
     style: string;
+    settings: RenderSettings;
     images: string[];
     timestamp: number;
 }

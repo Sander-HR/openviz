@@ -19,7 +19,9 @@ const CanvasViewport = () => {
         setZoom,
         setPan,
         pushHistory,
-        previewingRender
+        previewingRender,
+        setViewMode,
+        saveCurrentToWorkbench
     } = useStore();
 
 
@@ -381,9 +383,18 @@ const CanvasViewport = () => {
             <Stage
                 width={window.innerWidth}
                 height={window.innerHeight}
+                name="background-stage"
                 onMouseDown={handleMouseDown}
                 onMousemove={handleMouseMove}
                 onMouseup={handleMouseUp}
+                onDblClick={(e) => {
+                    console.log('Double click on stage background. Exit to workbench.');
+                    if (e.target === stageRef.current || e.target.name() === 'background-stage') {
+                        const thumbnail = getFlattenedCanvas();
+                        saveCurrentToWorkbench(thumbnail);
+                        setViewMode('WORKBENCH');
+                    }
+                }}
                 onContextMenu={handleContextMenu}
                 onWheel={handleWheel}
                 ref={stageRef}
