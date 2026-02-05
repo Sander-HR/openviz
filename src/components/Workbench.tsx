@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Stage, Layer, Rect, Group, Text, Image as KonvaImage, Line } from 'react-konva';
+import { Stage, Layer, Rect, Group, Text, Image as KonvaImage, Line, Circle, Path } from 'react-konva';
 
 const SNAP_THRESHOLD = 5;
 
@@ -138,23 +138,30 @@ const getGuides = (lineGuideStops: any, itemBounds: any) => {
 };
 
 const Workbench: React.FC = () => {
-    const { workbenchNodes, openNodeInStudio, updateWorkbenchNode, createNewSketch, activeNodeId, setActiveNodeId } = useStore();
-    const stageRef = useRef<any>(null);
-    const [scale, setScale] = useState(1);
-    const [position, setPosition] = useState({ x: 0, y: 0 });
-    const [gridPattern, setGridPattern] = useState<HTMLImageElement | null>(null);
-    const [activeMenuNodeId, setActiveMenuNodeId] = useState<string | null>(null);
-    const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, nodeId: string } | null>(null);
-
     const {
+        workbenchNodes,
+        connections,
+        openNodeInStudio,
+        updateWorkbenchNode,
+        createNewSketch,
+        activeNodeId,
+        setActiveNodeId,
         removeWorkbenchNode,
         duplicateWorkbenchNode,
         reorderWorkbenchNode,
         copyToClipboard,
         pasteFromClipboard,
-        clipboard
+        addWorkbenchNode,
+        addConnection
     } = useStore();
+
+    const stageRef = useRef<any>(null);
+    const [scale, setScale] = useState(1);
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [gridPattern, setGridPattern] = useState<HTMLImageElement | null>(null);
+    const [activeMenuNodeId, setActiveMenuNodeId] = useState<string | null>(null);
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, nodeId: string } | null>(null);
 
     const imageNodes = workbenchNodes.filter(n => n.type === 'image') as ImageNode[];
     const animateNodes = workbenchNodes.filter(n => n.type === 'animate') as AnimateNodeType[];
@@ -291,8 +298,8 @@ const Workbench: React.FC = () => {
         setSnappedNodeIds([]);
 
         // Ensure we only update if the Group itself is being dragged
-        if (e.target.nodeType !== 'Group') return;
-
+        // For Animate nodes it might be a Rect or Group depending on how they are hit-tested
+        // But the main draggable element is usually a Group
         updateWorkbenchNode(id, {
             x: e.target.x(),
             y: e.target.y(),
@@ -355,8 +362,57 @@ const Workbench: React.FC = () => {
         // if click on empty area - deselect all
         if (e.target === stageRef.current) {
             setActiveNodeId(null);
+            setSelectedNodeId(null);
         }
-    }, [viewMode, activeNodeId, workbenchNodes, scale]);
+    };
+
+    const handlePlusClick = (e: any, id: string) => {
+        e.cancelBubble = true;
+        setActiveMenuNodeId(id);
+    };
+
+    const handleMenuSelect = (type: string) => {
+        if (!activeMenuNodeId) return;
+
+        const fromNode = workbenchNodes.find(n => n.id === activeMenuNodeId);
+        if (!fromNode) return;
+
+        const newNodeId = Math.random().toString(36).substr(2, 9);
+        const newNode: AnimateNodeType = {
+            id: newNodeId,
+            type: 'animate',
+            x: fromNode.x + fromNode.width + 100,
+            y: fromNode.y,
+            width: 320,
+            height: 180,
+            data: {
+                prompt: '',
+                frames: {},
+                settings: {
+                    model: 'stable-video-diffusion',
+                    duration: '4s'
+                }
+            }
+        };
+
+        addWorkbenchNode(newNode);
+        addConnection(activeMenuNodeId, newNodeId);
+        setActiveMenuNodeId(null);
+    };
+
+    const handleContextMenu = (e: any, id: string) => {
+        if (e.evt) e.evt.preventDefault();
+        const stage = stageRef.current;
+        if (!stage) return;
+        const pointer = stage.getPointerPosition();
+        if (pointer) {
+            setContextMenu({
+                x: pointer.x,
+                y: pointer.y,
+                nodeId: id
+            });
+        }
+    };
 
     const contextMenuActions = contextMenu ? [
         { label: 'Wrap in section', onClick: () => console.log('Wrap in section'), divider: true },
@@ -600,20 +656,24 @@ const Workbench: React.FC = () => {
                             x={node.x}
                             y={node.y}
                             draggable
-                            onDragMove={(e) => handleDragMove(node.id, e)}
-                            onDragEnd={(e) => handleDragMove(node.id, e)}
+                            onDragMove={(e) => handleNodeDragMove(e, node.id)}
+                            onDragEnd={(e) => handleNodeDragEnd(node.id, e)}
                             onContextMenu={(e) => handleContextMenu(e, node.id)}
                             onClick={() => setSelectedNodeId(node.id)}
                             onMouseDown={() => setSelectedNodeId(node.id)}
-                            onMouseEnter={(e) => {
-                                setHoveredNodeId(node.id);
-                                const container = e.target.getStage()?.container();
-                                if (container) container.style.cursor = 'move';
+                            onMouseEnter={(e: any) => {
+                                const stage = e.target.getStage();
+                                if (stage) {
+                                    const container = stage.container();
+                                    container.style.cursor = 'move';
+                                }
                             }}
-                            onMouseLeave={(e) => {
-                                setHoveredNodeId(null);
-                                const container = e.target.getStage()?.container();
-                                if (container) container.style.cursor = 'default';
+                            onMouseLeave={(e: any) => {
+                                const stage = e.target.getStage();
+                                if (stage) {
+                                    const container = stage.container();
+                                    container.style.cursor = 'default';
+                                }
                             }}
                         >
                             <Rect
