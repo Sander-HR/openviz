@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 
-import { Project, ToolSettings, Layer, ToolType, AspectRatio, RenderSettings, RenderGroup, ViewMode, WorkbenchNode } from '../types';
+import { Project, ToolSettings, Layer, ToolType, AspectRatio, RenderSettings, RenderGroup, ViewMode, WorkbenchNode, Connection, ImageNode } from '../types';
 
 interface AppState {
     project: Project;
@@ -17,7 +17,10 @@ interface AppState {
     // Workbench State
     viewMode: ViewMode;
     workbenchNodes: WorkbenchNode[];
+    connections: Connection[];
     activeNodeId: string | null;
+    clipboard: WorkbenchNode | null;
+    isExitingStudio: boolean;
 
     history: Project[];
     historyIndex: number;
@@ -75,11 +78,19 @@ interface AppState {
     // Workbench Actions
     setViewMode: (mode: ViewMode) => void;
     addWorkbenchNode: (node: WorkbenchNode) => void;
+    addConnection: (fromId: string, toId: string) => void;
+    removeConnection: (id: string) => void;
     updateWorkbenchNode: (id: string, updates: Partial<WorkbenchNode>) => void;
+    removeWorkbenchNode: (id: string) => void;
+    duplicateWorkbenchNode: (id: string) => void;
+    reorderWorkbenchNode: (id: string, direction: 'front' | 'back') => void;
+    copyToClipboard: (id: string) => void;
+    pasteFromClipboard: (pos: { x: number, y: number }) => void;
     saveCurrentToWorkbench: (thumbnail: string) => void;
     openNodeInStudio: (id: string) => void;
     setActiveNodeId: (id: string | null) => void;
     createNewSketch: () => void;
+    setExitingStudio: (exiting: boolean) => void;
 }
 
 const INITIAL_PROJECT: Project = {
@@ -171,7 +182,10 @@ export const useStore = create<AppState>()(
 
             viewMode: 'STUDIO',
             workbenchNodes: [],
+            connections: [],
             activeNodeId: 'default',
+            clipboard: null,
+            isExitingStudio: false,
 
 
             history: [INITIAL_PROJECT],
@@ -384,8 +398,9 @@ export const useStore = create<AppState>()(
                         lastModifiedAt: Date.now()
                     };
 
-                    const newNode: WorkbenchNode = {
+                    const newNode: ImageNode = {
                         id,
+                        type: 'image',
                         name: promptTitle,
                         x: currentX,
                         y: currentY,
@@ -554,9 +569,82 @@ export const useStore = create<AppState>()(
                 workbenchNodes: [...state.workbenchNodes, node]
             })),
 
-            updateWorkbenchNode: (id, updates) => set((state) => ({
-                workbenchNodes: state.workbenchNodes.map(n => n.id === id ? { ...n, ...updates } : n)
+            addConnection: (fromId, toId) => set((state) => ({
+                connections: [...state.connections, {
+                    id: Math.random().toString(36).substr(2, 9),
+                    from: fromId,
+                    to: toId
+                }]
             })),
+
+            removeConnection: (id) => set((state) => ({
+                connections: state.connections.filter(c => c.id !== id)
+            })),
+
+            updateWorkbenchNode: (id, updates) => set((state) => ({
+                workbenchNodes: state.workbenchNodes.map(n => n.id === id ? { ...n, ...updates } as WorkbenchNode : n)
+            })),
+
+            removeWorkbenchNode: (id) => set((state) => ({
+                workbenchNodes: state.workbenchNodes.filter(n => n.id !== id),
+                connections: state.connections.filter(c => c.from !== id && c.to !== id)
+            })),
+
+            duplicateWorkbenchNode: (id) => set((state) => {
+                const node = state.workbenchNodes.find(n => n.id === id);
+                if (!node) return state;
+
+                const newId = Math.random().toString(36).substr(2, 9);
+                const newNode: WorkbenchNode = JSON.parse(JSON.stringify(node));
+                newNode.id = newId;
+                newNode.x += 40;
+                newNode.y += 40;
+                if (newNode.type === 'image') {
+                    newNode.project.id = newId;
+                }
+
+                return {
+                    workbenchNodes: [...state.workbenchNodes, newNode]
+                };
+            }),
+
+            reorderWorkbenchNode: (id, direction) => set((state) => {
+                const index = state.workbenchNodes.findIndex(n => n.id === id);
+                if (index === -1) return state;
+
+                const nodes = [...state.workbenchNodes];
+                const [node] = nodes.splice(index, 1);
+                if (direction === 'front') {
+                    nodes.push(node);
+                } else {
+                    nodes.unshift(node);
+                }
+
+                return { workbenchNodes: nodes };
+            }),
+
+            copyToClipboard: (id) => set((state) => {
+                const node = state.workbenchNodes.find(n => n.id === id);
+                if (!node) return state;
+                return { clipboard: JSON.parse(JSON.stringify(node)) };
+            }),
+
+            pasteFromClipboard: (pos) => set((state) => {
+                if (!state.clipboard) return state;
+
+                const newId = Math.random().toString(36).substr(2, 9);
+                const newNode = JSON.parse(JSON.stringify(state.clipboard)) as WorkbenchNode;
+                newNode.id = newId;
+                newNode.x = pos.x;
+                newNode.y = pos.y;
+                if (newNode.type === 'image') {
+                    newNode.project.id = newId;
+                }
+
+                return {
+                    workbenchNodes: [...state.workbenchNodes, newNode]
+                };
+            }),
 
             saveCurrentToWorkbench: (thumbnail) => {
                 const state = get();
@@ -571,8 +659,9 @@ export const useStore = create<AppState>()(
                         )
                     });
                 } else {
-                    const newNode: WorkbenchNode = {
+                    const newNode: ImageNode = {
                         id: currentProject.id,
+                        type: 'image',
                         name: currentProject.name,
                         x: 100,
                         y: 100,
@@ -599,7 +688,7 @@ export const useStore = create<AppState>()(
                 if (!id) return { activeNodeId: null };
 
                 const node = state.workbenchNodes.find(n => n.id === id);
-                if (!node) return state;
+                if (!node || node.type !== 'image') return state;
 
                 return {
                     project: node.project,
@@ -619,8 +708,9 @@ export const useStore = create<AppState>()(
                     lastModifiedAt: Date.now()
                 };
 
-                const newNode: WorkbenchNode = {
+                const newNode: ImageNode = {
                     id,
+                    type: 'image',
                     name: newProject.name,
                     x: window.innerWidth / 2 - 125, // Centered-ish
                     y: window.innerHeight / 2 - 100,
@@ -637,15 +727,14 @@ export const useStore = create<AppState>()(
                     history: [newProject],
                     historyIndex: 0
                 }));
-            }
+            },
+
+            setExitingStudio: (isExitingStudio) => set({ isExitingStudio }),
         }),
         {
             name: 'openviz-storage-idb', // Change name to avoid conflicts with localStorage
             storage: createJSONStorage(() => storage),
             partialize: (state) => ({
-                project: state.project,
-                activeLayerId: state.activeLayerId,
-                resultsPanelOpen: state.resultsPanelOpen,
                 renderSettings: state.renderSettings,
                 viewMode: state.viewMode,
                 workbenchNodes: state.workbenchNodes,

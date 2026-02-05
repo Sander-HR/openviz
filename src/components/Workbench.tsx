@@ -14,6 +14,10 @@ interface SnapLine {
 import { useStore } from '../store/useStore';
 import useImage from 'use-image';
 import { Plus } from 'lucide-react';
+import AnimateNode from './nodes/AnimateNode';
+import BasicBlocksMenu from './nodes/BasicBlocksMenu';
+import ContextMenu from './ContextMenu';
+import { ImageNode, AnimateNode as AnimateNodeType } from '../types';
 
 
 const NodeImage = ({ src, width, height }: { src?: string; width: number; height: number }) => {
@@ -139,6 +143,21 @@ const Workbench: React.FC = () => {
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [gridPattern, setGridPattern] = useState<HTMLImageElement | null>(null);
+    const [activeMenuNodeId, setActiveMenuNodeId] = useState<string | null>(null);
+    const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, nodeId: string } | null>(null);
+
+    const {
+        removeWorkbenchNode,
+        duplicateWorkbenchNode,
+        reorderWorkbenchNode,
+        copyToClipboard,
+        pasteFromClipboard,
+        clipboard
+    } = useStore();
+
+    const imageNodes = workbenchNodes.filter(n => n.type === 'image') as ImageNode[];
+    const animateNodes = workbenchNodes.filter(n => n.type === 'animate') as AnimateNodeType[];
 
     // Snapping state
     const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
@@ -337,6 +356,57 @@ const Workbench: React.FC = () => {
         if (e.target === stageRef.current) {
             setActiveNodeId(null);
         }
+    }, [viewMode, activeNodeId, workbenchNodes, scale]);
+
+    const contextMenuActions = contextMenu ? [
+        { label: 'Wrap in section', onClick: () => console.log('Wrap in section'), divider: true },
+        { label: 'Bring to front', shortcut: ']', onClick: () => reorderWorkbenchNode(contextMenu.nodeId, 'front') },
+        { label: 'Send to back', shortcut: '[', onClick: () => reorderWorkbenchNode(contextMenu.nodeId, 'back'), divider: true },
+        {
+            label: 'Copy link to selection', shortcut: 'Ctrl+L', onClick: () => {
+                // Just copy current URL for now as placeholder
+                navigator.clipboard.writeText(window.location.href);
+            }, divider: true
+        },
+        { label: 'Copy', shortcut: 'Ctrl+C', onClick: () => copyToClipboard(contextMenu.nodeId) },
+        {
+            label: 'Paste', shortcut: 'Ctrl+V', onClick: () => {
+                const stage = stageRef.current;
+                if (stage) {
+                    const pointer = stage.getPointerPosition() || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+                    const pos = {
+                        x: (pointer.x - position.x) / scale,
+                        y: (pointer.y - position.y) / scale
+                    };
+                    pasteFromClipboard(pos);
+                }
+            }
+        },
+        { label: 'Duplicate', shortcut: 'Ctrl+D', onClick: () => duplicateWorkbenchNode(contextMenu.nodeId), divider: true },
+        { label: 'Delete', shortcut: 'Del', onClick: () => removeWorkbenchNode(contextMenu.nodeId), type: 'danger' as const },
+    ] : [];
+
+    const renderConnections = () => {
+        return connections.map(conn => {
+            const fromNode = workbenchNodes.find(n => n.id === conn.from);
+            const toNode = workbenchNodes.find(n => n.id === conn.to);
+            if (!fromNode || !toNode) return null;
+
+            const fromX = fromNode.x + fromNode.width;
+            const fromY = fromNode.y + fromNode.height / 2;
+            const toX = toNode.x;
+            const toY = toNode.y + 70; // Connect to roughly the header area
+
+            return (
+                <ViewOnlyConnection
+                    key={conn.id}
+                    fromX={fromX}
+                    fromY={fromY}
+                    toX={toX}
+                    toY={toY}
+                />
+            );
+        });
     };
 
     // Grid rendering logic - Dotted grid notebook style using pattern fill for performance
@@ -417,7 +487,8 @@ const Workbench: React.FC = () => {
                     {renderGrid()}
                 </Layer>
                 <Layer>
-                    {workbenchNodes.map((node) => (
+                    {renderConnections()}
+                    {imageNodes.map((node) => (
                         <Group
                             key={node.id}
                             x={node.x}
@@ -501,6 +572,55 @@ const Workbench: React.FC = () => {
                                     />
                                 </>
                             )}
+
+                            {/* Plus Button - Only when selected */}
+                            {selectedNodeId === node.id && (
+                                <Group
+                                    x={node.width}
+                                    y={node.height / 2}
+                                    onClick={(e) => handlePlusClick(e, node.id)}
+                                    onMouseEnter={(e) => {
+                                        const container = e.target.getStage()?.container();
+                                        if (container) container.style.cursor = 'pointer';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        const container = e.target.getStage()?.container();
+                                        if (container) container.style.cursor = 'default';
+                                    }}
+                                >
+                                    <Circle radius={12} fill="#6366f1" />
+                                    <Path data="M-4 0 L4 0 M0 -4 L0 4" stroke="white" strokeWidth={2} x={0} y={0} />
+                                </Group>
+                            )}
+                        </Group>
+                    ))}
+                    {animateNodes.map((node) => (
+                        <Group // Transparent hit area for dragging Animate nodes
+                            key={`hit-${node.id}`}
+                            x={node.x}
+                            y={node.y}
+                            draggable
+                            onDragMove={(e) => handleDragMove(node.id, e)}
+                            onDragEnd={(e) => handleDragMove(node.id, e)}
+                            onContextMenu={(e) => handleContextMenu(e, node.id)}
+                            onClick={() => setSelectedNodeId(node.id)}
+                            onMouseDown={() => setSelectedNodeId(node.id)}
+                            onMouseEnter={(e) => {
+                                setHoveredNodeId(node.id);
+                                const container = e.target.getStage()?.container();
+                                if (container) container.style.cursor = 'move';
+                            }}
+                            onMouseLeave={(e) => {
+                                setHoveredNodeId(null);
+                                const container = e.target.getStage()?.container();
+                                if (container) container.style.cursor = 'default';
+                            }}
+                        >
+                            <Rect
+                                width={node.width}
+                                height={node.height}
+                                fill="transparent"
+                            />
                         </Group>
                     ))}
                 </Layer>
@@ -508,6 +628,45 @@ const Workbench: React.FC = () => {
                     {renderSnapLines()}
                 </Layer>
             </Stage>
+
+            {/* Scale/Pan Overlay Layer for HTML Nodes */}
+            <div
+                className="absolute top-0 left-0 w-full h-full pointer-events-none origin-top-left"
+                style={{
+                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                }}
+            >
+                {animateNodes.map(node => (
+                    <div
+                        key={node.id}
+                        className="absolute pointer-events-none"
+                        style={{
+                            left: node.x,
+                            top: node.y,
+                            width: node.width,
+                            height: node.height
+                        }}
+                    >
+                        <AnimateNode
+                            node={node}
+                            selected={selectedNodeId === node.id}
+                            updateNode={updateWorkbenchNode}
+                        />
+                    </div>
+                ))}
+
+                {activeMenuNodeId && (
+                    <div
+                        className="absolute pointer-events-auto"
+                        style={{
+                            left: (workbenchNodes.find(n => n.id === activeMenuNodeId)?.x || 0) + (workbenchNodes.find(n => n.id === activeMenuNodeId)?.width || 0) + 20,
+                            top: (workbenchNodes.find(n => n.id === activeMenuNodeId)?.y || 0) + (workbenchNodes.find(n => n.id === activeMenuNodeId)?.height || 0) / 2 - 100
+                        }}
+                    >
+                        <BasicBlocksMenu onSelect={handleMenuSelect} />
+                    </div>
+                )}
+            </div>
 
             {/* Floating UI */}
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-500">
@@ -519,7 +678,35 @@ const Workbench: React.FC = () => {
                     New Sketch
                 </button>
             </div>
-        </div>
+
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    actions={contextMenuActions}
+                />
+            )}
+        </div >
+    );
+};
+
+const ViewOnlyConnection = ({ fromX, fromY, toX, toY }: { fromX: number, fromY: number, toX: number, toY: number }) => {
+    // Bezier curve
+    const controlPointOffset = Math.abs(toX - fromX) * 0.5;
+
+    return (
+        <>
+            <Path
+                data={`M ${fromX} ${fromY} C ${fromX + controlPointOffset} ${fromY}, ${toX - controlPointOffset} ${toY}, ${toX} ${toY}`}
+                stroke="#ccc"
+                strokeWidth={2}
+                fill="transparent"
+                listening={false}
+            />
+            <Circle x={fromX} y={fromY} radius={4} fill="#6366f1" />
+            <Circle x={toX} y={toY} radius={4} fill="#6366f1" />
+        </>
     );
 };
 
