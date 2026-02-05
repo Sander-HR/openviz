@@ -2,6 +2,7 @@ export type AspectRatio = 'square' | 'landscape' | 'portrait';
 export type ToolType = 'select' | 'brush' | 'eraser' | 'circle' | 'rectangle' | 'line' | 'paintbucket' | 'transform';
 export type LayerType = 'sketch' | 'image' | 'render';
 export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay';
+export type ViewMode = 'STUDIO' | 'WORKBENCH';
 
 export interface CanvasState {
     width: number;
@@ -46,6 +47,46 @@ export interface Project {
     lastModifiedAt: number;
     canvas: CanvasState;
     layers: Layer[];
+    thumbnail?: string;
+}
+
+export type NodeType = 'image' | 'animate';
+
+export interface BaseNode {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface ImageNode extends BaseNode {
+    type: 'image';
+    name: string;
+    project: Project;
+}
+
+export interface AnimateNode extends BaseNode {
+    type: 'animate';
+    data: {
+        prompt: string;
+        frames: {
+            start?: string; // image id or url
+            end?: string;
+        };
+        settings: {
+            model: string;
+            duration: string;
+        };
+    };
+}
+
+export type WorkbenchNode = ImageNode | AnimateNode;
+
+export interface Connection {
+    id: string;
+    from: string; // Node ID
+    to: string;   // Node ID
 }
 
 export interface ToolSettings {
@@ -72,6 +113,7 @@ export interface RenderGroup {
     id: string;
     prompt: string;
     style: string;
+    settings: RenderSettings;
     images: string[];
     timestamp: number;
 }

@@ -19,7 +19,10 @@ const CanvasViewport = () => {
         setZoom,
         setPan,
         pushHistory,
-        previewingRender
+        previewingRender,
+        setViewMode,
+        saveCurrentToWorkbench,
+        setExitingStudio
     } = useStore();
 
 
@@ -381,9 +384,61 @@ const CanvasViewport = () => {
             <Stage
                 width={window.innerWidth}
                 height={window.innerHeight}
+                name="background-stage"
                 onMouseDown={handleMouseDown}
                 onMousemove={handleMouseMove}
                 onMouseup={handleMouseUp}
+                onClick={(e) => {
+                    // Detect click on empty space (stage itself or background-stage)
+                    if (e.target === stageRef.current || e.target.name() === 'background-stage') {
+                        const exitSequence = async () => {
+                            if (!stageRef.current) return;
+                            setExitingStudio(true);
+
+                            // Trigger zoom out animation via Konva
+                            const containerWidth = window.innerWidth;
+                            const containerHeight = window.innerHeight;
+                            const exitScale = 0.15;
+                            const exitX = (containerWidth - canvas.width * exitScale) / 2;
+                            const exitY = (containerHeight - canvas.height * exitScale) / 2;
+
+                            // Animate stage
+                            stageRef.current.to({
+                                x: exitX,
+                                y: exitY,
+                                scaleX: exitScale,
+                                scaleY: exitScale,
+                                duration: 0.4,
+                                easing: Konva.Easings.EaseInOut
+                            });
+
+                            // Wait for animations to complete
+                            await new Promise(resolve => setTimeout(resolve, 400));
+
+                            // Sync final state to store for consistency
+                            setZoom(exitScale);
+                            setPan(exitX, exitY);
+
+                            const thumbnail = getFlattenedCanvas();
+                            saveCurrentToWorkbench(thumbnail);
+                            setViewMode('WORKBENCH');
+
+                            // Wait a tiny bit more to ensure view mode has switched before reset
+                            setTimeout(() => setExitingStudio(false), 100);
+                        };
+
+                        exitSequence();
+                    }
+                }}
+                onDblClick={(e) => {
+                    // Keep double click as a quick exit if needed, or remove if single click is enough
+                    // Given the request, single click outside is the new standard
+                    if (e.target === stageRef.current || e.target.name() === 'background-stage') {
+                        const thumbnail = getFlattenedCanvas();
+                        saveCurrentToWorkbench(thumbnail);
+                        setViewMode('WORKBENCH');
+                    }
+                }}
                 onContextMenu={handleContextMenu}
                 onWheel={handleWheel}
                 ref={stageRef}

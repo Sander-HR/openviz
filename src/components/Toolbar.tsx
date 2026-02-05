@@ -23,7 +23,18 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const Toolbar: React.FC = () => {
-    const { toolSettings, setActiveTool, setBrushColor, undo, redo, addLayer, updateLayer } = useStore();
+    const {
+        toolSettings,
+        setActiveTool,
+        setBrushColor,
+        undo,
+        redo,
+        addLayer,
+        updateLayer,
+        setViewMode,
+        saveCurrentToWorkbench,
+        viewMode
+    } = useStore();
     const [showColorPicker, setShowColorPicker] = React.useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -148,7 +159,22 @@ const Toolbar: React.FC = () => {
                 <Import size={20} />
             </button>
 
-            <button className="p-2.5 rounded-full text-text-secondary opacity-50 cursor-not-allowed" disabled title="Workbench (Future Feature)">
+            <button
+                onClick={() => {
+                    if (viewMode === 'STUDIO') {
+                        const thumbnail = (window as any).getFlattenedCanvas?.();
+                        saveCurrentToWorkbench(thumbnail);
+                        setViewMode('WORKBENCH');
+                    } else {
+                        setViewMode('STUDIO');
+                    }
+                }}
+                className={cn(
+                    "p-2.5 rounded-full transition-all duration-200",
+                    viewMode === 'WORKBENCH' ? "bg-primary text-white" : "text-text-secondary hover:bg-neutral-800 hover:text-white"
+                )}
+                title={viewMode === 'STUDIO' ? "Workbench" : "Back to Studio"}
+            >
                 <IterationCcw size={20} />
             </button>
         </div>
