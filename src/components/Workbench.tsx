@@ -1,5 +1,16 @@
 import React, { useRef, useState } from 'react';
-import { Stage, Layer, Rect, Group, Text, Image as KonvaImage, Path, Circle } from 'react-konva';
+import { Stage, Layer, Rect, Group, Text, Image as KonvaImage, Line } from 'react-konva';
+
+const SNAP_THRESHOLD = 5;
+
+interface SnapLine {
+    vertical: boolean;
+    guide: number;
+    offset: number; // The offset of the node edge from the node's top-left
+    start: number; // For visual line drawing
+    end: number;
+    snappedTo: string[]; // IDs of nodes we snapped to
+}
 import { useStore } from '../store/useStore';
 import useImage from 'use-image';
 import { Plus } from 'lucide-react';
@@ -17,7 +28,7 @@ const NodeImage = ({ src, width, height }: { src?: string; width: number; height
     return <KonvaImage image={image} width={width} height={height} />;
 };
 
-const ScaleHandle = ({ x, y, cursor, onDragMove }: { x: number; y: number; cursor: string; onDragMove: (e: any) => void }) => (
+const ScaleHandle = ({ x, y, cursor, onDragMove, scale }: { x: number; y: number; cursor: string; onDragMove: (e: any) => void }) => (
     <Rect
         x={x - 6}
         y={y - 6}
@@ -29,6 +40,9 @@ const ScaleHandle = ({ x, y, cursor, onDragMove }: { x: number; y: number; curso
         cornerRadius={2}
         draggable
         onDragMove={onDragMove}
+        onDragEnd={(e) => {
+            e.cancelBubble = true;
+        }}
         onMouseEnter={(e: any) => {
             const container = e.target.getStage().container();
             container.style.cursor = cursor;
@@ -40,12 +54,94 @@ const ScaleHandle = ({ x, y, cursor, onDragMove }: { x: number; y: number; curso
     />
 );
 
+// --- Snapping Helper Functions ---
+
+const getLineGuideStops = (skipId: string, nodes: any[]) => {
+    const vertical: any[] = [];
+    const horizontal: any[] = [];
+
+    // "Stops" are the lines we can snap to (from other nodes)
+    nodes.forEach((node) => {
+        if (node.id === skipId) return;
+
+        // Vertical Stops (x-axis)
+        // Left, Center, Right
+        vertical.push({ guide: node.x, snap: 'start', id: node.id });
+        vertical.push({ guide: node.x + node.width / 2, snap: 'center', id: node.id });
+        vertical.push({ guide: node.x + node.width, snap: 'end', id: node.id });
+
+        // Horizontal Stops (y-axis)
+        // Top, Center, Bottom
+        horizontal.push({ guide: node.y, snap: 'start', id: node.id });
+        horizontal.push({ guide: node.y + node.height / 2, snap: 'center', id: node.id });
+        horizontal.push({ guide: node.y + node.height, snap: 'end', id: node.id });
+    });
+
+    return { vertical, horizontal };
+};
+
+const getObjectSnappingEdges = (node: any) => {
+    // "Edges" are the lines on the DRAGGED node that want to snap
+    return {
+        vertical: [
+            { guide: node.x, offset: 0, snap: 'start' },
+            { guide: node.x + node.width / 2, offset: node.width / 2, snap: 'center' },
+            { guide: node.x + node.width, offset: node.width, snap: 'end' },
+        ],
+        horizontal: [
+            { guide: node.y, offset: 0, snap: 'start' },
+            { guide: node.y + node.height / 2, offset: node.height / 2, snap: 'center' },
+            { guide: node.y + node.height, offset: node.height, snap: 'end' },
+        ],
+    };
+};
+
+const getGuides = (lineGuideStops: any, itemBounds: any) => {
+    const resultV: any[] = [];
+    const resultH: any[] = [];
+
+    // Check vertical snaps
+    lineGuideStops.vertical.forEach((stop: any) => {
+        itemBounds.vertical.forEach((bound: any) => {
+            if (Math.abs(stop.guide - bound.guide) < SNAP_THRESHOLD) {
+                resultV.push({
+                    lineGuide: stop.guide,
+                    diff: stop.guide - bound.guide,
+                    snap: bound.snap,
+                    offset: bound.offset,
+                    snappedTo: stop.id
+                });
+            }
+        });
+    });
+
+    // Check horizontal snaps
+    lineGuideStops.horizontal.forEach((stop: any) => {
+        itemBounds.horizontal.forEach((bound: any) => {
+            if (Math.abs(stop.guide - bound.guide) < SNAP_THRESHOLD) {
+                resultH.push({
+                    lineGuide: stop.guide,
+                    diff: stop.guide - bound.guide,
+                    snap: bound.snap,
+                    offset: bound.offset,
+                    snappedTo: stop.id
+                });
+            }
+        });
+    });
+
+    // Find best snap (closest)
+    const minV = resultV.sort((a, b) => Math.abs(a.diff) - Math.abs(b.diff))[0];
+    const minH = resultH.sort((a, b) => Math.abs(a.diff) - Math.abs(b.diff))[0];
+
+    return { resultV: minV, resultH: minH };
+};
+
 const Workbench: React.FC = () => {
-    const { workbenchNodes, connections, openNodeInStudio, updateWorkbenchNode, createNewSketch, addWorkbenchNode, addConnection } = useStore();
+    const { workbenchNodes, openNodeInStudio, updateWorkbenchNode, createNewSketch, activeNodeId, setActiveNodeId } = useStore();
     const stageRef = useRef<any>(null);
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
-    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [gridPattern, setGridPattern] = useState<HTMLImageElement | null>(null);
     const [activeMenuNodeId, setActiveMenuNodeId] = useState<string | null>(null);
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -63,6 +159,10 @@ const Workbench: React.FC = () => {
     const imageNodes = workbenchNodes.filter(n => n.type === 'image') as ImageNode[];
     const animateNodes = workbenchNodes.filter(n => n.type === 'animate') as AnimateNodeType[];
 
+    // Snapping state
+    const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
+    const [snappedNodeIds, setSnappedNodeIds] = useState<string[]>([]);
+
     // Create grid pattern
     React.useMemo(() => {
         const MAJOR_GRID = 100;
@@ -76,8 +176,8 @@ const Workbench: React.FC = () => {
         if (!ctx) return;
 
         // Colors from user edit
-        const majorColor = "#c5c5c5ff";
-        const minorColor = "#dcdcdcff";
+        const majorColor = "#858585ff";
+        const minorColor = "#b6b6b6ff";
 
         // Draw major dot
         ctx.fillStyle = majorColor;
@@ -129,190 +229,132 @@ const Workbench: React.FC = () => {
         setPosition(newPos);
     };
 
-    const handleDragMove = (id: string, e: any) => {
+    const handleNodeDragMove = (e: any, id: string) => {
+        setSnapLines([]);
+        setSnappedNodeIds([]);
+
+        const node = e.target;
+        // Group x/y are the current dragged positions
+        const currentNode = workbenchNodes.find(n => n.id === id);
+        if (!currentNode) return;
+
+        const draggedNode = {
+            id: id,
+            x: node.x(),
+            y: node.y(),
+            width: currentNode.width,
+            height: currentNode.height
+        };
+
+        const stops = getLineGuideStops(id, workbenchNodes);
+        const edges = getObjectSnappingEdges(draggedNode);
+        const guides = getGuides(stops, edges);
+
+        const newSnapLines: SnapLine[] = [];
+        const snappedIds: string[] = [];
+
+        if (guides.resultV) {
+            const snap = guides.resultV;
+            node.x(snap.lineGuide - snap.offset);
+            newSnapLines.push({
+                vertical: true,
+                guide: snap.lineGuide,
+                offset: snap.offset,
+                start: -10000,
+                end: 10000,
+                snappedTo: [snap.snappedTo]
+            });
+            snappedIds.push(snap.snappedTo);
+        }
+
+        if (guides.resultH) {
+            const snap = guides.resultH;
+            node.y(snap.lineGuide - snap.offset);
+            newSnapLines.push({
+                vertical: false,
+                guide: snap.lineGuide,
+                offset: snap.offset,
+                start: -10000,
+                end: 10000,
+                snappedTo: [snap.snappedTo]
+            });
+            snappedIds.push(snap.snappedTo);
+        }
+
+        setSnapLines(newSnapLines);
+        setSnappedNodeIds(snappedIds);
+    };
+
+    const handleNodeDragEnd = (id: string, e: any) => {
+        // Clear guides
+        setSnapLines([]);
+        setSnappedNodeIds([]);
+
+        // Ensure we only update if the Group itself is being dragged
+        if (e.target.nodeType !== 'Group') return;
+
         updateWorkbenchNode(id, {
             x: e.target.x(),
             y: e.target.y(),
         });
     };
 
+    // Handle scale change should keep aspect ratio of image
     const handleScaleMove = (id: string, corner: 'tl' | 'tr' | 'bl' | 'br', e: any) => {
         const node = workbenchNodes.find(n => n.id === id);
         if (!node) return;
 
-        if (!node) return;
-
-        const pos = e.target.position();
-
-        let newX = node.x;
-        let newY = node.y;
-        let newWidth = node.width;
-        let newHeight = node.height;
-
+        const pos = e.target.position(); // Relative to Group origin
+        const aspectRatio = node.width / node.height;
         const minSize = 100;
 
+        let newWidth = node.width;
+        let newHeight = node.height;
+        let newX = node.x;
+        let newY = node.y;
+
+        // Simplify scaling: Anchor the opposite corner and drive everything by the drag width
         if (corner === 'br') {
+            // Anchor is (x, y)
             newWidth = Math.max(minSize, pos.x + 6);
-            newHeight = Math.max(minSize, pos.y + 6);
+            newHeight = newWidth / aspectRatio;
             e.target.x(newWidth - 6);
             e.target.y(newHeight - 6);
         } else if (corner === 'tr') {
-            const deltaY = pos.y + 6;
+            // Anchor is (x, y + h)
+            const anchorY = node.y + node.height;
             newWidth = Math.max(minSize, pos.x + 6);
-            newHeight = Math.max(minSize, node.height - deltaY);
-            if (newHeight > minSize) {
-                newY = node.y + deltaY;
-            }
+            newHeight = newWidth / aspectRatio;
+            newY = anchorY - newHeight;
             e.target.x(newWidth - 6);
             e.target.y(-6);
         } else if (corner === 'bl') {
-            const deltaX = pos.x + 6;
-            newWidth = Math.max(minSize, node.width - deltaX);
-            newHeight = Math.max(minSize, pos.y + 6);
-            if (newWidth > minSize) {
-                newX = node.x + deltaX;
-            }
+            // Anchor is (x + w, y)
+            const anchorX = node.x + node.width;
+            newWidth = Math.max(minSize, node.width - (pos.x + 6));
+            newX = anchorX - newWidth;
+            newHeight = newWidth / aspectRatio;
             e.target.x(-6);
             e.target.y(newHeight - 6);
         } else if (corner === 'tl') {
-            const deltaX = pos.x + 6;
-            const deltaY = pos.y + 6;
-            newWidth = Math.max(minSize, node.width - deltaX);
-            newHeight = Math.max(minSize, node.height - deltaY);
-            if (newWidth > minSize) newX = node.x + deltaX;
-            if (newHeight > minSize) newY = node.y + deltaY;
+            // Anchor is (x + w, y + h)
+            const anchorX = node.x + node.width;
+            const anchorY = node.y + node.height;
+            newWidth = Math.max(minSize, node.width - (pos.x + 6));
+            newX = anchorX - newWidth;
+            newHeight = newWidth / aspectRatio;
+            newY = anchorY - newHeight;
             e.target.x(-6);
             e.target.y(-6);
         }
 
-        updateWorkbenchNode(id, {
-            x: newX,
-            y: newY,
-            width: newWidth,
-            height: newHeight
-        });
+        updateWorkbenchNode(id, { x: newX, y: newY, width: newWidth, height: newHeight });
     };
 
     const handleStageClick = (e: any) => {
         // if click on empty area - deselect all
         if (e.target === stageRef.current) {
-            setSelectedNodeId(null);
-            setActiveMenuNodeId(null);
-        }
-    };
-
-    const handlePlusClick = (e: any, nodeId: string) => {
-        e.cancelBubble = true;
-        setActiveMenuNodeId(activeMenuNodeId === nodeId ? null : nodeId);
-    };
-
-    const handleMenuSelect = (type: string) => {
-        if (!activeMenuNodeId) return;
-        const sourceNode = workbenchNodes.find(n => n.id === activeMenuNodeId);
-        if (!sourceNode) return;
-
-        if (type === 'animate') {
-            const newNodeId = Math.random().toString(36).substr(2, 9);
-            const newNode: AnimateNodeType = {
-                id: newNodeId,
-                type: 'animate',
-                x: sourceNode.x + sourceNode.width + 100,
-                y: sourceNode.y,
-                width: 320,
-                height: 400,
-                data: {
-                    prompt: '',
-                    frames: { start: sourceNode.type === 'image' ? (sourceNode as ImageNode).project.thumbnail : undefined },
-                    settings: { model: 'Standard v2', duration: '5 sec' }
-                }
-            };
-
-            addWorkbenchNode(newNode);
-            addConnection(sourceNode.id, newNodeId);
-            setActiveMenuNodeId(null);
-        }
-    };
-
-    const handleContextMenu = (e: any, nodeId: string) => {
-        if (e.evt) e.evt.preventDefault();
-        else e.preventDefault();
-
-        // e.evt is present for Konva events, for HTML events use e
-        const event = e.evt || e;
-        setContextMenu({
-            x: event.clientX,
-            y: event.clientY,
-            nodeId
-        });
-        setSelectedNodeId(nodeId);
-    };
-
-    // Keyboard shortcuts
-    React.useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Only handle if no input is focused
-            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
-
-            if (e.key === 'Delete' || e.key === 'Backspace') {
-                if (selectedNodeId) removeWorkbenchNode(selectedNodeId);
-            } else if (e.key === ']') {
-                if (selectedNodeId) reorderWorkbenchNode(selectedNodeId, 'front');
-            } else if (e.key === '[') {
-                if (selectedNodeId) reorderWorkbenchNode(selectedNodeId, 'back');
-            } else if (e.ctrlKey || e.metaKey) {
-                switch (e.key.toLowerCase()) {
-                    case 'c':
-                        if (selectedNodeId) copyToClipboard(selectedNodeId);
-                        break;
-                    case 'v':
-                        if (clipboard) {
-                            // Paste at cursor or center
-                            const stage = stageRef.current;
-                            if (stage) {
-                                const pointer = stage.getPointerPosition() || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-                                const pos = {
-                                    x: (pointer.x - position.x) / scale,
-                                    y: (pointer.y - position.y) / scale
-                                };
-                                pasteFromClipboard(pos);
-                            }
-                        }
-                        break;
-                    case 'd':
-                        e.preventDefault();
-                        if (selectedNodeId) duplicateWorkbenchNode(selectedNodeId);
-                        break;
-                }
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedNodeId, clipboard, scale, position, removeWorkbenchNode, duplicateWorkbenchNode, reorderWorkbenchNode, copyToClipboard, pasteFromClipboard]);
-
-    // Center on active node when entering workbench
-    const { viewMode, activeNodeId } = useStore();
-    const hasCentered = useRef(false);
-
-    React.useEffect(() => {
-        if (viewMode === 'WORKBENCH' && activeNodeId && !hasCentered.current) {
-            const node = workbenchNodes.find(n => n.id === activeNodeId);
-            if (node) {
-                const cx = window.innerWidth / 2;
-                const cy = window.innerHeight / 2;
-                const nx = node.x + node.width / 2;
-                const ny = node.y + node.height / 2;
-
-                const newPos = {
-                    x: cx - nx * scale,
-                    y: cy - ny * scale
-                };
-                setPosition(newPos);
-                setSelectedNodeId(activeNodeId);
-                hasCentered.current = true;
-            }
-        } else if (viewMode === 'STUDIO') {
-            hasCentered.current = false;
+            setActiveNodeId(null);
         }
     }, [viewMode, activeNodeId, workbenchNodes, scale]);
 
@@ -391,6 +433,36 @@ const Workbench: React.FC = () => {
         );
     };
 
+    const renderSnapLines = () => {
+        if (snapLines.length === 0) return null;
+
+        // Viewport dimensions for infinite lines
+        const startX = -position.x / scale;
+        const startY = -position.y / scale;
+        const viewportWidth = window.innerWidth / scale;
+        const viewportHeight = window.innerHeight / scale;
+
+        return (
+            <Group listening={false}>
+                {snapLines.map((line, i) => {
+                    const points = line.vertical
+                        ? [line.guide, startY, line.guide, startY + viewportHeight]
+                        : [startX, line.guide, startX + viewportWidth, line.guide];
+
+                    return (
+                        <Line
+                            key={i}
+                            points={points}
+                            stroke="#ff0000"
+                            strokeWidth={1 / scale}
+                            dash={[4 / scale, 4 / scale]}
+                        />
+                    );
+                })}
+            </Group>
+        );
+    };
+
     return (
         <div className="relative w-screen h-screen bg-white overflow-hidden">
             <Stage
@@ -422,63 +494,57 @@ const Workbench: React.FC = () => {
                             x={node.x}
                             y={node.y}
                             draggable
-                            onDragMove={(e) => handleDragMove(node.id, e)}
-                            onDragEnd={(e) => handleDragMove(node.id, e)}
-                            onContextMenu={(e) => handleContextMenu(e, node.id)}
+                            onDragMove={(e) => handleNodeDragMove(e, node.id)}
+                            onDragEnd={(e) => handleNodeDragEnd(node.id, e)}
                             onDblClick={() => openNodeInStudio(node.id)}
                             onTap={() => {
-                                setSelectedNodeId(node.id);
+                                setActiveNodeId(node.id);
                                 // If already selected, double tap opens
-                                if (selectedNodeId === node.id) openNodeInStudio(node.id);
+                                if (activeNodeId === node.id) openNodeInStudio(node.id);
                             }}
-                            onClick={() => setSelectedNodeId(node.id)}
-                            onMouseDown={() => setSelectedNodeId(node.id)}
-                            onMouseEnter={(e) => {
-                                setHoveredNodeId(node.id);
-                                const container = e.target.getStage()?.container();
-                                if (container && (selectedNodeId === node.id || hoveredNodeId === node.id)) {
-                                    container.style.cursor = 'move';
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                setHoveredNodeId(null);
-                                const container = e.target.getStage()?.container();
-                                if (container) container.style.cursor = 'default';
-                            }}
+                            onClick={() => setActiveNodeId(node.id)}
+                            onMouseDown={() => setActiveNodeId(node.id)}
                         >
                             {/* Paper Background */}
                             <Rect
                                 width={node.width}
                                 height={node.height}
                                 fill="white"
-                                stroke={(selectedNodeId === node.id || hoveredNodeId === node.id) ? "#3b82f6" : "transparent"}
-                                strokeWidth={(hoveredNodeId === node.id) ? 6 / scale : 2 / scale}
+                                stroke={
+                                    activeNodeId === node.id
+                                        ? "#3b82f6"
+                                        : snappedNodeIds.includes(node.id)
+                                            ? "#ff0000" // Highlight snapped target
+                                            : "transparent"
+                                }
+                                strokeWidth={activeNodeId === node.id ? 5 / scale : snappedNodeIds.includes(node.id) ? 3 / scale : 0}
                                 shadowBlur={15}
                                 shadowColor="rgba(0,0,0,0.1)"
                                 shadowOffset={{ x: 0, y: 5 }}
                                 cornerRadius={4}
                             />
                             {/* Project Content / Thumbnail */}
-                            <Group clipX={0} clipY={0} clipWidth={node.width} clipHeight={node.height}>
-                                <NodeImage
-                                    src={node.project.thumbnail}
-                                    width={node.width}
-                                    height={node.height}
-                                />
-                            </Group>
-                            {/* Label */}
-                            <Text
-                                text={node.name}
-                                y={node.height + 14}
+                            <NodeImage
+                                key={node.id + (node.project.thumbnail || '')}
+                                src={node.project.thumbnail}
                                 width={node.width}
-                                align="center"
-                                fontSize={14}
-                                fontFamily="Inter, sans-serif"
-                                fill="#4b5563"
+                                height={node.height}
                             />
+                            {/* Label - Only show when selected */}
+                            {activeNodeId === node.id && (
+                                <Text
+                                    text={node.project.name}
+                                    y={node.height + 8}
+                                    width={node.width}
+                                    align="left"
+                                    fontSize={14}
+                                    fontFamily="Inter, sans-serif"
+                                    fill="#3682ebff"
+                                />
+                            )}
 
                             {/* Resize Handles (4 corners) - Only show when selected */}
-                            {selectedNodeId === node.id && (
+                            {activeNodeId === node.id && (
                                 <>
                                     <ScaleHandle
                                         x={0}
@@ -557,6 +623,9 @@ const Workbench: React.FC = () => {
                             />
                         </Group>
                     ))}
+                </Layer>
+                <Layer>
+                    {renderSnapLines()}
                 </Layer>
             </Stage>
 

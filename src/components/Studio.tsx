@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Toolbar from './Toolbar';
-import SidebarLeft from './SidebarLeft';
 import SidebarRight from './SidebarRight';
+import LayerPanel from './LayerPanel';
 import CanvasViewport from './CanvasViewport';
 import BottomRightControls from './BottomRightControls';
 import BottomLeftControls from './BottomLeftControls';

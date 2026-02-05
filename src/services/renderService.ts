@@ -1,4 +1,5 @@
-import { RenderSettings } from '../types';
+import { RenderService, GenerateRequest, GenerateResponse } from './types';
+import { mockRenderService } from './mockRenderService';
 
 // Using Vite proxy to avoid CORS issues
 const COMFY_URL = '/comfy-api';
@@ -7,16 +8,6 @@ const WS_URL = `${window.location.protocol === 'http:' ? 'ws:' : 'ws:'}//${windo
 
 // Generate a persistent client ID for this session
 const client_id = crypto.randomUUID();
-
-export interface GenerateRequest extends RenderSettings {
-    init_image: string; // base64 data URI (data:image/png;base64,...)
-}
-
-export interface GenerateResponse {
-    success: boolean;
-    images: string[]; // Full URLs to the generated images
-    error?: string;
-}
 
 // Helper types for ComfyUI API responses
 interface ComfyUploadResponse {
@@ -175,7 +166,7 @@ const pollHistory = async (promptId: string): Promise<ComfyHistoryResponse[strin
     throw new Error('Timeout polling for history.');
 };
 
-export const renderService = {
+export const comfyRenderService: RenderService = {
     generate: async (request: GenerateRequest): Promise<GenerateResponse> => {
         try {
             console.log('🎨 Starting Detailed Render Process...');
@@ -328,3 +319,8 @@ export const renderService = {
         }
     }
 };
+
+// Toggle between real and mock service using environment variable
+const useMock = import.meta.env.VITE_USE_MOCK_RENDER === 'true';
+
+export const renderService: RenderService = useMock ? mockRenderService : comfyRenderService;

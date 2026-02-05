@@ -54,6 +54,11 @@ interface AppState {
     setActiveLayer: (id: string) => void;
     updateLayer: (id: string, updates: Partial<Layer>) => void;
     reorderLayers: (startIndex: number, endIndex: number) => void;
+    duplicateLayer: (id: string) => void;
+    copyLayer: (id: string) => void;
+    pasteLayer: () => void;
+
+    clipboard: Layer | null;
 
     // Render Results Actions
     addRenderResultGroup: (settings: RenderSettings, images: string[]) => void;
@@ -83,6 +88,7 @@ interface AppState {
     pasteFromClipboard: (pos: { x: number, y: number }) => void;
     saveCurrentToWorkbench: (thumbnail: string) => void;
     openNodeInStudio: (id: string) => void;
+    setActiveNodeId: (id: string | null) => void;
     createNewSketch: () => void;
     setExitingStudio: (exiting: boolean) => void;
 }
@@ -185,9 +191,15 @@ export const useStore = create<AppState>()(
             history: [INITIAL_PROJECT],
             historyIndex: 0,
 
-            setName: (name) => set((state) => ({
-                project: { ...state.project, name, lastModifiedAt: Date.now() }
-            })),
+            setName: (name) => set((state) => {
+                const newProject = { ...state.project, name, lastModifiedAt: Date.now() };
+                return {
+                    project: newProject,
+                    workbenchNodes: state.workbenchNodes.map(n =>
+                        n.id === state.activeNodeId ? { ...n, name, project: newProject } : n
+                    )
+                };
+            }),
 
             setCanvasSize: (width, height, ratio) => set((state) => ({
                 project: {
@@ -298,6 +310,7 @@ export const useStore = create<AppState>()(
                     blendMode: 'normal',
                     strokes: [],
                     image,
+                    thumbnail: image,
                     order: state.project.layers.length,
                     created: Date.now(),
                     modified: Date.now(),
@@ -465,6 +478,59 @@ export const useStore = create<AppState>()(
                 };
             }),
 
+            duplicateLayer: (id) => set((state) => {
+                const layer = state.project.layers.find(l => l.id === id);
+                if (!layer) return state;
+
+                const newLayer: Layer = {
+                    ...JSON.parse(JSON.stringify(layer)),
+                    id: Math.random().toString(36).substr(2, 9),
+                    name: `${layer.name} (Copy)`,
+                    order: state.project.layers.length,
+                    created: Date.now(),
+                    modified: Date.now(),
+                };
+
+                return {
+                    project: {
+                        ...state.project,
+                        layers: [...state.project.layers, newLayer],
+                        lastModifiedAt: Date.now()
+                    },
+                    activeLayerId: newLayer.id
+                };
+            }),
+
+            clipboard: null,
+
+            copyLayer: (id) => set((state) => {
+                const layer = state.project.layers.find(l => l.id === id);
+                if (!layer) return state;
+                return { clipboard: JSON.parse(JSON.stringify(layer)) };
+            }),
+
+            pasteLayer: () => set((state) => {
+                if (!state.clipboard) return state;
+
+                const newLayer: Layer = {
+                    ...JSON.parse(JSON.stringify(state.clipboard)),
+                    id: Math.random().toString(36).substr(2, 9),
+                    name: `${state.clipboard.name} (Pasted)`,
+                    order: state.project.layers.length,
+                    created: Date.now(),
+                    modified: Date.now(),
+                };
+
+                return {
+                    project: {
+                        ...state.project,
+                        layers: [...state.project.layers, newLayer],
+                        lastModifiedAt: Date.now()
+                    },
+                    activeLayerId: newLayer.id
+                };
+            }),
+
             undo: () => {
                 const { historyIndex, history } = get();
                 if (historyIndex > 0) {
@@ -613,14 +679,20 @@ export const useStore = create<AppState>()(
 
             // ... (rest of the actions)
 
-            openNodeInStudio: (id) => set((state) => {
+            openNodeInStudio: (id) => {
+                get().setActiveNodeId(id);
+                set({ viewMode: 'STUDIO' });
+            },
+
+            setActiveNodeId: (id) => set((state) => {
+                if (!id) return { activeNodeId: null };
+
                 const node = state.workbenchNodes.find(n => n.id === id);
                 if (!node || node.type !== 'image') return state;
 
                 return {
                     project: node.project,
                     activeNodeId: id,
-                    viewMode: 'STUDIO',
                     history: [node.project],
                     historyIndex: 0
                 };
@@ -666,8 +738,8 @@ export const useStore = create<AppState>()(
                 renderSettings: state.renderSettings,
                 viewMode: state.viewMode,
                 workbenchNodes: state.workbenchNodes,
-                connections: state.connections,
-                activeNodeId: state.activeNodeId
+                activeNodeId: state.activeNodeId,
+                clipboard: state.clipboard
             }),
         }
     )
