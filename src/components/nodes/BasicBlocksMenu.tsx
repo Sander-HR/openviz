@@ -1,20 +1,33 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Sparkles, Play, Repeat, Wand2, ArrowRight } from 'lucide-react';
 
 interface BasicBlocksMenuProps {
     onSelect: (type: 'modify' | 'animate' | 'variate' | 'render') => void;
+    onClose?: () => void;
 }
 
-const BasicBlocksMenu: React.FC<BasicBlocksMenuProps> = ({ onSelect }) => {
+export const BasicBlocksMenu: React.FC<BasicBlocksMenuProps> = ({ onSelect, onClose }) => {
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                onClose?.();
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [onClose]);
+
     return (
-        <div className="w-[300px] bg-[#1a1a1a] rounded-2xl shadow-2xl border border-[#333] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div ref={menuRef} className="w-[300px] bg-[#1a1a1a] rounded-2xl shadow-2xl border border-[#333] overflow-hidden animate-in fade-in zoom-in-95 duration-200 nowheel">
             {/* Header Input */}
             <div className="p-3 border-b border-[#333]">
                 <div className="relative bg-[#2a2a2a] rounded-xl flex items-center">
                     <input
                         type="text"
                         placeholder="What are you creating?"
-                        className="w-full bg-transparent text-white text-sm px-4 py-3 focus:outline-none placeholder-gray-500"
+                        className="w-full bg-transparent text-white text-sm px-4 py-3 focus:outline-none placeholder-gray-500 nowheel"
                     />
                     <button className="mr-2 p-1.5 hover:bg-[#333] rounded-lg transition-colors">
                         <ArrowRight size={14} className="text-gray-500" />
@@ -58,11 +71,8 @@ const BasicBlocksMenu: React.FC<BasicBlocksMenuProps> = ({ onSelect }) => {
                         <Sparkles size={18} className="text-gray-400 group-hover:text-white transition-colors" />
                         <span className="text-gray-300 group-hover:text-white text-sm">Render</span>
                     </div>
-                    <span className="text-[10px] bg-[#333] text-gray-500 px-1.5 py-0.5 rounded font-medium">LEGACY</span>
                 </button>
             </div>
         </div>
     );
 };
-
-export default BasicBlocksMenu;

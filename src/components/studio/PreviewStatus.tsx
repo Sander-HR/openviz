@@ -1,8 +1,8 @@
 import React from 'react';
-import { useStore } from '../store/useStore';
+import { useStore } from '../../store/useStore';
 import { X } from 'lucide-react';
 
-const PreviewStatus: React.FC = () => {
+export const PreviewStatus: React.FC = () => {
     const { previewingRender, setPreviewingRender } = useStore();
 
     if (!previewingRender) return null;
@@ -25,5 +25,3 @@ const PreviewStatus: React.FC = () => {
         </div>
     );
 };
-
-export default PreviewStatus;

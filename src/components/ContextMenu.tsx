@@ -13,7 +13,7 @@ interface ContextMenuProps {
     }[];
 }
 
-const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, actions }) => {
+export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, actions }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -29,7 +29,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, actions }) => 
     return (
         <div
             ref={menuRef}
-            className="fixed z-[1000] bg-[#2c2c2c] text-[#e0e0e0] py-1 rounded-lg shadow-xl border border-[#3c3c3c] min-w-[220px] backdrop-blur-sm"
+            className="fixed z-[1000] bg-[#2c2c2c] text-[#e0e0e0] py-1 rounded-lg shadow-xl border border-[#3c3c3c] min-w-[220px] backdrop-blur-sm nowheel"
             style={{ left: x, top: y }}
         >
             {actions.map((action, index) => (
@@ -56,5 +56,3 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, actions }) => 
         </div>
     );
 };
-
-export default ContextMenu;

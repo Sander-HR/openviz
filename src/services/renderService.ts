@@ -1,10 +1,11 @@
-import { RenderService, GenerateRequest, GenerateResponse } from './types';
+import { RenderService, GenerateRequest, GenerateResponse, AnimateRequest } from './types';
 import { mockRenderService } from './mockRenderService';
+import { getWorkflow, mapStyleToId, WorkflowDefinition } from './ai/workflowRegistry';
 
 // Using Vite proxy to avoid CORS issues
 const COMFY_URL = '/comfy-api';
 // We use the same protocol and host as the current page, but Vite will proxy /comfy-api to the backend
-const WS_URL = `${window.location.protocol === 'http:' ? 'ws:' : 'ws:'}//${window.location.host}/comfy-api`;
+const WS_URL = `${window.location.protocol === 'http:' ? 'ws:' : 'wss:'}//${window.location.host}/comfy-api`;
 
 // Generate a persistent client ID for this session
 const client_id = crypto.randomUUID();
@@ -22,6 +23,8 @@ interface ComfyHistoryResponse {
         outputs: {
             [node_id: string]: {
                 images: Array<{ filename: string; subfolder: string; type: string }>;
+                videos?: Array<{ filename: string; subfolder: string; type: string }>;
+                gifs?: Array<{ filename: string; subfolder: string; type: string }>;
             };
         };
     };
@@ -31,7 +34,7 @@ interface ComfyHistoryResponse {
  * Helper to perform a fetch with a specific timeout.
  */
 async function fetchWithTimeout(resource: string | Request, options: RequestInit & { timeout?: number } = {}) {
-    const { timeout = 5000 } = options;
+    const { timeout = 120000 } = options; // Increased default timeout
 
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
@@ -47,13 +50,13 @@ async function fetchWithTimeout(resource: string | Request, options: RequestInit
 /**
  * Uploads a base64 image to the ComfyUI server using production-ready form data.
  */
-const uploadImage = async (base64String: string): Promise<string> => {
+const uploadImage = async (base64String: string, prefix = 'sketch'): Promise<string> => {
     try {
         const fetchResponse = await fetch(base64String);
         const blob = await fetchResponse.blob();
 
         const formData = new FormData();
-        const filename = `sketch_${Date.now()}.png`;
+        const filename = `${prefix}_${Date.now()}.png`;
 
         // multipart/form-data fields expected by ComfyUI
         formData.append('image', blob, filename);
@@ -63,7 +66,7 @@ const uploadImage = async (base64String: string): Promise<string> => {
         const response = await fetchWithTimeout(`${COMFY_URL}/upload/image`, {
             method: 'POST',
             body: formData,
-            timeout: 5000 // 5 second timeout as requested
+            timeout: 10000 
         });
 
         if (!response.ok) {
@@ -92,7 +95,7 @@ const waitForCompletion = async (promptId: string): Promise<ComfyHistoryResponse
                 socket.close();
             }
             reject(new Error('Timeout waiting for render generation.'));
-        }, 120000); // 2 minute timeout for complex renders
+        }, 180000); // 3 minute timeout for complex renders/videos
 
         socket.onopen = () => {
             console.log('🔌 Connected to ComfyUI WebSocket');
@@ -161,136 +164,148 @@ const pollHistory = async (promptId: string): Promise<ComfyHistoryResponse[strin
             // Silently retry
         }
         attempts++;
-        await new Promise(r => setTimeout(r, 1500));
+        await new Promise(r => setTimeout(r, 2000));
     }
     throw new Error('Timeout polling for history.');
 };
 
+/**
+ * Executes a ComfyUI workflow by:
+ * 1. Deep cloning the template
+ * 2. Injecting values (seed, images, prompts)
+ * 3. Sending to API
+ */
+const executeWorkflow = async (
+    workflow: WorkflowDefinition, 
+    injections: { 
+        prompt?: string, 
+        negative?: string, 
+        initImage?: string,
+        width?: number,
+        height?: number,
+        strength?: number,
+        numImages?: number
+    }
+): Promise<string[]> => {
+    
+    // 1. Prepare Payload
+    const workflowPayload = JSON.parse(JSON.stringify(workflow.template));
+    const seed = Math.floor(Math.random() * 1_000_000_000_000);
+
+    // 2. Inject Values
+    const nodes = workflow.nodes;
+
+    // Seed
+    if (nodes.seed && workflowPayload[nodes.seed]) {
+        workflowPayload[nodes.seed].inputs.seed = seed;
+    }
+
+    // Prompts
+    if (nodes.prompt && workflowPayload[nodes.prompt] && injections.prompt) {
+        workflowPayload[nodes.prompt].inputs.text = injections.prompt;
+    }
+    if (nodes.negative_prompt && workflowPayload[nodes.negative_prompt]) {
+        // Use default negative if none provided
+        const negText = injections.negative || workflow.defaults?.negative_prompt || "blurry, low quality, distortion, watermark";
+        workflowPayload[nodes.negative_prompt].inputs.text = negText;
+    }
+
+    // Input Image
+    if (nodes.image_input && workflowPayload[nodes.image_input] && injections.initImage) {
+        workflowPayload[nodes.image_input].inputs.image = injections.initImage;
+    }
+
+    // ControlNet Strength (if applicable)
+    if (nodes.controlnet_strength && workflowPayload[nodes.controlnet_strength] && injections.strength !== undefined) {
+         workflowPayload[nodes.controlnet_strength].inputs.strength = injections.strength;
+    }
+
+    // Dimensions / Batch Size (This usually depends on EmptyLatent or specific nodes)
+    // Finding EmptyLatentImage or KSampler helps, but for now let's rely on specific node IDs if we had them or simple heuristics.
+    // In our current templates, "33" is EmptySD3LatentImage, "12" is EmptyLatentImage.
+    const emptyLatentNode = workflowPayload["33"] || workflowPayload["12"];
+    if (emptyLatentNode) {
+        if (injections.width) emptyLatentNode.inputs.width = injections.width;
+        if (injections.height) emptyLatentNode.inputs.height = injections.height;
+        if (injections.numImages) emptyLatentNode.inputs.batch_size = injections.numImages;
+    }
+
+    // 3. Queue Prompt
+    console.log('🚀 Sending workflow to ComfyUI...', { workflowId: workflow.id, seed });
+    const queueResponse = await fetchWithTimeout(`${COMFY_URL}/prompt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            prompt: workflowPayload,
+            client_id: client_id
+        }),
+        timeout: 10000
+    });
+
+    if (!queueResponse.ok) {
+        const errorText = await queueResponse.text();
+        throw new Error(`Queue failed (${queueResponse.status}): ${errorText || queueResponse.statusText}`);
+    }
+
+    const queueData = await queueResponse.json();
+    const promptId = queueData.prompt_id;
+    console.log('⏳ Queued with ID:', promptId);
+
+    // 4. Wait
+    const historyData = await waitForCompletion(promptId);
+
+    // 5. Extract Outputs
+    // Determine output node ID
+    const outputNodeId = workflow.type === 'video' ? workflow.nodes.video_output : workflow.nodes.image_output;
+    if (!outputNodeId || !historyData.outputs[outputNodeId]) {
+        throw new Error(`Output node ${outputNodeId} not found in history`);
+    }
+
+    const outputs = historyData.outputs[outputNodeId];
+    const files = outputs.images || outputs.videos || outputs.gifs || [];
+
+    if (files.length === 0) {
+         throw new Error('No output files returned');
+    }
+
+    return files.map((f) => 
+        `${COMFY_URL}/view?filename=${f.filename}&subfolder=${f.subfolder}&type=${f.type}`
+    );
+};
+
+
 export const comfyRenderService: RenderService = {
     generate: async (request: GenerateRequest): Promise<GenerateResponse> => {
         try {
-            console.log('🎨 Starting Detailed Render Process...');
+            console.log('🎨 Starting Detailed Render Process...', request);
 
-            // 1. Upload the Sketch
-            const uploadedFileName = await uploadImage(request.init_image);
-            console.log('✅ Sketch uploaded as:', uploadedFileName);
+            // 1. Upload
+            const uploadedFileName = await uploadImage(request.init_image, 'sketch');
+            
+            // 2. Resolve Workflow
+            // If request.workflowId is provided use it, otherwise map stylePreset
+            const workflowId = request.workflowId || mapStyleToId(request.stylePreset);
+            const workflow = getWorkflow(workflowId);
 
-            // 2. Prepare the Workflow Payload
-            const seed = Math.floor(Math.random() * 1_000_000_000_000);
+            if (!workflow) {
+                throw new Error(`Workflow not found for ID: ${workflowId} (Style: ${request.stylePreset})`);
+            }
 
-            const workflowPayload = {
-                "3": {
-                    "inputs": {
-                        "seed": seed,
-                        "steps": 25,
-                        "cfg": 4.5,
-                        "sampler_name": "euler",
-                        "scheduler": "simple",
-                        "denoise": 1,
-                        "model": ["4", 0],
-                        "positive": ["51", 0],
-                        "negative": ["51", 1],
-                        "latent_image": ["33", 0]
-                    },
-                    "class_type": "KSampler"
-                },
-                "4": {
-                    "inputs": { "ckpt_name": "sd3.5_large_fp8_scaled.safetensors" },
-                    "class_type": "CheckpointLoaderSimple"
-                },
-                "6": {
-                    "inputs": {
-                        "text": request.prompt,
-                        "clip": ["4", 1]
-                    },
-                    "class_type": "CLIPTextEncode"
-                },
-                "8": {
-                    "inputs": { "samples": ["3", 0], "vae": ["4", 2] },
-                    "class_type": "VAEDecode"
-                },
-                "9": {
-                    "inputs": { "filename_prefix": "openviz_render", "images": ["8", 0] },
-                    "class_type": "SaveImage"
-                },
-                "33": {
-                    "inputs": { "width": 1024, "height": 1024, "batch_size": request.numImages || 1 },
-                    "class_type": "EmptySD3LatentImage"
-                },
-                "45": {
-                    "inputs": { "image": uploadedFileName },
-                    "class_type": "LoadImage"
-                },
-                "46": {
-                    "inputs": { "control_net_name": "sd3.5_large_controlnet_canny.safetensors" },
-                    "class_type": "ControlNetLoader"
-                },
-                "47": {
-                    "inputs": { "low_threshold": 0.3, "high_threshold": 0.6, "image": ["48", 0] },
-                    "class_type": "Canny"
-                },
-                "48": {
-                    "inputs": { "upscale_method": "bilinear", "width": 1024, "height": 1024, "crop": "center", "image": ["45", 0] },
-                    "class_type": "ImageScale"
-                },
-                "50": {
-                    "inputs": { "conditioning": ["6", 0] },
-                    "class_type": "ConditioningZeroOut"
-                },
-                "51": {
-                    "inputs": {
-                        "strength": request.drawingInfluence ?? 0.65,
-                        "start_percent": 0,
-                        "end_percent": 1,
-                        "positive": ["6", 0],
-                        "negative": ["50", 0],
-                        "control_net": ["46", 0],
-                        "image": ["47", 0],
-                        "vae": ["4", 2]
-                    },
-                    "class_type": "ControlNetApplyAdvanced"
-                }
-            };
-
-            // 3. Queue the Prompt with client_id
-            console.log('🚀 Sending workflow to ComfyUI...');
-            const queueResponse = await fetchWithTimeout(`${COMFY_URL}/prompt`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: workflowPayload,
-                    client_id: client_id
-                }),
-                timeout: 5000
+            // 3. Execute
+            const imageUrls = await executeWorkflow(workflow, {
+                prompt: request.prompt,
+                initImage: uploadedFileName,
+                width: request.width,
+                height: request.height,
+                strength: request.drawingInfluence,
+                numImages: request.numImages
             });
 
-            if (!queueResponse.ok) {
-                const errorText = await queueResponse.text();
-                throw new Error(`Queue failed (${queueResponse.status}): ${errorText || queueResponse.statusText}`);
-            }
-
-            const queueData = await queueResponse.json();
-            const promptId = queueData.prompt_id;
-            console.log('⏳ Queued with ID:', promptId, 'Client ID:', client_id);
-
-            // 4. Wait for Completion
-            const historyData = await waitForCompletion(promptId);
-
-            // 5. Extract Output Images
-            const outputImages = historyData.outputs["9"].images;
-            if (!outputImages || outputImages.length === 0) {
-                throw new Error('No images returned from ComfyUI');
-            }
-
-            const finalImageUrls = outputImages.map((img) =>
-                `${COMFY_URL}/view?filename=${img.filename}&subfolder=${img.subfolder}&type=${img.type}`
-            );
-
-            console.log('✨ Generation Success:', finalImageUrls);
+            console.log('✨ Generation Success:', imageUrls);
 
             return {
                 success: true,
-                images: finalImageUrls,
+                images: imageUrls,
             };
 
         } catch (error: any) {
@@ -302,6 +317,48 @@ export const comfyRenderService: RenderService = {
             };
         }
     },
+
+    animate: async (request: AnimateRequest): Promise<GenerateResponse> => {
+        try {
+            console.log('🎬 Starting Animation Process...', request);
+
+            // 1. Upload
+            const uploadedFileName = await uploadImage(request.init_image, 'animate_source');
+
+            // 2. Resolve Workflow
+            const workflowId = request.workflowId || 'video_standard'; // Default to standard video
+            const workflow = getWorkflow(workflowId);
+
+             if (!workflow) {
+                throw new Error(`Workflow not found for ID: ${workflowId}`);
+            }
+
+            // 3. Execute
+            const videoUrls = await executeWorkflow(workflow, {
+                prompt: request.prompt || "animation",
+                initImage: uploadedFileName,
+                width: request.width,
+                height: request.height,
+                // Video specific params could be mapped here if workflow supported them (e.g. motion bucket id)
+            });
+
+             console.log('✨ Animation Success:', videoUrls);
+
+            return {
+                success: true,
+                images: videoUrls 
+            };
+
+        } catch (error: any) {
+            console.error('❌ Animation Error:', error);
+            return {
+                success: false,
+                images: [],
+                error: error.message || 'Unknown error occurred',
+            };
+        }
+    },
+
     checkConnection: async (): Promise<boolean> => {
         console.log('🔍 Checking ComfyUI connection via proxy...');
         try {

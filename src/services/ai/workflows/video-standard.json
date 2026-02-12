@@ -1,0 +1,51 @@
+{
+    "3": {
+        "inputs": {
+            "seed": 0,
+            "steps": 20,
+            "cfg": 2.5,
+            "sampler_name": "euler_ancestral",
+            "scheduler": "simple",
+            "denoise": 1,
+            "model": ["14", 0],
+            "positive": ["6", 0],
+            "negative": ["7", 0],
+            "latent_image": ["12", 0]
+        },
+        "class_type": "KSampler"
+    },
+    "6": {
+        "inputs": {
+            "text": "video animation",
+            "clip": ["14", 1]
+        },
+        "class_type": "CLIPTextEncode"
+    },
+    "7": {
+        "inputs": {
+            "text": "watermark, text, blur",
+            "clip": ["14", 1]
+        },
+        "class_type": "CLIPTextEncode"
+    },
+    "8": {
+        "inputs": { "samples": ["3", 0], "vae": ["14", 2] },
+        "class_type": "VAEDecode"
+    },
+    "12": {
+        "inputs": { "width": 512, "height": 512, "batch_size": 16 },
+        "class_type": "EmptyLatentImage"
+    },
+    "14": {
+        "inputs": { "ckpt_name": "svd_xt.safetensors" },
+        "class_type": "CheckpointLoaderSimple"
+    },
+    "45": {
+        "inputs": { "image": "example.png" },
+        "class_type": "LoadImage"
+    },
+    "90": {
+        "inputs": { "filename_prefix": "openviz_video", "images": ["8", 0], "format": "video/h264" },
+        "class_type": "VHS_VideoCombine"
+    }
+}

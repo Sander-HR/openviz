@@ -8,7 +8,13 @@ import {
     ClipboardPaste
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useStore } from '../store/useStore';
+import { useStore } from '../../store/useStore';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+    return twMerge(clsx(inputs));
+}
 
 interface LayerDropdownProps {
     layerId: string;
@@ -16,7 +22,7 @@ interface LayerDropdownProps {
     position: { x: number; y: number };
 }
 
-const LayerDropdown: React.FC<LayerDropdownProps> = ({ layerId, onClose, position }) => {
+export const LayerDropdown: React.FC<LayerDropdownProps> = ({ layerId, onClose, position }) => {
     const dropdownRef = useRef<HTMLDivElement>(null);
     const {
         removeLayer,
@@ -135,9 +141,3 @@ const LayerDropdown: React.FC<LayerDropdownProps> = ({ layerId, onClose, positio
 
     return ReactDOM.createPortal(dropdownContent, document.body);
 };
-
-function cn(...classes: any[]) {
-    return classes.filter(Boolean).join(' ');
-}
-
-export default LayerDropdown;

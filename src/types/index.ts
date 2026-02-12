@@ -50,7 +50,7 @@ export interface Project {
     thumbnail?: string;
 }
 
-export type NodeType = 'image' | 'animate';
+export type NodeType = 'image' | 'animate' | 'render' | 'video';
 
 export interface BaseNode {
     id: string;
@@ -64,6 +64,8 @@ export interface ImageNode extends BaseNode {
     type: 'image';
     name: string;
     project: Project;
+    status?: 'rendering' | 'done' | 'error';
+    renderResults?: RenderGroup[];
 }
 
 export interface AnimateNode extends BaseNode {
@@ -76,12 +78,26 @@ export interface AnimateNode extends BaseNode {
         };
         settings: {
             model: string;
+            workflowId?: string;
             duration: string;
         };
     };
 }
 
-export type WorkbenchNode = ImageNode | AnimateNode;
+export interface VideoNode extends BaseNode {
+    type: 'video';
+    name: string;
+    project: Project; // Reusing Project for consistency, thumbnail will be the video URL or poster
+    status?: 'rendering' | 'done' | 'error';
+    renderResults?: RenderGroup[];
+}
+
+export interface RenderNode extends BaseNode {
+    type: 'render';
+    data: RenderSettings;
+}
+
+export type WorkbenchNode = ImageNode | AnimateNode | RenderNode | VideoNode;
 
 export interface Connection {
     id: string;
@@ -105,6 +121,7 @@ export interface ToolSettings {
 export interface RenderSettings {
     prompt: string;
     stylePreset: string;
+    workflowId?: string;
     drawingInfluence: number;
     numImages: number;
     referenceImage?: string;
@@ -116,5 +133,8 @@ export interface RenderGroup {
     settings: RenderSettings;
     images: string[];
     timestamp: number;
+    width: number;
+    height: number;
+    sourceNodeId?: string;
 }
 

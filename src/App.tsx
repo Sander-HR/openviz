@@ -1,15 +1,14 @@
 import React, { useEffect } from 'react';
 import { useStore } from './store/useStore';
 import { renderService } from './services/renderService';
-import Studio from './components/Studio';
-import Workbench from './components/Workbench';
+import { Studio } from './components/Studio';
+import { Workbench } from './components/workbench/workbench';
 
-const App: React.FC = () => {
+export const App: React.FC = () => {
     const { viewMode } = useStore();
 
     useEffect(() => {
         console.log('🚀 OpenVizCom App Mounted');
-        // Check ComfyUI connection on startup
         renderService.checkConnection();
     }, []);
 
@@ -19,5 +18,3 @@ const App: React.FC = () => {
         </div>
     );
 };
-
-export default App;

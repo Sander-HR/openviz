@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useStore } from '../store/useStore';
-import { ToolType } from '../types';
+import { useStore } from '../../store/useStore';
+import { ToolType } from '../../types';
 import { Paintbrush, PaintBucket } from 'lucide-react';
-import ColorPicker from './ColorPicker';
+import { ColorPicker } from './ColorPicker';
 
 interface ToolContextMenuProps {
     x: number;
@@ -11,7 +11,7 @@ interface ToolContextMenuProps {
     onClose: () => void;
 }
 
-const ToolContextMenu: React.FC<ToolContextMenuProps> = ({ x, y, tool, onClose }) => {
+export const ToolContextMenu: React.FC<ToolContextMenuProps> = ({ x, y, tool, onClose }) => {
     const { toolSettings, setBrushSize, setBrushColor, setBrushOpacity, setBrushStabilizer, setBrushHardness, setEraserSize } = useStore();
     const [isVisible, setIsVisible] = useState(false);
     const [showColorPicker, setShowColorPicker] = useState(false);
@@ -183,5 +183,3 @@ const ToolContextMenu: React.FC<ToolContextMenuProps> = ({ x, y, tool, onClose }
         </div>
     );
 };
-
-export default ToolContextMenu;

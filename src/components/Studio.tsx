@@ -1,16 +1,16 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import Toolbar from './Toolbar';
-import SidebarRight from './SidebarRight';
-import LayerPanel from './LayerPanel';
-import CanvasViewport from './CanvasViewport';
-import BottomRightControls from './BottomRightControls';
-import BottomLeftControls from './BottomLeftControls';
-import ResultsPanel from './ResultsPanel';
-import PreviewStatus from './PreviewStatus';
+import { Toolbar } from './studio/Toolbar';
+import { RenderPanel } from './studio/RenderPanel';
+import { LayerPanel } from './studio/LayerPanel';
+import { CanvasViewport } from './studio/CanvasViewport';
+import { CanvasControls } from './studio/CanvasControls';
+import { BottomLeftControls } from './studio/BottomLeftControls';
+import { ResultsPanel } from './studio/ResultsPanel';
+import { PreviewStatus } from './studio/PreviewStatus';
 import { useStore } from '../store/useStore';
 
-const Studio: React.FC = () => {
+export const Studio: React.FC = () => {
     const { setActiveTool, isExitingStudio } = useStore();
 
     useEffect(() => {
@@ -24,6 +24,7 @@ const Studio: React.FC = () => {
                 case 'r': setActiveTool('rectangle'); break;
                 case 'o': setActiveTool('circle'); break;
                 case 'l': setActiveTool('line'); break;
+                case 'g': setActiveTool('paintbucket'); break;
             }
         };
 
@@ -61,7 +62,7 @@ const Studio: React.FC = () => {
                 {/* Main Workspace Area (Sidelines) */}
                 <div className="flex flex-1 justify-between p-4 pointer-events-none relative">
                     <motion.div
-                        className="pointer-events-auto flex flex-col gap-4"
+                        className="pointer-events-none flex flex-col gap-4 fixed top-4 left-4 bottom-4 z-50 w-60"
                         initial="visible"
                         animate={isExitingStudio ? "hiddenLeft" : "visible"}
                         variants={panelVariants}
@@ -69,12 +70,12 @@ const Studio: React.FC = () => {
                         <LayerPanel />
                     </motion.div>
                     <motion.div
-                        className="pointer-events-auto flex flex-col gap-4 fixed top-4 right-4 bottom-4 z-50 w-80"
+                        className="pointer-events-none flex flex-col gap-4 fixed top-4 right-4 bottom-4 z-50 w-60"
                         initial="visible"
                         animate={isExitingStudio ? "hiddenRight" : "visible"}
                         variants={panelVariants}
                     >
-                        <SidebarRight />
+                        <RenderPanel />
                         <ResultsPanel />
                     </motion.div>
                 </div>
@@ -90,7 +91,7 @@ const Studio: React.FC = () => {
                         <BottomLeftControls />
                     </div>
                     <div className="pointer-events-auto">
-                        <BottomRightControls />
+                        <CanvasControls />
                     </div>
                 </motion.div>
             </div>
@@ -100,5 +101,3 @@ const Studio: React.FC = () => {
         </div>
     );
 };
-
-export default Studio;

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, ChevronDown, Wand2, Palette, Layers, ImageIcon } from 'lucide-react';
-import { useStore } from '../store/useStore';
-import { renderService } from '../services/renderService';
+import { useStore } from '../../store/useStore';
+import { renderService } from '../../services/renderService';
+import { getRenderStyles } from '../../services/ai/workflowRegistry';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -9,9 +10,11 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-const SidebarRight: React.FC = () => {
+export const RenderPanel: React.FC = () => {
     const {
+        project,
         renderSettings,
+        activeNodeId,
         setRenderPrompt,
         setRenderStyle,
         setRenderInfluence,
@@ -26,14 +29,7 @@ const SidebarRight: React.FC = () => {
     const [showStyles, setShowStyles] = useState(false);
     const [showNumImagesDropdown, setShowNumImagesDropdown] = useState(false);
 
-    const stylePresets = [
-        'Photorealistic',
-        'Sketch / Line Art',
-        'Cyberpunk / Neon',
-        'Minimalist',
-        'Watercolor',
-        '3D Render'
-    ];
+    const availableStyles = getRenderStyles();
 
     const handleGenerate = async () => {
         if (!renderSettings?.prompt?.trim()) return;
@@ -42,13 +38,20 @@ const SidebarRight: React.FC = () => {
         try {
             const canvasData = (window as any).getFlattenedCanvas ? (window as any).getFlattenedCanvas() : "";
 
+            // Find workflow ID for the current style preset
+            const selectedStyle = availableStyles.find(s => s.name === renderSettings.stylePreset);
+            const workflowId = selectedStyle?.id;
+
             const response = await renderService.generate({
                 ...renderSettings,
-                init_image: canvasData
+                workflowId, // Pass explicit ID if found
+                init_image: canvasData,
+                width: project.canvas.width,
+                height: project.canvas.height
             });
 
             if (response.success && response.images.length > 0) {
-                addRenderResultGroup(renderSettings, response.images);
+                addRenderResultGroup(renderSettings, response.images, project.canvas.width, project.canvas.height, activeNodeId || undefined);
                 setResultsPanelOpen(true);
             }
 
@@ -71,14 +74,14 @@ const SidebarRight: React.FC = () => {
     };
 
     return (
-        <div className="w-80 flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl overflow-hidden h-fit max-h-[calc(100vh-120px)] backdrop-blur-md bg-opacity-95 text-white">
+        <div className="w-60 flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl overflow-hidden h-fit max-h-[calc(100vh-120px)] backdrop-blur-md bg-opacity-95 text-white pointer-events-auto">
             {/* Tabs */}
             <div className="flex border-b border-panel-border">
-                <button className="flex-1 py-3 text-sm font-bold border-b-2 border-primary bg-primary/5">RENDER</button>
-                <button className="flex-1 py-3 text-sm font-bold opacity-30 cursor-not-allowed">REFINE</button>
+                <button className="flex-1 py-2 text-sm font-bold border-b-2 border-primary bg-primary/5">RENDER</button>
+                <button className="flex-1 py-2 text-sm font-bold opacity-30 cursor-not-allowed">REFINE</button>
             </div>
 
-            <div className="p-5 space-y-6 overflow-y-auto custom-scrollbar">
+            <div className="p-3 space-y-3 overflow-y-auto custom-scrollbar">
                 {/* Prompt Section */}
                 <div className="space-y-2">
                     <div className="flex justify-between items-center text-sm">
@@ -88,7 +91,7 @@ const SidebarRight: React.FC = () => {
                         <button className="text-[10px] text-primary hover:underline">DESCRIBE</button>
                     </div>
                     <textarea
-                        className="w-full h-32 bg-neutral-900 border border-panel-border rounded-lg p-3 text-sm resize-none focus:border-primary outline-none transition-all placeholder:text-neutral-600"
+                        className="w-full h-20 bg-neutral-900 border border-panel-border rounded-lg p-2 text-sm resize-none focus:border-primary outline-none transition-all placeholder:text-neutral-600"
                         placeholder="Describe your design in detail... e.g., 'Minimalist line art of a trumpet with simplified geometric shapes...'"
                         value={renderSettings.prompt}
                         onChange={(e) => setRenderPrompt(e.target.value)}
@@ -100,7 +103,7 @@ const SidebarRight: React.FC = () => {
                 </div>
 
                 {/* Style Section */}
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                     <div className="flex items-center gap-2 text-sm font-semibold opacity-80">
                         <Palette size={16} className="text-primary" />
                         PALETTE
@@ -108,40 +111,41 @@ const SidebarRight: React.FC = () => {
                     <div className="relative">
                         <button
                             onClick={() => setShowStyles(!showStyles)}
-                            className="w-full flex items-center justify-between bg-neutral-900 border border-panel-border p-3 rounded-lg hover:bg-neutral-800 transition-all group"
+                            className="w-full flex items-center justify-between bg-neutral-900 border border-panel-border p-2 rounded-lg hover:bg-neutral-800 transition-all group"
                         >
-                            <span className="text-sm">{renderSettings.stylePreset}</span>
+                            <span className="text-sm truncate">{renderSettings.stylePreset}</span>
                             <ChevronDown size={16} className={cn("opacity-40 group-hover:opacity-100 transition-transform", showStyles && "rotate-180")} />
                         </button>
 
                         {showStyles && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-neutral-900 border border-panel-border rounded-lg shadow-xl z-50 overflow-hidden py-1">
-                                {stylePresets.map(style => (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-neutral-900 border border-panel-border rounded-lg shadow-xl z-50 overflow-hidden py-1 max-h-60 overflow-y-auto custom-scrollbar">
+                                {availableStyles.map(style => (
                                     <button
-                                        key={style}
+                                        key={style.id}
                                         className={cn(
-                                            "w-full px-4 py-2 text-left text-sm hover:bg-primary/20 hover:text-primary transition-colors",
-                                            renderSettings.stylePreset === style && "bg-primary/10 text-primary font-bold"
+                                            "w-full px-4 py-2 text-left text-sm hover:bg-primary/20 hover:text-primary transition-colors flex flex-col gap-0.5",
+                                            renderSettings.stylePreset === style.name && "bg-primary/10 text-primary font-bold"
                                         )}
                                         onClick={() => {
-                                            setRenderStyle(style);
+                                            setRenderStyle(style.name);
                                             setShowStyles(false);
                                         }}
                                     >
-                                        {style}
+                                        <span className="font-medium">{style.name}</span>
+                                        <span className="text-[10px] opacity-50 font-normal">{style.description}</span>
                                     </button>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm font-semibold opacity-80 pt-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold opacity-80 pt-1">
                         <ImageIcon size={16} className="text-primary" />
                         IMAGE
                     </div>
                     <div className="relative group">
                         {renderSettings.referenceImage ? (
-                            <div className="relative w-full h-24 rounded-lg overflow-hidden border border-panel-border">
+                            <div className="relative w-full h-20 rounded-lg overflow-hidden border border-panel-border">
                                 <img src={renderSettings.referenceImage} alt="Reference" className="w-full h-full object-cover" />
                                 <button
                                     onClick={() => setRenderReferenceImage(undefined)}
@@ -151,7 +155,7 @@ const SidebarRight: React.FC = () => {
                                 </button>
                             </div>
                         ) : (
-                            <label className="w-full h-12 dashed border-2 border-dashed border-panel-border rounded-lg flex items-center justify-center gap-2 text-xs opacity-40 hover:opacity-100 hover:bg-neutral-900 transition-all cursor-pointer">
+                            <label className="w-full h-10 dashed border-2 border-dashed border-panel-border rounded-lg flex items-center justify-center gap-2 text-xs opacity-40 hover:opacity-100 hover:bg-neutral-900 transition-all cursor-pointer">
                                 <Plus size={14} />
                                 ADD IMAGE...
                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
@@ -161,7 +165,7 @@ const SidebarRight: React.FC = () => {
                 </div>
 
                 {/* Influence Slider */}
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                     <div className="flex justify-between items-center text-sm font-semibold">
                         <span className="opacity-80 flex items-center gap-2">
                             <Layers size={16} className="text-primary" />
@@ -187,14 +191,14 @@ const SidebarRight: React.FC = () => {
             </div>
 
             {/* Generate Button Wrapper */}
-            <div className="p-5 pt-0 mt-auto flex gap-2">
+            <div className="p-3 pt-0 mt-auto flex gap-2">
                 <div className="relative">
                     <button
                         onClick={() => setShowNumImagesDropdown(!showNumImagesDropdown)}
                         disabled={isRendering}
                         title="Number of images to generate"
                         className={cn(
-                            "h-full px-4 bg-neutral-900 border border-panel-border rounded-xl transition-all flex items-center gap-2 group",
+                            "h-full px-2.5 bg-neutral-900 border border-panel-border rounded-xl transition-all flex items-center gap-1 group",
                             isRendering ? "opacity-50 cursor-not-allowed" : "hover:bg-neutral-800"
                         )}
                     >
@@ -228,7 +232,7 @@ const SidebarRight: React.FC = () => {
                     onClick={handleGenerate}
                     disabled={isRendering || !renderSettings?.prompt?.trim()}
                     className={cn(
-                        "flex-1 py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all relative overflow-hidden group",
+                        "flex-1 py-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-all relative overflow-hidden group",
                         isRendering
                             ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
                             : "bg-gradient-to-r from-primary to-primary-dark text-white shadow-xl hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.98]"
@@ -241,7 +245,7 @@ const SidebarRight: React.FC = () => {
                         </>
                     ) : (
                         <>
-                            <Wand2 size={20} className="group-hover:rotate-12 transition-transform" />
+                            <Wand2 size={18} className="group-hover:rotate-12 transition-transform" />
                             GENERATE
                         </>
                     )}
@@ -253,6 +257,3 @@ const SidebarRight: React.FC = () => {
         </div>
     );
 };
-
-
-export default SidebarRight;
