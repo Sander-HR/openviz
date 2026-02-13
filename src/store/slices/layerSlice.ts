@@ -6,7 +6,7 @@ export interface LayerSlice {
     activeLayerId: string | null;
     addLayer: (type?: 'sketch' | 'image' | 'render') => void;
     removeLayer: (id: string) => void;
-    setActiveLayer: (id: string) => void;
+    setActiveLayer: (id: string | null) => void;
     updateLayer: (id: string, updates: Partial<Layer>) => void;
     reorderLayers: (startIndex: number, endIndex: number) => void;
     duplicateLayer: (id: string) => void;
@@ -27,6 +27,14 @@ export const createLayerSlice: StateCreator<AppState, [], [], LayerSlice> = (set
             opacity: 100,
             blendMode: 'normal',
             strokes: [],
+            // Initialize transform properties
+            x: 0,
+            y: 0,
+            width: state.project.canvas.width,
+            height: state.project.canvas.height,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
             order: state.project.layers.length,
             created: Date.now(),
             modified: Date.now(),
@@ -134,6 +142,14 @@ export const createLayerSlice: StateCreator<AppState, [], [], LayerSlice> = (set
             strokes: [],
             image,
             thumbnail: image,
+            // Initialize transform properties
+            x: 0,
+            y: 0,
+            width: state.project.canvas.width,
+            height: state.project.canvas.height,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
             order: state.project.layers.length,
             created: Date.now(),
             modified: Date.now(),

@@ -59,14 +59,45 @@ export const Toolbar: React.FC = () => {
         const reader = new FileReader();
         reader.onload = (event) => {
             const base64 = event.target?.result as string;
-            addLayer('image');
-            const state = useStore.getState();
-            if (state.activeLayerId) {
-                updateLayer(state.activeLayerId, {
-                    image: base64,
-                    name: file.name
-                });
-            }
+            
+            // Create an image element to get dimensions
+            const img = new Image();
+            img.onload = () => {
+                const state = useStore.getState();
+                const canvasWidth = state.project.canvas.width;
+                const canvasHeight = state.project.canvas.height;
+                
+                // Calculate dimensions to fit within canvas while maintaining aspect ratio
+                let width = img.naturalWidth;
+                let height = img.naturalHeight;
+                
+                // If image is larger than canvas, scale it down
+                if (width > canvasWidth || height > canvasHeight) {
+                    const ratio = Math.min(canvasWidth / width, canvasHeight / height);
+                    width *= ratio;
+                    height *= ratio;
+                }
+                
+                // Center the image
+                const x = (canvasWidth - width) / 2;
+                const y = (canvasHeight - height) / 2;
+
+                addLayer('image');
+                const updatedState = useStore.getState();
+                if (updatedState.activeLayerId) {
+                    updateLayer(updatedState.activeLayerId, {
+                        image: base64,
+                        name: file.name,
+                        width,
+                        height,
+                        x,
+                        y,
+                        scaleX: 1,
+                        scaleY: 1
+                    });
+                }
+            };
+            img.src = base64;
         };
         reader.readAsDataURL(file);
     };

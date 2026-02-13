@@ -34,6 +34,14 @@ export interface Layer {
     blendMode: BlendMode;
     strokes: Stroke[];
     image?: string; // base64 or URL
+    // Transform properties
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    rotation?: number;
+    scaleX?: number;
+    scaleY?: number;
     order: number;
     created: number;
     thumbnail?: string; // base64 thumbnail

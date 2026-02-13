@@ -11,11 +11,30 @@ import { PreviewStatus } from './studio/PreviewStatus';
 import { useStore } from '../store/useStore';
 
 export const Studio: React.FC = () => {
-    const { setActiveTool, isExitingStudio } = useStore();
+    const { setActiveTool, isExitingStudio, undo, redo } = useStore();
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            // Undo/Redo shortcuts
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key.toLowerCase() === 'z') {
+                    if (e.shiftKey) {
+                        e.preventDefault();
+                        redo();
+                    } else {
+                        e.preventDefault();
+                        undo();
+                    }
+                    return;
+                }
+                if (e.key.toLowerCase() === 'y') {
+                    e.preventDefault();
+                    redo();
+                    return;
+                }
+            }
 
             switch (e.key.toLowerCase()) {
                 case 'b': setActiveTool('brush'); break;
@@ -30,7 +49,7 @@ export const Studio: React.FC = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [setActiveTool]);
+    }, [setActiveTool, undo, redo]);
 
     const panelVariants = {
         visible: { opacity: 1, x: 0, y: 0, transition: { duration: 0.3, ease: "easeOut" } },

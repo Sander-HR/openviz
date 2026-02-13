@@ -3,9 +3,9 @@ import { mockRenderService } from './mockRenderService';
 import { getWorkflow, mapStyleToId, WorkflowDefinition } from './ai/workflowRegistry';
 
 // Using Vite proxy to avoid CORS issues
-const COMFY_URL = '/comfy-api';
+let comfyUrl = '/comfy-api';
 // We use the same protocol and host as the current page, but Vite will proxy /comfy-api to the backend
-const WS_URL = `${window.location.protocol === 'http:' ? 'ws:' : 'wss:'}//${window.location.host}/comfy-api`;
+let wsUrl = `${window.location.protocol === 'http:' ? 'ws:' : 'wss:'}//${window.location.host}/comfy-api`;
 
 // Generate a persistent client ID for this session
 const client_id = crypto.randomUUID();
@@ -63,7 +63,7 @@ const uploadImage = async (base64String: string, prefix = 'sketch'): Promise<str
         formData.append('type', 'input');
         formData.append('overwrite', 'true');
 
-        const response = await fetchWithTimeout(`${COMFY_URL}/upload/image`, {
+        const response = await fetchWithTimeout(`${comfyUrl}/upload/image`, {
             method: 'POST',
             body: formData,
             timeout: 10000 
@@ -88,7 +88,7 @@ const uploadImage = async (base64String: string, prefix = 'sketch'): Promise<str
 const waitForCompletion = async (promptId: string): Promise<ComfyHistoryResponse[string]> => {
     return new Promise((resolve, reject) => {
         // Use the proxied WS URL
-        const socket = new WebSocket(`${WS_URL}/ws?clientId=${client_id}`);
+        const socket = new WebSocket(`${wsUrl}/ws?clientId=${client_id}`);
 
         const timeout = setTimeout(() => {
             if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
@@ -148,7 +148,7 @@ const waitForCompletion = async (promptId: string): Promise<ComfyHistoryResponse
 };
 
 const fetchHistory = async (promptId: string): Promise<ComfyHistoryResponse[string]> => {
-    const response = await fetchWithTimeout(`${COMFY_URL}/history/${promptId}`, { timeout: 5000 });
+    const response = await fetchWithTimeout(`${comfyUrl}/history/${promptId}`, { timeout: 5000 });
     if (!response.ok) throw new Error('Failed to fetch history');
     const history: ComfyHistoryResponse = await response.json();
     return history[promptId];
@@ -232,7 +232,7 @@ const executeWorkflow = async (
 
     // 3. Queue Prompt
     console.log('🚀 Sending workflow to ComfyUI...', { workflowId: workflow.id, seed });
-    const queueResponse = await fetchWithTimeout(`${COMFY_URL}/prompt`, {
+    const queueResponse = await fetchWithTimeout(`${comfyUrl}/prompt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -269,7 +269,7 @@ const executeWorkflow = async (
     }
 
     return files.map((f) => 
-        `${COMFY_URL}/view?filename=${f.filename}&subfolder=${f.subfolder}&type=${f.type}`
+        `${comfyUrl}/view?filename=${f.filename}&subfolder=${f.subfolder}&type=${f.type}`
     );
 };
 
@@ -360,20 +360,38 @@ export const comfyRenderService: RenderService = {
     },
 
     checkConnection: async (): Promise<boolean> => {
-        console.log('🔍 Checking ComfyUI connection via proxy...');
+        console.log(`🔍 Checking ComfyUI connection via proxy (${comfyUrl})...`);
         try {
-            const response = await fetchWithTimeout(`${COMFY_URL}/system_stats`, { timeout: 5000 });
+            const response = await fetchWithTimeout(`${comfyUrl}/system_stats`, { timeout: 2000 });
             if (response.ok) {
                 const stats = await response.json();
                 console.log('✅ ComfyUI System Stats:', stats);
                 return true;
             }
-            console.error('❌ ComfyUI connection failed with status:', response.status);
-            return false;
         } catch (e) {
-            console.error('❌ Connection check failed:', e);
-            return false;
+            console.warn(`⚠️ Connection to ${comfyUrl} failed, trying secondary proxy...`);
         }
+
+        // Try secondary proxy
+        const secondaryUrl = '/comfy-api-secondary';
+        try {
+            const response = await fetchWithTimeout(`${secondaryUrl}/system_stats`, { timeout: 2000 });
+            if (response.ok) {
+                const stats = await response.json();
+                console.log('✅ ComfyUI System Stats (Secondary):', stats);
+                
+                // Update global URLs to use secondary proxy
+                comfyUrl = secondaryUrl;
+                wsUrl = `${window.location.protocol === 'http:' ? 'ws:' : 'wss:'}//${window.location.host}${secondaryUrl}`;
+                console.log('🔄 Switched to secondary proxy:', comfyUrl);
+                
+                return true;
+            }
+        } catch (e) {
+             console.error('❌ Secondary connection check failed:', e);
+        }
+
+        return false;
     }
 };
 

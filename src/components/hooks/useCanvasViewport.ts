@@ -69,7 +69,7 @@ export const useCanvasViewport = () => {
                 y: 0,
                 width: canvas.width,
                 height: canvas.height,
-                pixelRatio: 256 / canvas.width
+                pixelRatio: 1
             });
             return dataURL;
         } catch (error) {
@@ -152,16 +152,27 @@ export const useCanvasViewport = () => {
 
             const stage = e.target.getStage();
             const pos = stage.getPointerPosition();
-            const transform = stage.getAbsoluteTransform().copy().invert();
-            const relativePos = transform.point(pos);
+            
+            // Transform for check inside canvas (using Stage transform)
+            const stageTransform = stage.getAbsoluteTransform().copy().invert();
+            const canvasPos = stageTransform.point(pos);
 
-            if (!isInsideCanvas(relativePos.x, relativePos.y)) return;
+            if (!isInsideCanvas(canvasPos.x, canvasPos.y)) return;
+            
+            // Calculate local position relative to the active layer
+            let localPos = canvasPos;
+            const layerNode = stage.findOne('#' + activeLayerId);
+            if (layerNode) {
+                const layerTransform = layerNode.getAbsoluteTransform().copy().invert();
+                localPos = layerTransform.point(pos);
+            }
+
             setIsDrawing(true);
 
             if (toolSettings.activeTool === 'brush' || toolSettings.activeTool === 'eraser') {
                 const newStroke = {
                     tool: toolSettings.activeTool,
-                    points: [relativePos.x, relativePos.y],
+                    points: [localPos.x, localPos.y],
                     color: toolSettings.brushColor,
                     size: toolSettings.activeTool === 'brush' ? toolSettings.brushSize : toolSettings.eraserSize,
                     opacity: (toolSettings.activeTool === 'brush' ? toolSettings.brushOpacity : 100) / 100,
@@ -172,7 +183,7 @@ export const useCanvasViewport = () => {
             } else if (['circle', 'rectangle', 'line'].includes(toolSettings.activeTool)) {
                 setPreviewShape({
                     tool: toolSettings.activeTool,
-                    points: [relativePos.x, relativePos.y, relativePos.x, relativePos.y],
+                    points: [localPos.x, localPos.y, localPos.x, localPos.y],
                     color: toolSettings.brushColor,
                     size: toolSettings.strokeWidth || 2,
                     opacity: toolSettings.brushOpacity / 100,
@@ -181,13 +192,27 @@ export const useCanvasViewport = () => {
             } else if (toolSettings.activeTool === 'paintbucket') {
                 const fillRect = {
                     tool: 'rectangle' as any,
-                    points: [0, 0, canvas.width, canvas.height],
+                    points: [0, 0, canvas.width, canvas.height], // Fill entire layer bounds? Or canvas bounds relative to layer?
+                    // Ideally flood fill, but for now it seems to be "fill layer" or "fill canvas"
+                    // If we want to fill the canvas area but in local coordinates, we need to transform the canvas rect to local.
+                    // But simpler: just fill a huge rect or the layer's current bounds if it's an image.
+                    // For now, let's stick to filling the "Canvas" area but mapped to local space if possible, 
+                    // or just 0,0 to width,height assuming the layer is aligned. 
+                    // If the layer is transformed, 0,0,width,height might not cover the whole screen.
+                    // However, 'paintbucket' usually means flood fill. The current impl is a big rectangle.
+                    // Let's keep it as 0,0,w,h for now, assuming the user wants to fill the "layer's logical size".
+                    // But wait, if the layer is transformed, 0,0 is the top-left of the layer.
                     color: 'transparent',
                     size: 0,
                     opacity: toolSettings.brushOpacity / 100,
                     hardness: 100,
                     fill: toolSettings.brushColor
                 };
+                
+                // If paintbucket is intended to fill the screen, we might need to calculate the inverse of the layer rect.
+                // But for now let's leave paintbucket as is (0,0,w,h) relative to the layer.
+                // If the layer is shifted, it will fill the shifted rectangle.
+                
                 updateLayer(activeLayerId, { strokes: [...activeLayer.strokes, fillRect] });
                 pushHistory();
                 setTimeout(() => updateLayerThumbnail(activeLayerId), 10);
@@ -200,8 +225,16 @@ export const useCanvasViewport = () => {
         const stage = e.target.getStage();
         const pos = stage.getPointerPosition();
         if (!pos) return;
-        const transform = stage.getAbsoluteTransform().copy().invert();
-        const relativePos = transform.point(pos);
+        
+        let localPos;
+        const layerNode = stage.findOne('#' + activeLayerId);
+        if (layerNode) {
+             const layerTransform = layerNode.getAbsoluteTransform().copy().invert();
+             localPos = layerTransform.point(pos);
+        } else {
+             const transform = stage.getAbsoluteTransform().copy().invert();
+             localPos = transform.point(pos);
+        }
 
         if (toolSettings.activeTool === 'brush' || toolSettings.activeTool === 'eraser') {
             const activeLayer = project.layers.find(l => l.id === activeLayerId);
@@ -211,13 +244,13 @@ export const useCanvasViewport = () => {
             const newStrokes = [...activeLayer.strokes];
             newStrokes[newStrokes.length - 1] = {
                 ...lastStroke,
-                points: [...lastStroke.points, relativePos.x, relativePos.y]
+                points: [...lastStroke.points, localPos.x, localPos.y]
             };
             updateLayer(activeLayerId, { strokes: newStrokes });
         } else if (previewShape) {
             setPreviewShape({
                 ...previewShape,
-                points: [previewShape.points[0], previewShape.points[1], relativePos.x, relativePos.y]
+                points: [previewShape.points[0], previewShape.points[1], localPos.x, localPos.y]
             });
         }
     };

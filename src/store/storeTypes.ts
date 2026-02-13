@@ -48,7 +48,7 @@ export interface AppState {
     // Layer Actions
     addLayer: (type?: 'sketch' | 'image' | 'render') => void;
     removeLayer: (id: string) => void;
-    setActiveLayer: (id: string) => void;
+    setActiveLayer: (id: string | null) => void;
     updateLayer: (id: string, updates: Partial<Layer>) => void;
     reorderLayers: (startIndex: number, endIndex: number) => void;
     duplicateLayer: (id: string) => void;

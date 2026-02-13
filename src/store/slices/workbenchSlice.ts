@@ -63,34 +63,34 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             if (n.id !== id) return n;
             const updated = { ...n, ...updates } as WorkbenchNode;
 
-            if ((updated.type === 'image' || updated.type === 'video') && (updates.width || updates.height)) {
-                const ratio = updated.width / updated.height;
-                const baseDim = 1024;
-                let newWidth, newHeight, newRatio;
+            // if ((updated.type === 'image' || updated.type === 'video') && (updates.width || updates.height)) {
+            //     const ratio = updated.width / updated.height;
+            //     const baseDim = 1024;
+            //     let newWidth, newHeight, newRatio;
 
-                if (updated.width >= updated.height) {
-                    newWidth = baseDim;
-                    newHeight = Math.round(baseDim / ratio);
-                    newRatio = ratio === 1 ? 'square' : 'landscape';
-                } else {
-                    newHeight = baseDim;
-                    newWidth = Math.round(baseDim * ratio);
-                    newRatio = 'portrait';
-                }
+            //     if (updated.width >= updated.height) {
+            //         newWidth = baseDim;
+            //         newHeight = Math.round(baseDim / ratio);
+            //         newRatio = ratio === 1 ? 'square' : 'landscape';
+            //     } else {
+            //         newHeight = baseDim;
+            //         newWidth = Math.round(baseDim * ratio);
+            //         newRatio = 'portrait';
+            //     }
 
-                return {
-                    ...updated,
-                    project: {
-                        ...updated.project,
-                        canvas: {
-                            ...updated.project.canvas,
-                            width: newWidth,
-                            height: newHeight,
-                            aspectRatio: newRatio as AspectRatio
-                        }
-                    }
-                } as WorkbenchNode;
-            }
+            //     return {
+            //         ...updated,
+            //         project: {
+            //             ...updated.project,
+            //             canvas: {
+            //                 ...updated.project.canvas,
+            //                 width: newWidth,
+            //                 height: newHeight,
+            //                 aspectRatio: newRatio as AspectRatio
+            //             }
+            //         }
+            //     } as WorkbenchNode;
+            // }
             return updated;
         });
         return { workbenchNodes: nodes };
