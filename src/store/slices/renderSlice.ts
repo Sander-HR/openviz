@@ -6,6 +6,7 @@ export interface RenderSlice {
     renderSettings: RenderSettings;
     renderResults: RenderGroup[];
     previewingRender: string | null;
+    isPreviewVisible: boolean;
     isRendering: boolean;
     resultsPanelOpen: boolean;
     setRenderPrompt: (prompt: string) => void;
@@ -18,6 +19,7 @@ export interface RenderSlice {
     clearRenderResults: () => void;
     setRenderResults: (results: RenderGroup[]) => void;
     setPreviewingRender: (image: string | null) => void;
+    setIsPreviewVisible: (visible: boolean) => void;
     setRendering: (loading: boolean) => void;
     setResultsPanelOpen: (open: boolean) => void;
 }
@@ -31,6 +33,7 @@ export const createRenderSlice: StateCreator<AppState, [], [], RenderSlice> = (s
     },
     renderResults: [],
     previewingRender: null,
+    isPreviewVisible: true,
     isRendering: false,
     resultsPanelOpen: false,
     setRenderPrompt: (prompt) => set((state: AppState) => ({
@@ -71,6 +74,7 @@ export const createRenderSlice: StateCreator<AppState, [], [], RenderSlice> = (s
     clearRenderResults: () => set({ renderResults: [] }),
     setRenderResults: (renderResults) => set({ renderResults }),
     setPreviewingRender: (previewingRender) => set({ previewingRender }),
+    setIsPreviewVisible: (isPreviewVisible) => set({ isPreviewVisible }),
     setRendering: (isRendering) => set({ isRendering: isRendering }),
     setResultsPanelOpen: (resultsPanelOpen) => set({ resultsPanelOpen }),
 });

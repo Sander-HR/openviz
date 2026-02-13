@@ -88,6 +88,7 @@ export const CanvasViewport = () => {
         toolSettings,
         setPan,
         previewingRender,
+        isPreviewVisible,
         activeLayerId,
         updateLayer,
         setActiveLayer
@@ -273,7 +274,7 @@ export const CanvasViewport = () => {
                     />
                 </KonvaLayer>
 
-                {previewingRender && (
+                {previewingRender && isPreviewVisible && (
                     <KonvaLayer
                         clipX={0}
                         clipY={0}

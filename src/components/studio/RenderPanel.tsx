@@ -10,7 +10,11 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-export const RenderPanel: React.FC = () => {
+interface RenderPanelProps {
+    height: number;
+}
+
+export const RenderPanel: React.FC<RenderPanelProps> = ({ height }) => {
     const {
         project,
         renderSettings,
@@ -74,14 +78,17 @@ export const RenderPanel: React.FC = () => {
     };
 
     return (
-        <div className="w-60 flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl overflow-hidden h-fit max-h-[calc(100vh-120px)] backdrop-blur-md bg-opacity-95 text-white pointer-events-auto">
+        <div 
+            className="w-60 flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl overflow-hidden backdrop-blur-md bg-opacity-95 text-white pointer-events-auto flex-shrink-0"
+            style={{ height }}
+        >
             {/* Tabs */}
             <div className="flex border-b border-panel-border">
                 <button className="flex-1 py-2 text-sm font-bold border-b-2 border-primary bg-primary/5">RENDER</button>
                 <button className="flex-1 py-2 text-sm font-bold opacity-30 cursor-not-allowed">REFINE</button>
             </div>
 
-            <div className="p-3 space-y-3 overflow-y-auto custom-scrollbar">
+            <div className="p-[5px] space-y-[5px] overflow-y-auto custom-scrollbar">
                 {/* Prompt Section */}
                 <div className="space-y-2">
                     <div className="flex justify-between items-center text-sm">
@@ -191,7 +198,7 @@ export const RenderPanel: React.FC = () => {
             </div>
 
             {/* Generate Button Wrapper */}
-            <div className="p-3 pt-0 mt-auto flex gap-2">
+            <div className="p-[5px] pt-0 mt-auto flex gap-2">
                 <div className="relative">
                     <button
                         onClick={() => setShowNumImagesDropdown(!showNumImagesDropdown)}

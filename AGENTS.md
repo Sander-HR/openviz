@@ -22,6 +22,15 @@ This repository contains **OpenViz**, a React-based design application powered b
 **File Limits**: Alert me if a file is >300 lines. Refactor by splitting Logic/View/Types.
 **Imports**: Use named exports. Absolute imports `@/features/...` preferred over relative `../../`.
 
+## Tech Stack
+| Library | Purpose | Usage |
+|---------|---------|-------|
+| **Radix UI** | Accessible UI primitives | Context menus, dropdowns, dialogs. Handles portalling, collision detection, keyboard nav |
+| **Tailwind CSS** | Styling | All styling - no inline styles |
+| **Framer Motion** | Animations | UI transitions, layout animations |
+| **Zustand** | State management | Global app state |
+| **Konva.js** | Canvas rendering | Design canvas implementation |
+
 ## Folder Mapping
 | Type | Location |
 |------|----------|

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { ChevronDown, MoreHorizontal, RotateCcw, Eye, Download, ArrowLeft, ArrowRight, Archive, PlusSquare } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -6,12 +6,17 @@ import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { ContextMenu } from '../ContextMenu';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-export const ResultsPanel: React.FC = () => {
+interface ResultsPanelProps {
+    height: number;
+}
+
+export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
     const {
         renderResults,
         activeNodeId,
@@ -19,14 +24,18 @@ export const ResultsPanel: React.FC = () => {
         setResultsPanelOpen,
         previewingRender,
         setPreviewingRender,
+        isPreviewVisible,
+        setIsPreviewVisible,
         addResultAsLayer,
         loadRenderSettings,
         addGroupToWorkbench,
+        addImageToWorkbench,
         isRendering
     } = useStore();
 
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
     const [isExporting, setIsExporting] = React.useState<string | null>(null);
+    const [lastPreviewedImage, setLastPreviewedImage] = useState<string | null>(null);
 
     // Filter render results to show only those for the current active node
     const filteredRenderResults = renderResults.filter(group =>
@@ -34,7 +43,46 @@ export const ResultsPanel: React.FC = () => {
         (!group.sourceNodeId && activeNodeId === 'default')
     );
 
-    if (filteredRenderResults.length === 0 && !isRendering) return null;
+    // Flatten all images for navigation
+    const allImages = filteredRenderResults.flatMap(g => g.images);
+    const currentIndex = previewingRender ? allImages.indexOf(previewingRender) : -1;
+
+    const handlePrevRender = useCallback(() => {
+        if (allImages.length === 0) return;
+        const newIndex = currentIndex <= 0 ? allImages.length - 1 : currentIndex - 1;
+        const newImage = allImages[newIndex];
+        setLastPreviewedImage(newImage);
+        setIsPreviewVisible(true);
+        setPreviewingRender(newImage);
+    }, [allImages, currentIndex, setPreviewingRender]);
+
+    const handleNextRender = useCallback(() => {
+        if (allImages.length === 0) return;
+        const newIndex = currentIndex >= allImages.length - 1 ? 0 : currentIndex + 1;
+        const newImage = allImages[newIndex];
+        setLastPreviewedImage(newImage);
+        setIsPreviewVisible(true);
+        setPreviewingRender(newImage);
+    }, [allImages, currentIndex, setPreviewingRender]);
+
+    // Keyboard navigation
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only handle if we're in the studio and not typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                handlePrevRender();
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                handleNextRender();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handlePrevRender, handleNextRender]);
 
     const handleExportZip = async (group: any) => {
         setIsExporting(group.id);
@@ -59,14 +107,28 @@ export const ResultsPanel: React.FC = () => {
         }
     };
 
+    const handleDownloadImage = async (imageUrl: string) => {
+        try {
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+            const extension = imageUrl.split('.').pop()?.split('?')[0] || 'png';
+            saveAs(blob, `render_${Date.now()}.${extension}`);
+        } catch (error) {
+            console.error("Failed to download image", error);
+        }
+    };
+
     return (
-        <div className={cn(
-            "w-full flex-shrink flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl overflow-hidden backdrop-blur-md bg-opacity-95 text-white transition-all duration-300 pointer-events-auto",
-            !resultsPanelOpen ? "h-10" : "max-h-[40vh]"
-        )}>
+        <div 
+            className={cn(
+                "w-full flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl overflow-hidden backdrop-blur-md bg-opacity-95 text-white transition-all duration-300 pointer-events-auto flex-1",
+                !resultsPanelOpen && "h-10"
+            )}
+            style={resultsPanelOpen ? { height } : undefined}
+        >
             {/* Header */}
             <div
-                className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-white/5 transition-colors border-b border-panel-border"
+                className="flex items-center justify-between px-[5px] py-[5px] cursor-pointer hover:bg-white/5 transition-colors border-b border-panel-border"
                 onClick={() => setResultsPanelOpen(!resultsPanelOpen)}
             >
                 <div className="flex items-center gap-2">
@@ -81,7 +143,7 @@ export const ResultsPanel: React.FC = () => {
             {/* Content Area */}
             {resultsPanelOpen && (
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-3">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-[5px] space-y-[5px]">
                         {/* Rendering Status Placeholder */}
                         {isRendering && (
                             <div className="space-y-3 animate-pulse">
@@ -101,6 +163,12 @@ export const ResultsPanel: React.FC = () => {
                         {/* Date Grouping */}
                         <div className="space-y-3">
                             {filteredRenderResults.length > 0 && <h3 className="text-xs font-bold opacity-90">Latest Renders</h3>}
+
+                            {filteredRenderResults.length === 0 && !isRendering && (
+                                <div className="flex items-center justify-center h-32 text-sm opacity-50 text-center px-4">
+                                    nothing here yet! once you generate something it will appear here
+                                </div>
+                            )}
 
                             {filteredRenderResults.map((group) => (
                                 <div key={group.id} className="space-y-2">
@@ -183,19 +251,52 @@ export const ResultsPanel: React.FC = () => {
                                     {/* Image Grid */}
                                     <div className="grid grid-cols-4 gap-1">
                                         {group.images.map((img, idx) => (
-                                            <button
+                                            <ContextMenu
                                                 key={idx}
-                                                onClick={() => setPreviewingRender(img)}
-                                                className={cn(
-                                                    "aspect-square rounded-lg overflow-hidden border transition-all relative group/thumb",
-                                                    previewingRender === img ? "border-primary shadow-lg shadow-primary/20" : "border-neutral-800 hover:border-white/20"
-                                                )}
+                                                actions={[
+                                                    {
+                                                        label: 'Add as layer',
+                                                        onClick: () => addResultAsLayer(img)
+                                                    },
+                                                    {
+                                                        label: 'Add to workbench',
+                                                        onClick: () => addImageToWorkbench(img)
+                                                    },
+                                                    {
+                                                        label: 'Add to Asset Library',
+                                                        onClick: () => {},
+                                                        disabled: true
+                                                    },
+                                                    {
+                                                        divider: true
+                                                    },
+                                                    {
+                                                        label: 'Download',
+                                                        onClick: () => handleDownloadImage(img)
+                                                    },
+                                                    {
+                                                        label: 'Download all results',
+                                                        onClick: () => handleExportZip(group)
+                                                    },
+                                                ]}
                                             >
-                                                <img src={img} alt={`Result ${idx}`} className="w-full h-full object-cover" />
-                                                {previewingRender === img && (
-                                                    <div className="absolute inset-0 bg-primary/10 pointer-events-none" />
-                                                )}
-                                            </button>
+                                                <div
+                                                    onClick={() => {
+                                                        setLastPreviewedImage(img);
+                                                        setIsPreviewVisible(true);
+                                                        setPreviewingRender(img);
+                                                    }}
+                                                    className={cn(
+                                                        "aspect-square rounded-lg overflow-hidden border transition-all relative group/thumb cursor-pointer",
+                                                        previewingRender === img ? "border-primary shadow-lg shadow-primary/20" : "border-neutral-800 hover:border-white/20"
+                                                    )}
+                                                >
+                                                    <img src={img} alt={`Result ${idx}`} className="w-full h-full object-cover" />
+                                                    {previewingRender === img && (
+                                                        <div className="absolute inset-0 bg-primary/10 pointer-events-none" />
+                                                    )}
+                                                </div>
+                                            </ContextMenu>
                                         ))}
                                     </div>
                                 </div>
@@ -204,18 +305,49 @@ export const ResultsPanel: React.FC = () => {
                     </div>
 
                     {/* Footer */}
-                    <div className="p-2 border-t border-panel-border flex items-center justify-between bg-black/20 mt-auto">
+                    <div className="p-[5px] border-t border-panel-border flex items-center justify-between bg-black/20 mt-auto">
                         <div className="flex items-center gap-1">
-                            <button className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60">
+                            <button
+                                className={cn(
+                                    "p-1.5 hover:bg-white/10 rounded-lg transition-colors",
+                                    isPreviewVisible && previewingRender ? "opacity-100 text-primary" : "opacity-60"
+                                )}
+                                onClick={() => {
+                                    if (previewingRender) {
+                                        // Toggle visibility without clearing the selected image
+                                        setIsPreviewVisible(!isPreviewVisible);
+                                    } else if (lastPreviewedImage) {
+                                        // Restore last viewed image
+                                        setPreviewingRender(lastPreviewedImage);
+                                        setIsPreviewVisible(true);
+                                    }
+                                }}
+                                title={isPreviewVisible && previewingRender ? "Hide preview" : "Show preview"}
+                            >
                                 <Eye size={16} />
                             </button>
-                            <button className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60">
+                            <button 
+                                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60"
+                                onClick={handlePrevRender}
+                                disabled={allImages.length === 0}
+                                title="Previous render (←)"
+                            >
                                 <ArrowLeft size={16} />
                             </button>
-                            <button className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60">
+                            <button 
+                                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60"
+                                onClick={handleNextRender}
+                                disabled={allImages.length === 0}
+                                title="Next render (→)"
+                            >
                                 <ArrowRight size={16} />
                             </button>
-                            <button className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60">
+                            <button 
+                                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60"
+                                onClick={() => previewingRender && handleDownloadImage(previewingRender)}
+                                disabled={!previewingRender}
+                                title="Download current"
+                            >
                                 <Download size={16} />
                             </button>
                         </div>
@@ -235,6 +367,7 @@ export const ResultsPanel: React.FC = () => {
                     </div>
                 </div >
             )}
-        </div >
+
+        </div>
     );
 };

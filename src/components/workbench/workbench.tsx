@@ -18,7 +18,7 @@ import { VideoNode } from './VideoNode';
 import { WorkbenchAnimateNode } from './AnimateNode';
 import { WorkbenchRenderNode } from './RenderNode';
 import { CustomEdge } from './CustomEdge';
-import { ContextMenu } from '../ContextMenu';
+import { PositionedMenu } from '../ContextMenu';
 import { BasicBlocksMenu } from '../nodes/BasicBlocksMenu';
 import { useWorkbench } from './hooks/useWorkbench';
 import { useStore } from '../../store/useStore';
@@ -190,9 +190,10 @@ const WorkbenchContent: React.FC = () => {
             </div>
 
             {contextMenu && (
-                <ContextMenu
+                <PositionedMenu
                     x={contextMenu.x}
                     y={contextMenu.y}
+                    open={!!contextMenu}
                     onClose={() => setContextMenu(null)}
                     actions={contextMenuActions}
                 />

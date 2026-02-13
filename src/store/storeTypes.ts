@@ -6,6 +6,7 @@ export interface AppState {
     renderSettings: RenderSettings;
     renderResults: RenderGroup[];
     previewingRender: string | null;
+    isPreviewVisible: boolean;
     isRendering: boolean;
     resultsPanelOpen: boolean;
     activeLayerId: string | null;
@@ -61,9 +62,11 @@ export interface AppState {
     clearRenderResults: () => void;
     setRenderResults: (results: RenderGroup[]) => void;
     setPreviewingRender: (image: string | null) => void;
+    setIsPreviewVisible: (visible: boolean) => void;
     setRendering: (loading: boolean) => void;
     setResultsPanelOpen: (open: boolean) => void;
     addGroupToWorkbench: (group: RenderGroup) => void;
+    addImageToWorkbench: (image: string) => void;
     addResultAsLayer: (image: string) => void;
 
     // History Actions

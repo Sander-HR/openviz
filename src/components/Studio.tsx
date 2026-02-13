@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Toolbar } from './studio/Toolbar';
 import { RenderPanel } from './studio/RenderPanel';
@@ -12,6 +12,48 @@ import { useStore } from '../store/useStore';
 
 export const Studio: React.FC = () => {
     const { setActiveTool, isExitingStudio, undo, redo } = useStore();
+    const [renderPanelHeight, setRenderPanelHeight] = useState(320);
+    const [resultsPanelHeight, setResultsPanelHeight] = useState(200);
+    const [isResizing, setIsResizing] = useState(false);
+    const resizeStartY = useRef(0);
+    const startRenderHeight = useRef(0);
+    const startResultsHeight = useRef(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const handleResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+        resizeStartY.current = e.clientY;
+        startRenderHeight.current = renderPanelHeight;
+        startResultsHeight.current = resultsPanelHeight;
+    }, [renderPanelHeight, resultsPanelHeight]);
+
+    const handleResizeMove = useCallback((e: MouseEvent) => {
+        if (!isResizing) return;
+        
+        const deltaY = e.clientY - resizeStartY.current;
+        const newRenderHeight = Math.max(200, Math.min(500, startRenderHeight.current + deltaY));
+        const newResultsHeight = Math.max(100, Math.min(400, startResultsHeight.current - deltaY));
+        
+        setRenderPanelHeight(newRenderHeight);
+        setResultsPanelHeight(newResultsHeight);
+    }, [isResizing]);
+
+    const handleResizeEnd = useCallback(() => {
+        setIsResizing(false);
+    }, []);
+
+    useEffect(() => {
+        if (isResizing) {
+            window.addEventListener('mousemove', handleResizeMove);
+            window.addEventListener('mouseup', handleResizeEnd);
+        }
+        
+        return () => {
+            window.removeEventListener('mousemove', handleResizeMove);
+            window.removeEventListener('mouseup', handleResizeEnd);
+        };
+    }, [isResizing, handleResizeMove, handleResizeEnd]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -89,13 +131,19 @@ export const Studio: React.FC = () => {
                         <LayerPanel />
                     </motion.div>
                     <motion.div
-                        className="pointer-events-none flex flex-col gap-4 fixed top-4 right-4 bottom-4 z-50 w-60"
+                        ref={containerRef}
+                        className="pointer-events-none flex flex-col fixed top-4 right-4 bottom-4 z-50 w-60"
                         initial="visible"
                         animate={isExitingStudio ? "hiddenRight" : "visible"}
                         variants={panelVariants}
                     >
-                        <RenderPanel />
-                        <ResultsPanel />
+                        <RenderPanel height={renderPanelHeight} />
+                        <div 
+                            className="h-[5px] cursor-row-resize hover:bg-primary/30 transition-colors flex-shrink-0 pointer-events-auto"
+                            onMouseDown={handleResizeStart}
+                            title="Drag to resize panels"
+                        />
+                        <ResultsPanel height={resultsPanelHeight} />
                     </motion.div>
                 </div>
 

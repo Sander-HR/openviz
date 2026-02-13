@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../storeTypes';
 import { ViewMode, WorkbenchNode, ImageNode, VideoNode, Project, AspectRatio, RenderGroup } from '../../types';
 import { INITIAL_PROJECT } from '../initialState';
+import { findNonOverlappingPosition } from '../../services/nodePositioning';
 
 export interface WorkbenchSlice {
     viewMode: ViewMode;
@@ -29,6 +30,7 @@ export interface WorkbenchSlice {
     createSketchWithFormat: (width: number, height: number) => void;
     setExitingStudio: (exiting: boolean) => void;
     addGroupToWorkbench: (group: RenderGroup) => void;
+    addImageToWorkbench: (image: string) => void;
 }
 
 export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice> = (set, get) => ({
@@ -411,30 +413,17 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
         group.images.forEach((image) => {
             const id = Math.random().toString(36).substr(2, 9);
 
-            // Find non-overlapping position
-            let currentX = startX;
-            let currentY = startY;
-            let foundPos = false;
-
-            while (!foundPos) {
-                const overlap = [...nodes, ...newNodes].some(n =>
-                    currentX < n.x + n.width + 20 &&
-                    currentX + nodeWidth + 20 > n.x &&
-                    currentY < n.y + n.height + 20 &&
-                    currentY + nodeHeight + 20 > n.y
-                );
-
-                if (overlap) {
-                    currentY += nodeHeight + 50;
-                    // If we've gone too far down, move right and reset Y
-                    if (currentY > startY + (nodeHeight + 50) * 3) {
-                        currentY = startY;
-                        currentX += nodeWidth + 50;
-                    }
-                } else {
-                    foundPos = true;
-                }
-            }
+            // Find non-overlapping position using the positioning service
+            const { x: currentX, y: currentY } = findNonOverlappingPosition({
+                startX,
+                startY,
+                nodeWidth,
+                nodeHeight,
+                existingNodes: [...nodes, ...newNodes],
+                columns: 4,
+                gap: 50,
+                margin: 20
+            });
 
             const newProject: Project = {
                 ...INITIAL_PROJECT,
@@ -488,6 +477,96 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
 
         return {
             workbenchNodes: [...state.workbenchNodes, ...newNodes]
+        };
+    }),
+
+    addImageToWorkbench: (image) => set((state: AppState) => {
+        const activeNode = state.workbenchNodes.find(n => n.id === state.activeNodeId) as ImageNode | undefined;
+
+        // Default dimensions (256x256 matches Studio's 1024/4)
+        let nodeWidth = 256;
+        let nodeHeight = 256;
+
+        // Inherit dimensions from active node if it exists
+        if (activeNode) {
+            nodeWidth = activeNode.width;
+            nodeHeight = activeNode.height;
+        }
+
+        // Position to the right of the active node, or default position
+        const startX = activeNode ? activeNode.x + activeNode.width + 100 : 100;
+        const startY = activeNode ? activeNode.y : 100;
+
+        // Use the extracted positioning service
+        const { x: currentX, y: currentY } = findNonOverlappingPosition({
+            startX,
+            startY,
+            nodeWidth,
+            nodeHeight,
+            existingNodes: state.workbenchNodes,
+            columns: 4,
+            gap: 50,
+            margin: 20
+        });
+
+        const id = Math.random().toString(36).substr(2, 9);
+
+        // Calculate aspect ratio from dimensions
+        const ratio = nodeWidth / nodeHeight;
+        let aspectRatio: AspectRatio = 'square';
+        if (Math.abs(ratio - 1) > 0.1) {
+            aspectRatio = ratio > 1 ? 'landscape' : 'portrait';
+        }
+
+        const newProject: Project = {
+            ...INITIAL_PROJECT,
+            id,
+            name: 'Image',
+            thumbnail: image,
+            canvas: {
+                ...INITIAL_PROJECT.canvas,
+                width: 1024,
+                height: 1024,
+                aspectRatio
+            },
+            layers: [
+                {
+                    ...INITIAL_PROJECT.layers[0],
+                    id: 'bg-layer',
+                    order: 0,
+                },
+                {
+                    id: 'render-layer',
+                    name: 'Render',
+                    type: 'render',
+                    visible: true,
+                    locked: false,
+                    opacity: 100,
+                    blendMode: 'normal',
+                    strokes: [],
+                    image,
+                    order: 1,
+                    created: Date.now(),
+                    modified: Date.now(),
+                }
+            ],
+            createdAt: Date.now(),
+            lastModifiedAt: Date.now()
+        };
+
+        const newNode: ImageNode = {
+            id,
+            type: 'image',
+            name: 'Image',
+            x: currentX,
+            y: currentY,
+            width: nodeWidth,
+            height: nodeHeight,
+            project: newProject
+        };
+
+        return {
+            workbenchNodes: [...state.workbenchNodes, newNode]
         };
     }),
 });

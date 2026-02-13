@@ -4,6 +4,7 @@ import { RenderNode as RenderNodeType, RenderSettings, ImageNode as ImageNodeTyp
 import { useStore } from '../../store/useStore';
 import { renderService } from '../../services/renderService';
 import { getRenderStyles } from '../../services/ai/workflowRegistry';
+import { findNonOverlappingPosition } from '../../services/nodePositioning';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -92,47 +93,21 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                 }
             }
             
-            const gap = 50;
-            const columns = 4;
-            let slotIndex = 0;
-
             for (let i = 0; i < numImages; i++) {
                 const newId = crypto.randomUUID();
                 placeholderIds.push(newId);
 
-                // Find a non-overlapping position
-                let foundPosition = false;
-                let currentX = 0;
-                let currentY = 0;
-
-                while (!foundPosition) {
-                    const col = slotIndex % columns;
-                    const row = Math.floor(slotIndex / columns);
-                    
-                    currentX = startX + (col * (nodeWidth + gap));
-                    currentY = startY + (row * (nodeHeight + gap));
-
-                    // Check for overlap with existing nodes (including newly added placeholders)
-                    // We need to check against workbenchNodes AND the placeholders we just decided positions for, 
-                    // but since placeholders aren't in workbenchNodes yet until next render cycle (conceptually),
-                    // we rely on the grid logic + checking existing workbench nodes.
-                    // Actually addWorkbenchNode updates the store, but the local 'workbenchNodes' var 
-                    // from useStore() hook might not update instantly within this function execution.
-                    // However, our grid logic inherently avoids self-overlap. 
-                    // So we just check against existing workbench nodes to skip occupied slots.
-
-                    const isOverlapping = workbenchNodes.some(n => 
-                        currentX < n.x + n.width + 20 &&
-                        currentX + nodeWidth + 20 > n.x &&
-                        currentY < n.y + n.height + 20 &&
-                        currentY + nodeHeight + 20 > n.y
-                    );
-
-                    if (!isOverlapping) {
-                        foundPosition = true;
-                    }
-                    slotIndex++;
-                }
+                // Find a non-overlapping position using the positioning service
+                const { x: currentX, y: currentY } = findNonOverlappingPosition({
+                    startX,
+                    startY,
+                    nodeWidth,
+                    nodeHeight,
+                    existingNodes: workbenchNodes,
+                    columns: 4,
+                    gap: 50,
+                    margin: 20
+                });
 
                 const placeholderNode: ImageNodeType = {
                     id: newId,

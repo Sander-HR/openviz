@@ -11,10 +11,7 @@ export const mockRenderService: RenderService = {
         // Simulate upload and processing delay
         const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-        await delay(1500); // Simulate upload
-        console.log('🧪 [Mock] Sketch uploaded (simulated)');
-
-        await delay(3000); // Simulate rendering
+        await delay(1000); // Simulate upload and rendering
         console.log('🧪 [Mock] Rendering completed (simulated)');
 
         // Return a set of placeholder images with requested dimensions
@@ -36,7 +33,7 @@ export const mockRenderService: RenderService = {
         console.log('🧪 [Mock] Starting mock animation process...', request);
 
         const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-        await delay(5000); // Animation takes longer
+        await delay(1000); // Simulate animation rendering
 
         // Simulate video URL (using a placeholder video or GIF if possible, but let's just return a placeholder image for now as the type expects string URLs)
         // Ideally GenerateResponse.images should support video URLs too
