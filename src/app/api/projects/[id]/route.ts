@@ -43,3 +43,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     return NextResponse.json(updated);
 }
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // In a real app, verify project ownership/permissions here
+
+    const [deleted] = await db
+        .delete(projects)
+        .where(eq(projects.id, id))
+        .returning();
+
+    if (!deleted) return NextResponse.json({ error: "Not Found" }, { status: 404 });
+
+    return NextResponse.json(deleted);
+}

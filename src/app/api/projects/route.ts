@@ -7,12 +7,15 @@ import { NextResponse } from "next/server";
 
 /**
  * GET /api/projects
- * Fetches all projects for the authenticated user across all workspaces.
+ * Fetches all projects for the authenticated user in a specific workspace.
  * Auto-initializes user and default workspace if they don't exist.
  */
-export async function GET() {
+export async function GET(req: Request) {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { searchParams } = new URL(req.url);
+    const workspaceId = searchParams.get("workspaceId");
 
     const userId = session.user.id;
 
@@ -26,47 +29,73 @@ export async function GET() {
         });
     }
 
-    // 2. Check for workspace membership
+    // 2. Check for workspace membership to ensure user can access this workspace
+    // If no workspaceId is provided, fallback to matching any workspace the user is in (or return empty)
+    // But for this feature request, we want strict filtering. 
+    // If workspaceId is missing, we might return an empty list or error, but let's handle the auto-init case first.
+
     const userMemberships = await db
         .select()
         .from(workspaceMemberships)
         .where(eq(workspaceMemberships.userId, userId));
 
-    let targetWorkspaceId: string;
-
     if (userMemberships.length === 0) {
-        // Create a default workspace
+        // ... (Same auto-init logic as before) ...
         const [newWorkspace] = await db.insert(workspaces).values({
             name: "Default Workspace",
             slug: `default-${userId.slice(0, 8)}`,
             ownerId: userId,
         }).returning();
 
-        targetWorkspaceId = newWorkspace.id;
-
-        // Add user as owner
         await db.insert(workspaceMemberships).values({
-            workspaceId: targetWorkspaceId,
+            workspaceId: newWorkspace.id,
             userId: userId,
             role: "owner",
         });
 
-        // Create the "Introduction" project
         await db.insert(projects).values({
             name: "Introduction",
             description: "Welcome to OpenViz! This is your first project.",
-            workspaceId: targetWorkspaceId,
+            workspaceId: newWorkspace.id,
         });
+
+        // Return the projects for this new workspace
+        const userProjects = await db
+            .select()
+            .from(projects)
+            .where(eq(projects.workspaceId, newWorkspace.id));
+
+        return NextResponse.json(userProjects);
     }
 
-    const userProjects = await db
+    if (!workspaceId) {
+        // If no workspace specified, return all projects for user (legacy behavior) or empty?
+        // Let's return all projects the user has access to for now, or just projects from the first found workspace?
+        // The implementation plan says "Filter projects by this workspaceId". 
+        // If the frontend always sends workspaceId (which it should), this is fine.
+        // If not, let's return all projects the user is a member of workspaces for.
+        const userProjects = await db
+            .select()
+            .from(projects)
+            .innerJoin(workspaces, eq(projects.workspaceId, workspaces.id))
+            .innerJoin(workspaceMemberships, eq(workspaces.id, workspaceMemberships.workspaceId))
+            .where(eq(workspaceMemberships.userId, userId));
+
+        return NextResponse.json(userProjects.map(p => p.projects));
+    }
+
+    // Verify membership in the requested workspace
+    const isMember = userMemberships.some(m => m.workspaceId === workspaceId);
+    if (!isMember) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const workspaceProjects = await db
         .select()
         .from(projects)
-        .innerJoin(workspaces, eq(projects.workspaceId, workspaces.id))
-        .innerJoin(workspaceMemberships, eq(workspaces.id, workspaceMemberships.workspaceId))
-        .where(eq(workspaceMemberships.userId, userId));
+        .where(eq(projects.workspaceId, workspaceId));
 
-    return NextResponse.json(userProjects.map(p => p.projects));
+    return NextResponse.json(workspaceProjects);
 }
 
 /**
