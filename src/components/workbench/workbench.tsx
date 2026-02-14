@@ -23,6 +23,7 @@ import { BasicBlocksMenu } from '../nodes/BasicBlocksMenu';
 import { useWorkbench } from './hooks/useWorkbench';
 import { useStore } from '../../store/useStore';
 import { CanvasControls } from '../studio/CanvasControls';
+import { GoHomeButton } from '../common/GoHomeButton';
 
 const nodeTypes: NodeTypes = {
     imageNode: ImageNode,
@@ -152,13 +153,17 @@ const WorkbenchContent: React.FC = () => {
             </ReactFlow>
 
             <div className="absolute bottom-4 right-4 z-20">
-                <CanvasControls 
+                <CanvasControls
                     zoomLevel={zoom}
                     onZoomIn={() => zoomIn({ duration: 300 })}
                     onZoomOut={() => zoomOut({ duration: 300 })}
                     onResetZoom={() => setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 300 })}
                     onFitToScreen={() => fitView({ duration: 300 })}
                 />
+            </div>
+
+            <div className="absolute bottom-4 left-4 z-20">
+                <GoHomeButton />
             </div>
 
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10" ref={dropdownRef}>
@@ -208,7 +213,7 @@ const WorkbenchContent: React.FC = () => {
                         transform: 'translateY(-50%)',
                     }}
                 >
-                    <BasicBlocksMenu onSelect={handleBlockSelect} onClose={() => {}} />
+                    <BasicBlocksMenu onSelect={handleBlockSelect} onClose={() => { }} />
                 </div>
             )}
         </div>

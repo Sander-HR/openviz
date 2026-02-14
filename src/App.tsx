@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useStore } from './store/useStore';
-import { renderService } from './services/renderService';
+import { renderService } from './services/apiRenderService';
 import { Studio } from './components/Studio';
 import { Workbench } from './components/workbench/workbench';
 

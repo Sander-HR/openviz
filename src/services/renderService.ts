@@ -66,7 +66,7 @@ const uploadImage = async (base64String: string, prefix = 'sketch'): Promise<str
         const response = await fetchWithTimeout(`${comfyUrl}/upload/image`, {
             method: 'POST',
             body: formData,
-            timeout: 10000 
+            timeout: 10000
         });
 
         if (!response.ok) {
@@ -176,10 +176,10 @@ const pollHistory = async (promptId: string): Promise<ComfyHistoryResponse[strin
  * 3. Sending to API
  */
 const executeWorkflow = async (
-    workflow: WorkflowDefinition, 
-    injections: { 
-        prompt?: string, 
-        negative?: string, 
+    workflow: WorkflowDefinition,
+    injections: {
+        prompt?: string,
+        negative?: string,
         initImage?: string,
         width?: number,
         height?: number,
@@ -187,7 +187,7 @@ const executeWorkflow = async (
         numImages?: number
     }
 ): Promise<string[]> => {
-    
+
     // 1. Prepare Payload
     const workflowPayload = JSON.parse(JSON.stringify(workflow.template));
     const seed = Math.floor(Math.random() * 1_000_000_000_000);
@@ -217,7 +217,7 @@ const executeWorkflow = async (
 
     // ControlNet Strength (if applicable)
     if (nodes.controlnet_strength && workflowPayload[nodes.controlnet_strength] && injections.strength !== undefined) {
-         workflowPayload[nodes.controlnet_strength].inputs.strength = injections.strength;
+        workflowPayload[nodes.controlnet_strength].inputs.strength = injections.strength;
     }
 
     // Dimensions / Batch Size (This usually depends on EmptyLatent or specific nodes)
@@ -265,10 +265,10 @@ const executeWorkflow = async (
     const files = outputs.images || outputs.videos || outputs.gifs || [];
 
     if (files.length === 0) {
-         throw new Error('No output files returned');
+        throw new Error('No output files returned');
     }
 
-    return files.map((f) => 
+    return files.map((f) =>
         `${comfyUrl}/view?filename=${f.filename}&subfolder=${f.subfolder}&type=${f.type}`
     );
 };
@@ -281,7 +281,7 @@ export const comfyRenderService: RenderService = {
 
             // 1. Upload
             const uploadedFileName = await uploadImage(request.init_image, 'sketch');
-            
+
             // 2. Resolve Workflow
             // If request.workflowId is provided use it, otherwise map stylePreset
             const workflowId = request.workflowId || mapStyleToId(request.stylePreset);
@@ -329,7 +329,7 @@ export const comfyRenderService: RenderService = {
             const workflowId = request.workflowId || 'video_standard'; // Default to standard video
             const workflow = getWorkflow(workflowId);
 
-             if (!workflow) {
+            if (!workflow) {
                 throw new Error(`Workflow not found for ID: ${workflowId}`);
             }
 
@@ -342,11 +342,11 @@ export const comfyRenderService: RenderService = {
                 // Video specific params could be mapped here if workflow supported them (e.g. motion bucket id)
             });
 
-             console.log('✨ Animation Success:', videoUrls);
+            console.log('✨ Animation Success:', videoUrls);
 
             return {
                 success: true,
-                images: videoUrls 
+                images: videoUrls
             };
 
         } catch (error: any) {
@@ -379,16 +379,16 @@ export const comfyRenderService: RenderService = {
             if (response.ok) {
                 const stats = await response.json();
                 console.log('✅ ComfyUI System Stats (Secondary):', stats);
-                
+
                 // Update global URLs to use secondary proxy
                 comfyUrl = secondaryUrl;
                 wsUrl = `${window.location.protocol === 'http:' ? 'ws:' : 'wss:'}//${window.location.host}${secondaryUrl}`;
                 console.log('🔄 Switched to secondary proxy:', comfyUrl);
-                
+
                 return true;
             }
         } catch (e) {
-             console.error('❌ Secondary connection check failed:', e);
+            console.error('❌ Secondary connection check failed:', e);
         }
 
         return false;
@@ -396,6 +396,6 @@ export const comfyRenderService: RenderService = {
 };
 
 // Toggle between real and mock service using environment variable
-const useMock = import.meta.env.VITE_USE_MOCK_RENDER === 'true';
+const useMock = process.env.NEXT_PUBLIC_USE_MOCK_RENDER === 'true' || process.env.VITE_USE_MOCK_RENDER === 'true';
 
 export const renderService: RenderService = useMock ? mockRenderService : comfyRenderService;

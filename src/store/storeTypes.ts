@@ -92,4 +92,6 @@ export interface AppState {
     createNewSketch: () => void;
     createSketchWithFormat: (width: number, height: number) => void;
     setExitingStudio: (exiting: boolean) => void;
+    setWorkbenchNodes: (nodes: WorkbenchNode[]) => void;
+    setConnections: (connections: Connection[]) => void;
 }

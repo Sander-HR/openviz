@@ -31,6 +31,8 @@ export interface WorkbenchSlice {
     setExitingStudio: (exiting: boolean) => void;
     addGroupToWorkbench: (group: RenderGroup) => void;
     addImageToWorkbench: (image: string) => void;
+    setWorkbenchNodes: (nodes: WorkbenchNode[]) => void;
+    setConnections: (connections: any[]) => void;
 }
 
 export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice> = (set, get) => ({
@@ -212,10 +214,20 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
         };
     }),
 
+
     saveCurrentToWorkbench: (thumbnail) => {
         const state = get() as AppState;
         const currentProject = { ...state.project, thumbnail, lastModifiedAt: Date.now() };
         const existingNode = state.workbenchNodes.find(n => n.id === state.activeNodeId);
+
+        // Sync to backend if it's a real project ID (UUID)
+        if (state.activeNodeId && state.activeNodeId.length > 20) {
+            fetch(`/api/projects/${state.activeNodeId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ thumbnailUrl: thumbnail }),
+                headers: { 'Content-Type': 'application/json' }
+            }).catch(err => console.error("Failed to sync thumbnail:", err));
+        }
 
         // Get render results for the current active node
         const nodeRenderResults = state.renderResults.filter(r =>
@@ -249,6 +261,7 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             });
         }
     },
+
 
     openNodeInStudio: (id) => {
         const state = get() as AppState;
@@ -337,7 +350,7 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
     createSketchWithFormat: (width, height) => {
         const id = Math.random().toString(36).substr(2, 9);
         const ratio = width === height ? 'square' : width > height ? 'landscape' : 'portrait';
-        
+
         const newProject: Project = {
             ...INITIAL_PROJECT,
             id,
@@ -569,4 +582,6 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             workbenchNodes: [...state.workbenchNodes, newNode]
         };
     }),
+    setWorkbenchNodes: (nodes) => set({ workbenchNodes: nodes }),
+    setConnections: (connections) => set({ connections }),
 });
