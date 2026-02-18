@@ -15,6 +15,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const viewMode = useStore((state) => state.viewMode);
     const setNodes = useStore((state) => state.setWorkbenchNodes);
     const setConnections = useStore((state) => state.setConnections);
+    const setCurrentProjectId = useStore((state) => state.setCurrentProjectId);
 
     const { data: projectData, isLoading, error } = useQuery({
         queryKey: ["projects", id],
@@ -26,16 +27,37 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     });
 
     useEffect(() => {
-        if (projectData?.data?.scene) {
+        // Set the current project ID in the store
+        setCurrentProjectId(id);
+
+        return () => {
+            // Clear the project ID when leaving the page
+            // Note: We keep workbenchNodes so the dashboard can show previews
+            setCurrentProjectId(null);
+        };
+    }, [id, setCurrentProjectId]);
+
+    useEffect(() => {
+        // Clear workbench nodes and connections first to avoid showing data from previous project
+        setNodes([]);
+        setConnections([]);
+
+        if (projectData?.scene) {
             // Hydrate the store with the project's scene data
-            const scene = projectData.data.scene;
-            if (scene.nodes) setNodes(scene.nodes);
+            const scene = projectData.scene;
+            // Tag nodes with projectId so dashboard can filter them properly
+            const nodesWithProjectId = scene.nodes?.map((node: any) => ({
+                ...node,
+                projectId: id
+            })) || [];
+            if (nodesWithProjectId.length > 0) setNodes(nodesWithProjectId);
             if (scene.connections) setConnections(scene.connections);
             setIsHydrated(true);
         } else if (projectData) {
+            // Project exists but has no scene data yet - start with empty workbench
             setIsHydrated(true);
         }
-    }, [projectData, setNodes, setConnections]);
+    }, [projectData, setNodes, setConnections, id]);
 
     if (isLoading || !isHydrated) {
         return (

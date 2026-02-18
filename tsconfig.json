@@ -21,6 +21,8 @@
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true,
+        "incremental": true,
+        "tsBuildInfoFile": ".tsbuildinfo",
         "baseUrl": ".",
         "paths": {
             "@/*": [

@@ -36,7 +36,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
 
     pushHistory: () => {
         const state = get() as AppState;
-        const snapshot = JSON.parse(JSON.stringify(state.project));
+        const snapshot = structuredClone(state.project);
         const newHistory = state.history.slice(0, state.historyIndex + 1);
         newHistory.push(snapshot);
         if (newHistory.length > 50) newHistory.shift();

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Settings2, Video, ChevronDown, Play } from 'lucide-react';
+import { useConnection, Handle, Position } from '@xyflow/react';
+import { Settings2, Video, ChevronDown, Play, Image as ImageIcon, Plus, X } from 'lucide-react';
 import { AnimateNode as AnimateNodeType, VideoNode as VideoNodeType, Project } from '../../types';
 import { useStore } from '../../store/useStore';
 import { renderService } from '../../services/renderService';
 import { getVideoStyles } from '../../services/ai/workflowRegistry';
+import { findNonOverlappingPosition } from '../../services/nodePositioning';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -18,9 +20,12 @@ interface AnimateNodeProps {
 }
 
 export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) => {
-    const { setActiveNodeId, updateWorkbenchNode, workbenchNodes, connections, addWorkbenchNode, addConnection } = useStore();
+    const connection = useConnection();
+    const { setActiveNodeId, updateWorkbenchNode, workbenchNodes, connections, removeConnection, addWorkbenchNode, addConnection } = useStore();
     const [isAnimating, setAnimating] = useState(false);
     const [showStyles, setShowStyles] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
+    const isHoverConnectable = connection.inProgress && connection.fromNode?.type === 'imageNode' && isHovered;
 
     const videoStyles = getVideoStyles();
     const settings = data.data.settings || { model: 'standard', duration: '5s' };
@@ -43,9 +48,48 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
         });
     };
 
-    // Find input connection
     const inboundConnections = connections.filter(c => c.to === id);
-    const sourceNodeId = inboundConnections[0]?.from;
+    const sourceNodeId1 = inboundConnections[0]?.from;
+    const sourceNodeId2 = inboundConnections[1]?.from;
+
+    const sourceNode1 = workbenchNodes.find(n => n.id === sourceNodeId1);
+    const sourceNode2 = workbenchNodes.find(n => n.id === sourceNodeId2);
+
+    const handleDisconnect = (index: number) => {
+        const connection = inboundConnections[index];
+        if (connection) {
+            removeConnection(connection.id);
+        }
+    };
+
+    const handleSwapFrames = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (inboundConnections.length === 2) {
+            const conn1 = inboundConnections[0];
+            const conn2 = inboundConnections[1];
+            // Remove both connections
+            removeConnection(conn1.id);
+            removeConnection(conn2.id);
+            // Re-add with swapped sources
+            addConnection(conn2.from, id);
+            addConnection(conn1.from, id);
+        }
+    };
+
+    // Auto-position once when connected to a source node - DISABLED
+    // Track the last source node ID to only auto-position on initial connection
+    // const lastSourceId = React.useRef<string | null>(null);
+    // useEffect(() => {
+    //     if (sourceNodeId1 && sourceNodeId1 !== lastSourceId.current) {
+    //         lastSourceId.current = sourceNodeId1;
+    //         const sourceNode = workbenchNodes.find(n => n.id === sourceNodeId1);
+    //         if (sourceNode) {
+    //             const targetX = sourceNode.x + (sourceNode.width || 0) + 100;
+    //             const targetY = sourceNode.y + ((sourceNode.height || 0) / 2) - ((data.height || 0) / 2);
+    //             updateWorkbenchNode(id, { x: targetX, y: targetY });
+    //         }
+    //     }
+    // }, [sourceNodeId1, workbenchNodes, id, data.height, updateWorkbenchNode]);
 
     const handleAnimate = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -54,18 +98,20 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
         const placeholderId = crypto.randomUUID();
 
         try {
-            // 1. Get Input Image
-            let initImage = data.data.frames?.start || "";
+            // 1. Get Input Images
+            let initImage = "";
+            let endImage = "";
             let width = 512;
             let height = 512;
 
-            if (sourceNodeId && !initImage) {
-                const sourceNode = workbenchNodes.find(n => n.id === sourceNodeId);
-                if (sourceNode?.type === 'image' && sourceNode.project?.thumbnail) {
-                    initImage = sourceNode.project.thumbnail;
-                    width = sourceNode.project.canvas.width;
-                    height = sourceNode.project.canvas.height;
-                }
+            if (sourceNode1 && (sourceNode1.type === 'image' || sourceNode1.type === 'video') && sourceNode1.project?.thumbnail) {
+                initImage = sourceNode1.project.thumbnail;
+                width = sourceNode1.project.canvas.width;
+                height = sourceNode1.project.canvas.height;
+            }
+
+            if (sourceNode2 && (sourceNode2.type === 'image' || sourceNode2.type === 'video') && sourceNode2.project?.thumbnail) {
+                endImage = sourceNode2.project.thumbnail;
             }
 
             if (!initImage) {
@@ -75,20 +121,42 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
             }
 
             // 2. Create Placeholder Output Node
-            const startX = data.x + data.width + 100;
-            const startY = data.y;
+            const startX = data.x + (data.width || 320) + 100;
             
-            // Calculate aspect ratio
+            // Calculate aspect ratio and dimensions
             const aspectRatio = width / height;
+            
+            // Try to inherit dimensions from source node for visual consistency
+            let nodeWidth = 512;
+            let nodeHeight = 512 / aspectRatio;
+            
+            if (sourceNode1) {
+                nodeWidth = sourceNode1.width || 512;
+                nodeHeight = sourceNode1.height || (512 / aspectRatio);
+            }
+
+            const startY = data.y + ((data.height || 0) / 2) - (nodeHeight / 2);
+
+            // Find a non-overlapping position using the positioning service
+            const { x: currentX, y: currentY } = findNonOverlappingPosition({
+                startX,
+                startY,
+                nodeWidth,
+                nodeHeight,
+                existingNodes: workbenchNodes,
+                columns: 4,
+                gap: 50,
+                margin: 50
+            });
 
             const placeholderNode: VideoNodeType = {
                 id: placeholderId,
                 type: 'video',
                 name: `Animating...`,
-                x: startX,
-                y: startY,
-                width: 512, // Default width
-                height: 512 / aspectRatio, // Calculate height based on aspect ratio
+                x: currentX,
+                y: currentY,
+                width: nodeWidth,
+                height: nodeHeight,
                 status: 'rendering',
                 project: {
                     id: placeholderId,
@@ -113,8 +181,9 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
 
             // 3. Call Service
             const response = await renderService.animate({
-                workflowId: settings.workflowId || 'video_standard',
+                workflowId: endImage ? 'animate_from_to' : (settings.workflowId || 'video_standard'),
                 init_image: initImage,
+                end_image: endImage,
                 prompt: prompt,
                 width: width,
                 height: height
@@ -193,11 +262,29 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
     return (
         <div
             onClick={handleNodeClick}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
             className={cn(
-                "w-[320px] bg-[#1a1a1a] rounded-2xl shadow-2xl border-2 transition-colors pointer-events-auto flex flex-col overflow-hidden",
-                selected ? 'border-[#6366f1]' : 'border-[#333] hover:border-[#6366f1]'
+                "relative w-[320px] bg-[#1a1a1a] rounded-2xl shadow-2xl border-2 transition-colors pointer-events-auto flex flex-col overflow-hidden",
+                selected ? 'border-[#6366f1]' : 'border-[#333] hover:border-[#6366f1]',
+                isHoverConnectable && 'border-[#6366f1]'
             )}
         >
+            {/* Invisible target handle covering the whole node for better snap detection */}
+            <Handle
+                type="target"
+                position={Position.Left}
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    zIndex: 10000,
+                }}
+            />
              {/* Header */}
              <div className="p-4 border-b border-[#333] bg-[#222]">
                  <div className="flex items-center justify-between">
@@ -209,6 +296,74 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
             </div>
 
             <div className="p-4 space-y-4">
+                {/* Frames Section */}
+                <div className="space-y-2 pointer-events-auto">
+                    <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Frames</div>
+                    <div className="flex items-center gap-2">
+                        {sourceNode1 && (sourceNode1.type === 'image' || sourceNode1.type === 'video') ? (
+                            <div className="flex items-center gap-2 bg-[#2a2a2a] pl-1 pr-2 py-1 rounded-lg border border-[#333] group transition-colors hover:border-gray-600">
+                                {sourceNode1.project?.thumbnail ? (
+                                    <img src={sourceNode1.project.thumbnail} className="w-8 h-8 rounded object-cover bg-white" alt="Start" />
+                                ) : (
+                                    <div className="w-8 h-8 rounded bg-[#333] flex items-center justify-center">
+                                        <ImageIcon size={14} className="text-gray-500" />
+                                    </div>
+                                )}
+                                <span className="text-white text-xs font-medium">Start</span>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDisconnect(0); }}
+                                    className="p-1 hover:bg-[#333] rounded-md transition-colors"
+                                >
+                                    <X size={12} className="text-gray-500 hover:text-white" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex items-center gap-2 bg-[#2a2a2a]/50 px-3 py-2 rounded-lg border border-dashed border-[#333] opacity-60">
+                                <ImageIcon size={14} className="text-gray-500" />
+                                <span className="text-gray-500 text-xs">Drop Start</span>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={handleSwapFrames}
+                            disabled={inboundConnections.length !== 2}
+                            className={cn(
+                                "p-1.5 rounded-lg transition-colors",
+                                inboundConnections.length === 2
+                                    ? "text-gray-400 hover:text-white hover:bg-[#333] cursor-pointer"
+                                    : "text-gray-700 cursor-not-allowed"
+                            )}
+                            title={inboundConnections.length === 2 ? "Swap frames" : "Connect two frames to swap"}
+                        >
+                            ⇄
+                        </button>
+
+                        {sourceNode2 && (sourceNode2.type === 'image' || sourceNode2.type === 'video') ? (
+                            <div className="flex items-center gap-2 bg-[#2a2a2a] pl-1 pr-2 py-1 rounded-lg border border-[#333] group transition-colors hover:border-gray-600">
+                                {sourceNode2.project?.thumbnail ? (
+                                    <img src={sourceNode2.project.thumbnail} className="w-8 h-8 rounded object-cover bg-white" alt="End" />
+                                ) : (
+                                    <div className="w-8 h-8 rounded bg-[#333] flex items-center justify-center">
+                                        <ImageIcon size={14} className="text-gray-500" />
+                                    </div>
+                                )}
+                                <span className="text-white text-xs font-medium">End</span>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDisconnect(1); }}
+                                    className="p-1 hover:bg-[#333] rounded-md transition-colors"
+                                >
+                                    <X size={12} className="text-gray-500 hover:text-white" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex items-center gap-2 bg-[#2a2a2a]/50 px-3 py-2 rounded-lg border border-dashed border-[#333] opacity-60">
+                                <Plus size={14} className="text-gray-500" />
+                                <span className="text-gray-500 text-xs">Add End</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
                 <div className="space-y-2">
                     <div className="text-gray-400 text-xs font-bold uppercase tracking-wider">Settings</div>
                     <div className="flex gap-2">

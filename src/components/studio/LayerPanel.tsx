@@ -12,13 +12,22 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Reorder } from 'framer-motion';
 import { LayerDropdown } from './LayerDropdown';
+import { LayerPanelCanvasSettings } from './LayerPanelCanvasSettings';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
 export const LayerPanel: React.FC = () => {
-    const { project, activeLayerId, addLayer, setActiveLayer, updateLayer, reorderLayers, setName } = useStore();
+    const {
+        project,
+        activeLayerId,
+        addLayer,
+        setActiveLayer,
+        updateLayer,
+        reorderLayers,
+        setName
+    } = useStore();
     const panelRef = React.useRef<HTMLDivElement>(null);
     const [dropdownLayerId, setDropdownLayerId] = React.useState<string | null>(null);
     const [dropdownPos, setDropdownPos] = React.useState<{ x: number, y: number }>({ x: 0, y: 0 });
@@ -154,6 +163,9 @@ export const LayerPanel: React.FC = () => {
                         </Reorder.Item>
                     ))}
                 </Reorder.Group>
+
+                {/* Canvas Settings Layer */}
+                <LayerPanelCanvasSettings />
             </div>
 
             {dropdownLayerId && (

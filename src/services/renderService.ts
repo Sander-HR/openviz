@@ -181,6 +181,7 @@ const executeWorkflow = async (
         prompt?: string,
         negative?: string,
         initImage?: string,
+        endImage?: string,
         width?: number,
         height?: number,
         strength?: number,
@@ -202,7 +203,19 @@ const executeWorkflow = async (
 
     // Prompts
     if (nodes.prompt && workflowPayload[nodes.prompt] && injections.prompt) {
-        workflowPayload[nodes.prompt].inputs.text = injections.prompt;
+        const promptNode = workflowPayload[nodes.prompt];
+        // Handle standard CLIPTextEncode
+        if (promptNode.inputs.text !== undefined) {
+            promptNode.inputs.text = injections.prompt;
+        } 
+        // Handle StringConstantMultiline or similar
+        else if (promptNode.inputs.string !== undefined) {
+            promptNode.inputs.string = injections.prompt;
+        }
+        // Fallback for widgets_values if using Workflow format (though we converted to API format)
+        else if (promptNode.widgets_values !== undefined) {
+            promptNode.widgets_values[0] = injections.prompt;
+        }
     }
     if (nodes.negative_prompt && workflowPayload[nodes.negative_prompt]) {
         // Use default negative if none provided
@@ -210,9 +223,12 @@ const executeWorkflow = async (
         workflowPayload[nodes.negative_prompt].inputs.text = negText;
     }
 
-    // Input Image
+    // Input Images
     if (nodes.image_input && workflowPayload[nodes.image_input] && injections.initImage) {
         workflowPayload[nodes.image_input].inputs.image = injections.initImage;
+    }
+    if (nodes.image_input_end && workflowPayload[nodes.image_input_end] && injections.endImage) {
+        workflowPayload[nodes.image_input_end].inputs.image = injections.endImage;
     }
 
     // ControlNet Strength (if applicable)
@@ -324,6 +340,11 @@ export const comfyRenderService: RenderService = {
 
             // 1. Upload
             const uploadedFileName = await uploadImage(request.init_image, 'animate_source');
+            let uploadedEndFileName = undefined;
+            
+            if (request.end_image) {
+                uploadedEndFileName = await uploadImage(request.end_image, 'animate_end');
+            }
 
             // 2. Resolve Workflow
             const workflowId = request.workflowId || 'video_standard'; // Default to standard video
@@ -337,6 +358,7 @@ export const comfyRenderService: RenderService = {
             const videoUrls = await executeWorkflow(workflow, {
                 prompt: request.prompt || "animation",
                 initImage: uploadedFileName,
+                endImage: uploadedEndFileName,
                 width: request.width,
                 height: request.height,
                 // Video specific params could be mapped here if workflow supported them (e.g. motion bucket id)

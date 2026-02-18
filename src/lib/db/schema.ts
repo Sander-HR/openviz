@@ -49,6 +49,7 @@ export const projects = pgTable('projects', {
     thumbnailUrl: text('thumbnail_url'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    lastViewedAt: timestamp('last_viewed_at').defaultNow().notNull(),
 });
 
 /**

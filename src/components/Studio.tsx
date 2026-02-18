@@ -8,6 +8,7 @@ import { CanvasControls } from './studio/CanvasControls';
 import { BottomLeftControls } from './studio/BottomLeftControls';
 import { ResultsPanel } from './studio/ResultsPanel';
 import { PreviewStatus } from './studio/PreviewStatus';
+import { ProjectHeader } from './common/ProjectHeader';
 import { useStore } from '../store/useStore';
 
 export const Studio: React.FC = () => {
@@ -30,11 +31,11 @@ export const Studio: React.FC = () => {
 
     const handleResizeMove = useCallback((e: MouseEvent) => {
         if (!isResizing) return;
-        
+
         const deltaY = e.clientY - resizeStartY.current;
         const newRenderHeight = Math.max(200, Math.min(500, startRenderHeight.current + deltaY));
         const newResultsHeight = Math.max(100, Math.min(400, startResultsHeight.current - deltaY));
-        
+
         setRenderPanelHeight(newRenderHeight);
         setResultsPanelHeight(newResultsHeight);
     }, [isResizing]);
@@ -48,7 +49,7 @@ export const Studio: React.FC = () => {
             window.addEventListener('mousemove', handleResizeMove);
             window.addEventListener('mouseup', handleResizeEnd);
         }
-        
+
         return () => {
             window.removeEventListener('mousemove', handleResizeMove);
             window.removeEventListener('mouseup', handleResizeEnd);
@@ -110,6 +111,16 @@ export const Studio: React.FC = () => {
 
             {/* UI Overlay Layers */}
             <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
+                {/* Top Left - Project Header */}
+                <motion.div
+                    className="absolute top-4 left-4 z-50"
+                    initial="visible"
+                    animate={isExitingStudio ? "hiddenLeft" : "visible"}
+                    variants={panelVariants}
+                >
+                    <ProjectHeader />
+                </motion.div>
+
                 {/* Top Toolbar */}
                 <motion.div
                     className="flex justify-center p-4 pointer-events-auto"
@@ -138,7 +149,7 @@ export const Studio: React.FC = () => {
                         variants={panelVariants}
                     >
                         <RenderPanel height={renderPanelHeight} />
-                        <div 
+                        <div
                             className="h-[5px] cursor-row-resize hover:bg-primary/30 transition-colors flex-shrink-0 pointer-events-auto"
                             onMouseDown={handleResizeStart}
                             title="Drag to resize panels"

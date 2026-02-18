@@ -13,7 +13,9 @@ export interface AppState {
 
     // Workbench State
     viewMode: ViewMode;
+    currentProjectId: string | null;
     workbenchNodes: WorkbenchNode[];
+    projectNodes: Record<string, WorkbenchNode[] | undefined>;
     connections: Connection[];
     activeNodeId: string | null;
     selectedNodeIds: string[];
@@ -26,6 +28,7 @@ export interface AppState {
     // Actions
     setName: (name: string) => void;
     setCanvasSize: (width: number, height: number, ratio: AspectRatio) => void;
+    setBackgroundColor: (color: string) => void;
     setZoom: (zoom: number) => void;
     setPan: (x: number, y: number) => void;
 
@@ -93,5 +96,7 @@ export interface AppState {
     createSketchWithFormat: (width: number, height: number) => void;
     setExitingStudio: (exiting: boolean) => void;
     setWorkbenchNodes: (nodes: WorkbenchNode[]) => void;
+    setProjectNodes: (projectId: string, nodes: WorkbenchNode[]) => void;
     setConnections: (connections: Connection[]) => void;
+    setCurrentProjectId: (id: string | null) => void;
 }

@@ -6,7 +6,9 @@ import { findNonOverlappingPosition } from '../../services/nodePositioning';
 
 export interface WorkbenchSlice {
     viewMode: ViewMode;
+    currentProjectId: string | null;
     workbenchNodes: WorkbenchNode[];
+    projectNodes: Record<string, WorkbenchNode[] | undefined>;
     connections: any[];
     activeNodeId: string | null;
     selectedNodeIds: string[];
@@ -32,12 +34,16 @@ export interface WorkbenchSlice {
     addGroupToWorkbench: (group: RenderGroup) => void;
     addImageToWorkbench: (image: string) => void;
     setWorkbenchNodes: (nodes: WorkbenchNode[]) => void;
+    setProjectNodes: (projectId: string, nodes: WorkbenchNode[]) => void;
     setConnections: (connections: any[]) => void;
+    setCurrentProjectId: (id: string | null) => void;
 }
 
 export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice> = (set, get) => ({
     viewMode: 'STUDIO',
+    currentProjectId: null,
     workbenchNodes: [],
+    projectNodes: {},
     connections: [],
     activeNodeId: 'default',
     selectedNodeIds: [],
@@ -46,9 +52,17 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
 
     setViewMode: (viewMode) => set({ viewMode }),
 
-    addWorkbenchNode: (node) => set((state: AppState) => ({
-        workbenchNodes: [...state.workbenchNodes, node]
-    })),
+    addWorkbenchNode: (node) => set((state: AppState) => {
+        const newNodes = [...state.workbenchNodes, node];
+        const newState: Partial<AppState> = { workbenchNodes: newNodes };
+        if (state.currentProjectId) {
+            newState.projectNodes = {
+                ...state.projectNodes,
+                [state.currentProjectId]: newNodes
+            };
+        }
+        return newState;
+    }),
 
     addConnection: (fromId, toId) => set((state: AppState) => ({
         connections: [...state.connections, {
@@ -65,51 +79,42 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
     updateWorkbenchNode: (id, updates) => set((state: AppState) => {
         const nodes = state.workbenchNodes.map(n => {
             if (n.id !== id) return n;
+            // Ensure project stays in sync if resolution properties are ever added, 
+            // but as per requirements, we DO NOT update project.canvas from node resize.
             const updated = { ...n, ...updates } as WorkbenchNode;
-
-            // if ((updated.type === 'image' || updated.type === 'video') && (updates.width || updates.height)) {
-            //     const ratio = updated.width / updated.height;
-            //     const baseDim = 1024;
-            //     let newWidth, newHeight, newRatio;
-
-            //     if (updated.width >= updated.height) {
-            //         newWidth = baseDim;
-            //         newHeight = Math.round(baseDim / ratio);
-            //         newRatio = ratio === 1 ? 'square' : 'landscape';
-            //     } else {
-            //         newHeight = baseDim;
-            //         newWidth = Math.round(baseDim * ratio);
-            //         newRatio = 'portrait';
-            //     }
-
-            //     return {
-            //         ...updated,
-            //         project: {
-            //             ...updated.project,
-            //             canvas: {
-            //                 ...updated.project.canvas,
-            //                 width: newWidth,
-            //                 height: newHeight,
-            //                 aspectRatio: newRatio as AspectRatio
-            //             }
-            //         }
-            //     } as WorkbenchNode;
-            // }
             return updated;
         });
-        return { workbenchNodes: nodes };
+        
+        const newState: Partial<AppState> = { workbenchNodes: nodes };
+        if (state.currentProjectId) {
+            newState.projectNodes = {
+                ...state.projectNodes,
+                [state.currentProjectId]: nodes
+            };
+        }
+        return newState;
     }),
 
     removeWorkbenchNode: (id) => set((state: AppState) => {
         const idsToRemove = id ? [id] : state.selectedNodeIds;
         if (idsToRemove.length === 0) return state;
 
-        return {
-            workbenchNodes: state.workbenchNodes.filter(n => !idsToRemove.includes(n.id)),
+        const newNodes = state.workbenchNodes.filter(n => !idsToRemove.includes(n.id));
+        const newState: Partial<AppState> = {
+            workbenchNodes: newNodes,
             connections: state.connections.filter((c: any) => !idsToRemove.includes(c.from) && !idsToRemove.includes(c.to)),
             selectedNodeIds: state.selectedNodeIds.filter(sid => !idsToRemove.includes(sid)),
             activeNodeId: idsToRemove.includes(state.activeNodeId as string) ? null : state.activeNodeId
         };
+
+        if (state.currentProjectId) {
+            newState.projectNodes = {
+                ...state.projectNodes,
+                [state.currentProjectId]: newNodes
+            };
+        }
+
+        return newState;
     }),
 
     duplicateWorkbenchNode: (id) => set((state: AppState) => {
@@ -123,13 +128,15 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
         nodesToDuplicate.forEach(node => {
             const newId = Math.random().toString(36).substr(2, 9);
             idMap[node.id] = newId;
-            const newNode: WorkbenchNode = JSON.parse(JSON.stringify(node));
+            const newNode: WorkbenchNode = structuredClone(node);
             newNode.id = newId;
             newNode.x += 40;
             newNode.y += 40;
             if (newNode.type === 'image' || newNode.type === 'video') {
                 newNode.project.id = newId;
             }
+            // Preserve projectId for dashboard grouping
+            newNode.projectId = node.projectId;
             newNodes.push(newNode);
         });
 
@@ -142,12 +149,21 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
                 to: idMap[c.to]
             }));
 
-        return {
+        const newState: Partial<AppState> = {
             workbenchNodes: [...state.workbenchNodes, ...newNodes],
             connections: [...state.connections, ...newConnections],
             selectedNodeIds: newNodes.map(n => n.id),
             activeNodeId: newNodes.length === 1 ? newNodes[0].id : state.activeNodeId
         };
+
+        if (state.currentProjectId && newState.workbenchNodes) {
+            newState.projectNodes = {
+                ...state.projectNodes,
+                [state.currentProjectId]: newState.workbenchNodes
+            } as Record<string, WorkbenchNode[]>;
+        }
+
+        return newState;
     }),
 
     reorderWorkbenchNode: (id, direction) => set((state: AppState) => {
@@ -162,7 +178,14 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             nodes.unshift(node);
         }
 
-        return { workbenchNodes: nodes };
+        const newState: Partial<AppState> = { workbenchNodes: nodes };
+        if (state.currentProjectId) {
+            newState.projectNodes = {
+                ...state.projectNodes,
+                [state.currentProjectId]: nodes
+            };
+        }
+        return newState;
     }),
 
     copyToClipboard: (id) => set((state: AppState) => {
@@ -170,7 +193,7 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
         if (idsToCopy.length === 0) return state;
 
         const nodesToCopy = state.workbenchNodes.filter(n => idsToCopy.includes(n.id));
-        return { clipboard: JSON.parse(JSON.stringify(nodesToCopy)) };
+        return { clipboard: structuredClone(nodesToCopy) };
     }),
 
     pasteFromClipboard: (pos) => set((state: AppState) => {
@@ -186,13 +209,15 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
         state.clipboard.forEach(node => {
             const newId = Math.random().toString(36).substr(2, 9);
             idMap[node.id] = newId;
-            const newNode: WorkbenchNode = JSON.parse(JSON.stringify(node));
+            const newNode: WorkbenchNode = structuredClone(node);
             newNode.id = newId;
             newNode.x = pos.x + (node.x - minX);
             newNode.y = pos.y + (node.y - minY);
             if (newNode.type === 'image' || newNode.type === 'video') {
                 newNode.project.id = newId;
             }
+            // Preserve projectId for dashboard grouping
+            newNode.projectId = node.projectId;
             newNodes.push(newNode);
         });
 
@@ -220,9 +245,10 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
         const currentProject = { ...state.project, thumbnail, lastModifiedAt: Date.now() };
         const existingNode = state.workbenchNodes.find(n => n.id === state.activeNodeId);
 
-        // Sync to backend if it's a real project ID (UUID)
-        if (state.activeNodeId && state.activeNodeId.length > 20) {
-            fetch(`/api/projects/${state.activeNodeId}`, {
+        // Sync to backend using currentProjectId (the real project ID from database)
+        // This should work for both the main project and nodes created from it
+        if (state.currentProjectId) {
+            fetch(`/api/projects/${state.currentProjectId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ thumbnailUrl: thumbnail }),
                 headers: { 'Content-Type': 'application/json' }
@@ -236,22 +262,59 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
         );
 
         if (existingNode) {
+            // Recalculate scale based on new canvas dimensions to maintain visual size (or reset to default fit)
+            // If the node already has a scale, we might want to keep it proportional or reset it.
+            // Let's reset it to fit 256px to ensure it looks good if aspect ratio changed drastically.
+            const canvasWidth = currentProject.canvas.width;
+            const canvasHeight = currentProject.canvas.height;
+            const thumbnailScale = 256 / Math.max(canvasWidth, canvasHeight);
+
             set({
                 project: currentProject,
                 workbenchNodes: state.workbenchNodes.map(n =>
-                    n.id === state.activeNodeId ? { ...n, project: currentProject, renderResults: nodeRenderResults } : n
+                    n.id === state.activeNodeId ? { 
+                        ...n, 
+                        project: currentProject, 
+                        renderResults: nodeRenderResults,
+                        scale: thumbnailScale,
+                        // We can optionally update width/height for backward compatibility or remove them.
+                        // For now, let's update them to match the new scale so everything stays in sync.
+                        width: canvasWidth * thumbnailScale,
+                        height: canvasHeight * thumbnailScale
+                    } : n
                 )
             });
         } else {
+            // Standardize thumbnail scaling: Fit canvas into 256px max dimension
+            const canvasWidth = currentProject.canvas.width;
+            const canvasHeight = currentProject.canvas.height;
+            const thumbnailScale = 256 / Math.max(canvasWidth, canvasHeight);
+            const nodeWidth = canvasWidth * thumbnailScale;
+            const nodeHeight = canvasHeight * thumbnailScale;
+
+            // Find non-overlapping position
+            const { x, y } = findNonOverlappingPosition({
+                startX: 100,
+                startY: 100,
+                nodeWidth,
+                nodeHeight,
+                existingNodes: state.workbenchNodes,
+                columns: 4,
+                gap: 50,
+                margin: 50
+            });
+
             const newNode: ImageNode = {
                 id: currentProject.id,
                 type: 'image',
                 name: currentProject.name,
-                x: 100,
-                y: 100,
-                width: currentProject.canvas.width / 4,
-                height: currentProject.canvas.height / 4,
+                x,
+                y,
+                width: nodeWidth,
+                height: nodeHeight,
+                scale: thumbnailScale,
                 project: currentProject,
+                projectId: state.currentProjectId || undefined,
                 renderResults: nodeRenderResults
             };
             set({
@@ -313,27 +376,45 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
 
     createNewSketch: () => {
         const id = Math.random().toString(36).substr(2, 9);
-        const state = get() as AppState;
+        const currentState = get() as AppState;
         const newProject: Project = {
             ...INITIAL_PROJECT,
             id,
-            name: `Untitled ${state.workbenchNodes.length + 1}`,
+            name: `Untitled ${currentState.workbenchNodes.length + 1}`,
             createdAt: Date.now(),
             lastModifiedAt: Date.now()
         };
 
-        const displayWidth = INITIAL_PROJECT.canvas.width / 4;
-        const displayHeight = INITIAL_PROJECT.canvas.height / 4;
+        // Standardize thumbnail scaling: Fit canvas into 256px max dimension
+        const canvasWidth = newProject.canvas.width;
+        const canvasHeight = newProject.canvas.height;
+        const thumbnailScale = 256 / Math.max(canvasWidth, canvasHeight);
+        const nodeWidth = canvasWidth * thumbnailScale;
+        const nodeHeight = canvasHeight * thumbnailScale;
+
+        // Use non-overlapping position
+        const { x, y } = findNonOverlappingPosition({
+            startX: 100,
+            startY: 100,
+            nodeWidth,
+            nodeHeight,
+            existingNodes: currentState.workbenchNodes,
+            columns: 4,
+            gap: 50,
+            margin: 50
+        });
 
         const newNode: ImageNode = {
             id,
             type: 'image',
             name: newProject.name,
-            x: window.innerWidth / 2 - displayWidth / 2,
-            y: window.innerHeight / 2 - displayHeight / 2,
-            width: displayWidth,
-            height: displayHeight,
-            project: newProject
+            x,
+            y,
+            width: nodeWidth,
+            height: nodeHeight,
+            scale: thumbnailScale,
+            project: newProject,
+            projectId: currentState.currentProjectId || undefined
         };
 
         set((state: AppState) => ({
@@ -365,18 +446,36 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             lastModifiedAt: Date.now()
         };
 
-        const displayWidth = Math.min(300, width * 0.25);
-        const displayHeight = displayWidth * (height / width);
+        // Standardize thumbnail scaling: Fit canvas into 256px max dimension
+        const thumbnailScale = 256 / Math.max(width, height);
+        const nodeWidth = width * thumbnailScale;
+        const nodeHeight = height * thumbnailScale;
+
+        const currentState = get() as AppState;
+
+        // Use non-overlapping position
+        const { x, y } = findNonOverlappingPosition({
+            startX: 100,
+            startY: 100,
+            nodeWidth,
+            nodeHeight,
+            existingNodes: currentState.workbenchNodes,
+            columns: 4,
+            gap: 50,
+            margin: 50
+        });
 
         const newNode: ImageNode = {
             id,
             type: 'image',
             name: newProject.name,
-            x: window.innerWidth / 2 - displayWidth / 2,
-            y: window.innerHeight / 2 - displayHeight / 2,
-            width: displayWidth,
-            height: displayHeight,
-            project: newProject
+            x,
+            y,
+            width: nodeWidth,
+            height: nodeHeight,
+            scale: thumbnailScale,
+            project: newProject,
+            projectId: currentState.currentProjectId || undefined
         };
 
         set((state: AppState) => ({
@@ -396,28 +495,20 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
         const nodes = [...state.workbenchNodes];
         const activeNode = nodes.find(n => n.id === state.activeNodeId) as ImageNode | undefined;
 
-        let startX = activeNode ? activeNode.x + activeNode.width + 50 : 100;
-        let startY = activeNode ? activeNode.y : 100;
+        // Position to the right of the active node, but aligned to a grid
+        // Fallback to defaults if dimensions are missing
+        const activeWidth = activeNode ? (activeNode.width ?? (activeNode.scale ?? 1) * activeNode.project.canvas.width) : 0;
+        const startX = activeNode ? activeNode.x + activeWidth + 100 : 100;
+        const startY = activeNode ? activeNode.y : 100;
 
         // Use dimensions from the render group (source node dimensions)
-        const canvasWidth = group.width || INITIAL_PROJECT.canvas.width;
-        const canvasHeight = group.height || INITIAL_PROJECT.canvas.height;
+        const canvasWidth = group.width || activeNode?.project.canvas.width || INITIAL_PROJECT.canvas.width;
+        const canvasHeight = group.height || activeNode?.project.canvas.height || INITIAL_PROJECT.canvas.height;
 
-        // Calculate display size based on active node's display ratio if available
-        let nodeWidth: number;
-        let nodeHeight: number;
-
-        if (activeNode) {
-            // Use the active node's display size as reference
-            const activeCanvasWidth = activeNode.project.canvas.width;
-            const displayScale = activeNode.width / activeCanvasWidth;
-            nodeWidth = canvasWidth * displayScale;
-            nodeHeight = canvasHeight * displayScale;
-        } else {
-            // Fallback to default scale if no active node
-            nodeWidth = canvasWidth / 4;
-            nodeHeight = canvasHeight / 4;
-        }
+        // Standardize thumbnail scaling: Fit canvas into 256px max dimension
+        const thumbnailScale = 256 / Math.max(canvasWidth, canvasHeight);
+        const nodeWidth = canvasWidth * thumbnailScale;
+        const nodeHeight = canvasHeight * thumbnailScale;
 
         const promptTitle = group.prompt.length > 50 ? group.prompt.substring(0, 50) + '...' : group.prompt;
 
@@ -435,7 +526,7 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
                 existingNodes: [...nodes, ...newNodes],
                 columns: 4,
                 gap: 50,
-                margin: 20
+                margin: 50
             });
 
             const newProject: Project = {
@@ -482,7 +573,9 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
                 y: currentY,
                 width: nodeWidth,
                 height: nodeHeight,
-                project: newProject
+                scale: thumbnailScale,
+                project: newProject,
+                projectId: state.currentProjectId || undefined
             };
 
             newNodes.push(newNode);
@@ -496,18 +589,18 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
     addImageToWorkbench: (image) => set((state: AppState) => {
         const activeNode = state.workbenchNodes.find(n => n.id === state.activeNodeId) as ImageNode | undefined;
 
-        // Default dimensions (256x256 matches Studio's 1024/4)
-        let nodeWidth = 256;
-        let nodeHeight = 256;
+        // Use dimensions from active node if it exists, otherwise use default
+        const canvasWidth = activeNode?.project.canvas.width || INITIAL_PROJECT.canvas.width;
+        const canvasHeight = activeNode?.project.canvas.height || INITIAL_PROJECT.canvas.height;
 
-        // Inherit dimensions from active node if it exists
-        if (activeNode) {
-            nodeWidth = activeNode.width;
-            nodeHeight = activeNode.height;
-        }
+        // Standardize thumbnail scaling: Fit canvas into 256px max dimension
+        const thumbnailScale = 256 / Math.max(canvasWidth, canvasHeight);
+        const nodeWidth = canvasWidth * thumbnailScale;
+        const nodeHeight = canvasHeight * thumbnailScale;
 
         // Position to the right of the active node, or default position
-        const startX = activeNode ? activeNode.x + activeNode.width + 100 : 100;
+        const activeWidth = activeNode ? (activeNode.width ?? (activeNode.scale ?? 1) * activeNode.project.canvas.width) : 0;
+        const startX = activeNode ? activeNode.x + activeWidth + 100 : 100;
         const startY = activeNode ? activeNode.y : 100;
 
         // Use the extracted positioning service
@@ -519,13 +612,13 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             existingNodes: state.workbenchNodes,
             columns: 4,
             gap: 50,
-            margin: 20
+            margin: 50
         });
 
         const id = Math.random().toString(36).substr(2, 9);
 
         // Calculate aspect ratio from dimensions
-        const ratio = nodeWidth / nodeHeight;
+        const ratio = canvasWidth / canvasHeight;
         let aspectRatio: AspectRatio = 'square';
         if (Math.abs(ratio - 1) > 0.1) {
             aspectRatio = ratio > 1 ? 'landscape' : 'portrait';
@@ -538,8 +631,8 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             thumbnail: image,
             canvas: {
                 ...INITIAL_PROJECT.canvas,
-                width: 1024,
-                height: 1024,
+                width: canvasWidth,
+                height: canvasHeight,
                 aspectRatio
             },
             layers: [
@@ -567,6 +660,8 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             lastModifiedAt: Date.now()
         };
 
+        const currentState = get() as AppState;
+
         const newNode: ImageNode = {
             id,
             type: 'image',
@@ -575,13 +670,39 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             y: currentY,
             width: nodeWidth,
             height: nodeHeight,
-            project: newProject
+            scale: thumbnailScale,
+            project: newProject,
+            projectId: currentState.currentProjectId || undefined
         };
 
         return {
             workbenchNodes: [...state.workbenchNodes, newNode]
         };
     }),
-    setWorkbenchNodes: (nodes) => set({ workbenchNodes: nodes }),
+    setWorkbenchNodes: (nodes) => set((state: AppState) => {
+        const newState: Partial<AppState> = { workbenchNodes: nodes };
+        if (state.currentProjectId) {
+            newState.projectNodes = {
+                ...state.projectNodes,
+                [state.currentProjectId]: nodes
+            };
+        }
+        return newState;
+    }),
+    setProjectNodes: (projectId, nodes) => set((state: AppState) => ({
+        projectNodes: {
+            ...state.projectNodes,
+            [projectId]: nodes
+        }
+    })),
     setConnections: (connections) => set({ connections }),
+    setCurrentProjectId: (id) => set((state: AppState) => {
+        const newState: Partial<AppState> = { currentProjectId: id };
+        if (id && state.projectNodes[id]) {
+            newState.workbenchNodes = state.projectNodes[id];
+        } else if (id) {
+            newState.workbenchNodes = [];
+        }
+        return newState;
+    }),
 });

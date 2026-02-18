@@ -22,8 +22,9 @@ import { PositionedMenu } from '../ContextMenu';
 import { BasicBlocksMenu } from '../nodes/BasicBlocksMenu';
 import { useWorkbench } from './hooks/useWorkbench';
 import { useStore } from '../../store/useStore';
+import { useAutoSaveScene } from '../../hooks/useAutoSaveScene';
 import { CanvasControls } from '../studio/CanvasControls';
-import { GoHomeButton } from '../common/GoHomeButton';
+import { ProjectHeader } from '../common/ProjectHeader';
 
 const nodeTypes: NodeTypes = {
     imageNode: ImageNode,
@@ -39,7 +40,9 @@ const edgeTypes: EdgeTypes = {
 const WorkbenchContent: React.FC = () => {
     const { setCenter, zoomIn, zoomOut, fitView, setViewport } = useReactFlow();
     const { zoom } = useViewport();
-    const { viewMode } = useStore();
+    const { viewMode, currentProjectId } = useStore();
+    
+    useAutoSaveScene(currentProjectId);
     const prevViewModeRef = useRef(viewMode);
     const {
         workbenchNodes,
@@ -76,8 +79,17 @@ const WorkbenchContent: React.FC = () => {
         if (viewMode === 'WORKBENCH' && prevViewModeRef.current === 'STUDIO' && activeNodeId) {
             const node = workbenchNodes.find((n: any) => n.id === activeNodeId);
             if (node) {
-                const centerX = node.x + node.width / 2;
-                const centerY = node.y + node.height / 2;
+                let width = node.width;
+                let height = node.height;
+                if ((node.type === 'image' || node.type === 'video') && node.project?.canvas && typeof node.scale === 'number') {
+                    width = node.project.canvas.width * node.scale;
+                    height = node.project.canvas.height * node.scale;
+                }
+                width = width ?? 256;
+                height = height ?? 256;
+
+                const centerX = node.x + width / 2;
+                const centerY = node.y + height / 2;
                 setCenter(centerX, centerY, { zoom: 1, duration: 500 });
             }
         }
@@ -85,15 +97,25 @@ const WorkbenchContent: React.FC = () => {
         prevViewModeRef.current = viewMode;
     }, [viewMode, activeNodeId, workbenchNodes, setCenter]);
 
-    const nodes = workbenchNodes.map((node: any) => ({
-        id: node.id,
-        type: node.type === 'image' ? 'imageNode' : node.type === 'video' ? 'videoNode' : node.type === 'animate' ? 'animateNode' : 'renderNode',
-        position: { x: node.x, y: node.y },
-        width: node.width,
-        height: node.height,
-        data: { ...node, onSourceClick: handleSourceClick, onResize: handleResize } as unknown as Record<string, unknown>,
-        selected: selectedNodeIds.includes(node.id),
-    }));
+    const nodes = workbenchNodes.map((node: any) => {
+        let width = node.width;
+        let height = node.height;
+
+        if ((node.type === 'image' || node.type === 'video') && node.project?.canvas && typeof node.scale === 'number') {
+            width = node.project.canvas.width * node.scale;
+            height = node.project.canvas.height * node.scale;
+        }
+
+        return {
+            id: node.id,
+            type: node.type === 'image' ? 'imageNode' : node.type === 'video' ? 'videoNode' : node.type === 'animate' ? 'animateNode' : 'renderNode',
+            position: { x: node.x, y: node.y },
+            width,
+            height,
+            data: { ...node, onSourceClick: handleSourceClick, onResize: handleResize } as unknown as Record<string, unknown>,
+            selected: selectedNodeIds.includes(node.id),
+        };
+    });
 
     const edges = connections.map((conn: any) => ({
         id: conn.id,
@@ -147,10 +169,15 @@ const WorkbenchContent: React.FC = () => {
                 fitView
                 minZoom={0.1}
                 maxZoom={2}
+                connectionRadius={60}
             >
                 <Background id='smalldots' variant={BackgroundVariant.Dots} gap={10} size={1} color="#c0c0c0" />
                 <Background id="fatdots" color="#191919" variant={BackgroundVariant.Dots} gap={50} size={1} />
             </ReactFlow>
+
+            <div className="absolute top-4 left-4 z-20">
+                <ProjectHeader />
+            </div>
 
             <div className="absolute bottom-4 right-4 z-20">
                 <CanvasControls
@@ -160,10 +187,6 @@ const WorkbenchContent: React.FC = () => {
                     onResetZoom={() => setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 300 })}
                     onFitToScreen={() => fitView({ duration: 300 })}
                 />
-            </div>
-
-            <div className="absolute bottom-4 left-4 z-20">
-                <GoHomeButton />
             </div>
 
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10" ref={dropdownRef}>

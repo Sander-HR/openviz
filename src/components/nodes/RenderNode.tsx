@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useConnection, Handle, Position } from '@xyflow/react';
 import { Wand2, ChevronDown, Layers } from 'lucide-react';
 import { RenderNode as RenderNodeType, RenderSettings, ImageNode as ImageNodeType, Project } from '../../types';
 import { useStore } from '../../store/useStore';
@@ -19,10 +20,13 @@ interface RenderNodeProps {
 }
 
 export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) => {
+    const connection = useConnection();
     const { updateWorkbenchNode, addRenderResultGroup, connections, workbenchNodes, addWorkbenchNode, addConnection } = useStore();
     const [isRendering, setRendering] = useState(false);
     const [showStyles, setShowStyles] = useState(false);
     const [showNumImagesDropdown, setShowNumImagesDropdown] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
+    const isHoverConnectable = connection.inProgress && connection.fromNode?.type === 'imageNode' && isHovered;
 
     const settings = data.data;
 
@@ -31,6 +35,21 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
     // Find all connections to this node
     const inboundConnections = connections.filter(c => c.to === id);
     const sourceNodeId = inboundConnections[0]?.from;
+
+    // Auto-position once when connected to a source node - DISABLED
+    // Track the last source node ID to only auto-position on initial connection
+    // const lastSourceId = React.useRef<string | null>(null);
+    // useEffect(() => {
+    //     if (sourceNodeId && sourceNodeId !== lastSourceId.current) {
+    //         lastSourceId.current = sourceNodeId;
+    //         const sourceNode = workbenchNodes.find(n => n.id === sourceNodeId);
+    //         if (sourceNode) {
+    //             const targetX = sourceNode.x + (sourceNode.width ?? 320) + 100;
+    //             const targetY = sourceNode.y + ((sourceNode.height ?? 400) / 2) - ((data.height ?? 400) / 2);
+    //             updateWorkbenchNode(id, { x: targetX, y: targetY });
+    //         }
+    //     }
+    // }, [sourceNodeId, workbenchNodes, id, data.height, updateWorkbenchNode]);
 
     const updateSettings = (updates: Partial<RenderSettings>) => {
         updateWorkbenchNode(id, {
@@ -68,45 +87,56 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
 
             // --- 1. Create Placeholder Nodes ---
             const numImages = settings.numImages || 1;
-            const startX = data.x + data.width + 100;
-            const startY = data.y;
-            
-            // Get source node dimensions or default to 256 (matching Studio 1024/4)
+            const startX = data.x + (data.width ?? 320) + 100;
+
+            // Get source node dimensions and resolution
             let nodeWidth = 256;
             let nodeHeight = 256;
+            let canvasWidth = 1024;
+            let canvasHeight = 1024;
             let aspectRatio = 'square';
-            
+
             if (sourceNodeId) {
                 const sourceNode = workbenchNodes.find(n => n.id === sourceNodeId);
                 if (sourceNode) {
-                    nodeWidth = sourceNode.width;
-                    nodeHeight = sourceNode.height;
-                    if (sourceNode.type === 'image') {
+                    nodeWidth = sourceNode.width ?? 256;
+                    nodeHeight = sourceNode.height ?? 256;
+                    if (sourceNode.type === 'image' || sourceNode.type === 'video') {
+                        canvasWidth = sourceNode.project.canvas.width;
+                        canvasHeight = sourceNode.project.canvas.height;
                         aspectRatio = sourceNode.project.canvas.aspectRatio;
                     } else {
-                         // Calculate aspect ratio from dimensions if not an image node (e.g. animate node)
+                         // Fallback for other node types
                         const ratio = nodeWidth / nodeHeight;
                         if (Math.abs(ratio - 1) < 0.1) aspectRatio = 'square';
                         else if (ratio > 1) aspectRatio = 'landscape';
                         else aspectRatio = 'portrait';
+
+                        canvasWidth = aspectRatio === 'portrait' ? Math.round(1024 * (nodeWidth / nodeHeight)) : 1024;
+                        canvasHeight = aspectRatio === 'landscape' ? Math.round(1024 * (nodeHeight / nodeWidth)) : 1024;
                     }
                 }
             }
+
+            // Center vertically relative to the generator node
+            const startY = data.y + ((data.height ?? 400) / 2) - (nodeHeight / 2);
             
+            const batchNewNodes: any[] = [];
             for (let i = 0; i < numImages; i++) {
                 const newId = crypto.randomUUID();
                 placeholderIds.push(newId);
 
                 // Find a non-overlapping position using the positioning service
+                // Include batchNewNodes in the search to avoid overlapping within the same batch
                 const { x: currentX, y: currentY } = findNonOverlappingPosition({
                     startX,
                     startY,
                     nodeWidth,
                     nodeHeight,
-                    existingNodes: workbenchNodes,
+                    existingNodes: [...workbenchNodes, ...batchNewNodes],
                     columns: 4,
                     gap: 50,
-                    margin: 20
+                    margin: 50
                 });
 
                 const placeholderNode: ImageNodeType = {
@@ -124,8 +154,8 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                         createdAt: Date.now(),
                         lastModifiedAt: Date.now(),
                         canvas: {
-                            width: aspectRatio === 'portrait' ? Math.round(1024 * (nodeWidth / nodeHeight)) : 1024,
-                            height: aspectRatio === 'landscape' ? Math.round(1024 * (nodeHeight / nodeWidth)) : 1024,
+                            width: canvasWidth,
+                            height: canvasHeight,
                             aspectRatio: aspectRatio as any,
                             zoomLevel: 1,
                             panX: 0,
@@ -136,27 +166,17 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                     }
                 };
 
+                batchNewNodes.push(placeholderNode);
                 addWorkbenchNode(placeholderNode);
                 // Optional: Connect render node to output nodes
                 addConnection(id, newId);
             }
 
             // --- 2. Call Render Service ---
-            // Get canvas dimensions from source node or use defaults
-            let canvasWidth = 1024;
-            let canvasHeight = 1024;
-            
-            if (sourceNodeId) {
-                const sourceNode = workbenchNodes.find(n => n.id === sourceNodeId);
-                if (sourceNode?.type === 'image') {
-                    canvasWidth = sourceNode.project.canvas.width;
-                    canvasHeight = sourceNode.project.canvas.height;
-                }
-            }
-
             // Look up workflow ID
             const selectedStyle = availableStyles.find(s => s.name === settings.stylePreset);
             const workflowId = selectedStyle?.id;
+
 
             const response = await renderService.generate({
                 ...settings,
@@ -180,8 +200,8 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                             lastModifiedAt: Date.now(),
                             thumbnail: imageUrl,
                             canvas: {
-                                width: 1024,
-                                height: 1024,
+                                width: canvasWidth,
+                                height: canvasHeight,
                                 aspectRatio: aspectRatio as any,
                                 zoomLevel: 1,
                                 panX: 0,
@@ -232,10 +252,30 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
     };
 
     return (
-        <div className={cn(
-            "w-[320px] bg-[#1a1a1a] rounded-2xl shadow-2xl border-2 transition-colors pointer-events-auto flex flex-col overflow-hidden",
-            selected ? 'border-[#6366f1]' : 'border-[#333] hover:border-[#6366f1]'
-        )}>
+        <div
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className={cn(
+                "relative w-[320px] bg-[#1a1a1a] rounded-2xl shadow-2xl border-2 transition-colors pointer-events-auto flex flex-col overflow-hidden",
+                selected ? 'border-[#6366f1]' : 'border-[#333] hover:border-[#6366f1]',
+                isHoverConnectable && 'border-[#6366f1]'
+            )}
+        >
+            {/* Invisible target handle covering the whole node for better snap detection */}
+            <Handle
+                type="target"
+                position={Position.Left}
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    zIndex: 0,
+                }}
+            />
              {/* Header */}
             <div className="p-4 border-b border-[#333] bg-[#222]">
                  <div className="flex items-center justify-between">

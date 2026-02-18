@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/auth";
 import { projects, workspaces, workspaceMemberships, users } from "@/lib/db/schema";
 import { ProjectSchema } from "@/lib/schemas/base";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 /**
@@ -63,7 +63,8 @@ export async function GET(req: Request) {
         const userProjects = await db
             .select()
             .from(projects)
-            .where(eq(projects.workspaceId, newWorkspace.id));
+            .where(eq(projects.workspaceId, newWorkspace.id))
+            .orderBy(desc(projects.lastViewedAt));
 
         return NextResponse.json(userProjects);
     }
@@ -79,7 +80,8 @@ export async function GET(req: Request) {
             .from(projects)
             .innerJoin(workspaces, eq(projects.workspaceId, workspaces.id))
             .innerJoin(workspaceMemberships, eq(workspaces.id, workspaceMemberships.workspaceId))
-            .where(eq(workspaceMemberships.userId, userId));
+            .where(eq(workspaceMemberships.userId, userId))
+            .orderBy(desc(projects.lastViewedAt));
 
         return NextResponse.json(userProjects.map(p => p.projects));
     }
@@ -93,7 +95,8 @@ export async function GET(req: Request) {
     const workspaceProjects = await db
         .select()
         .from(projects)
-        .where(eq(projects.workspaceId, workspaceId));
+        .where(eq(projects.workspaceId, workspaceId))
+        .orderBy(desc(projects.lastViewedAt));
 
     return NextResponse.json(workspaceProjects);
 }

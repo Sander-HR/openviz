@@ -19,6 +19,8 @@ dist-ssr
 .next
 .opencode
 .DS_Store
+.gitignore
+*.code-workspace
 *.suo
 *.ntvs*
 *.njsproj
@@ -28,3 +30,8 @@ dist-ssr
 # Agent documentation
 # AGENTS.md
 # AGENTS/
+
+# Environment files
+.env
+.env.local
+.env.*.local

@@ -59,9 +59,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         async signIn({ user }) {
             const isLocal = process.env.NODE_ENV === "development" || process.env.NEXTAUTH_URL?.includes("localhost");
             const email = user.email || "";
+            const allowedDomains = process.env.ALLOWED_EMAIL_DOMAIN?.split(',').map(d => d.trim()).filter(Boolean) || [];
 
             if (isLocal) return true;
-            if (email.endsWith("@hr.nl")) return true;
+            if (allowedDomains.some(domain => email.endsWith(domain))) return true;
 
             return false; // Deny access for other domains in production
         },

@@ -1,4 +1,4 @@
-export type AspectRatio = 'square' | 'landscape' | 'portrait';
+export type AspectRatio = '16:9' | '4:3' | '1:1' | '9:16' | '3:4' | 'square' | 'landscape' | 'portrait';
 export type ToolType = 'select' | 'brush' | 'eraser' | 'circle' | 'rectangle' | 'line' | 'paintbucket' | 'transform';
 export type LayerType = 'sketch' | 'image' | 'render';
 export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay';
@@ -64,8 +64,10 @@ export interface BaseNode {
     id: string;
     x: number;
     y: number;
-    width: number;
-    height: number;
+    width?: number;
+    height?: number;
+    scale?: number;
+    projectId?: string; // Database project ID for grouping/filtering
 }
 
 export interface ImageNode extends BaseNode {

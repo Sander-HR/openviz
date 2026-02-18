@@ -6,6 +6,7 @@ import product from './workflows/render-product.json';
 import carInterior from './workflows/render-car-interior.json';
 import carExterior from './workflows/render-car-exterior.json';
 import videoStandard from './workflows/video-standard.json';
+import animateFromTo from './workflows/animate-from-to-api.json';
 
 export interface WorkflowDefinition {
     id: string;
@@ -20,6 +21,7 @@ export interface WorkflowDefinition {
         negative_prompt?: string; // Node ID for negative prompt
         seed?: string;         // Node ID for KSampler
         image_input?: string;  // Node ID for LoadImage
+        image_input_end?: string; // Node ID for second LoadImage (From-To)
         image_output?: string; // Node ID for SaveImage
         video_output?: string; // Node ID for VideoCombine
         
@@ -155,6 +157,20 @@ export const WORKFLOWS: Record<string, WorkflowDefinition> = {
             image_input: "45",
             video_output: "90",
             seed: "3"
+        }
+    },
+    'animate_from_to': {
+        id: 'animate_from_to',
+        name: 'Animate From-To',
+        type: 'video',
+        description: 'Animate between two keyframes',
+        template: animateFromTo,
+        nodes: {
+            prompt: "22",
+            image_input: "14",
+            image_input_end: "21",
+            video_output: "37",
+            seed: "2"
         }
     }
 };

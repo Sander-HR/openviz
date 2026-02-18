@@ -1,5 +1,13 @@
 import { RenderService, GenerateRequest, GenerateResponse, AnimateRequest } from './types';
 
+const MOCK_VIDEOS = [
+    'https://download.samplelib.com/mp4/sample-5s.mp4',
+    'https://download.samplelib.com/mp4/sample-10s.mp4',
+    'https://download.samplelib.com/mp4/sample-15s.mp4',
+    'https://download.samplelib.com/mp4/sample-20s.mp4',
+    'https://download.samplelib.com/mp4/sample-30s.mp4'
+];
+
 /**
  * A mock implementation of the RenderService for debugging and testing.
  * It simulates network delays and returns placeholder images.
@@ -33,11 +41,11 @@ export const mockRenderService: RenderService = {
         console.log('🧪 [Mock] Starting mock animation process...', request);
 
         const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-        await delay(1000); // Simulate animation rendering
+        await delay(1500); // Simulate animation rendering
 
-        // Simulate video URL (using a placeholder video or GIF if possible, but let's just return a placeholder image for now as the type expects string URLs)
-        // Ideally GenerateResponse.images should support video URLs too
-        const videoUrl = `https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMzQyMzQyMzQyMzQyMzQyMzQyMzQyMzQyMzQyMzQyMzQmZXA9djFfaW50ZXJuYWxfZ2lmX2J5X2lkJmN0PWc/3o7aD2saalBwwftBIY/giphy.gif`; // Just a placeholder gif
+        // Return a random video from our mock library
+        const randomIndex = Math.floor(Math.random() * MOCK_VIDEOS.length);
+        const videoUrl = MOCK_VIDEOS[randomIndex];
 
         return {
             success: true,

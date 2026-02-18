@@ -45,7 +45,7 @@ export const apiRenderService: RenderService = {
         }
     },
 
-    animate: async (request: AnimateRequest): Promise<GenerateResponse> => {
+    animate: async (_request: AnimateRequest): Promise<GenerateResponse> => {
         // Similar pattern for animate...
         return { success: false, images: [] };
     },

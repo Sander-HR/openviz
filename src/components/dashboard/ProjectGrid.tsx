@@ -3,11 +3,11 @@
 import { MoreHorizontal, FileText, Pencil, ArrowRightLeft, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Project } from "@/lib/schemas/base";
-import { useStore } from "@/store/useStore";
 import { useState, useRef, useEffect } from "react";
 import { RenameProjectModal } from "./RenameProjectModal";
 import { MoveProjectModal } from "./MoveProjectModal";
 import { useProjects } from "@/hooks/useProjects";
+import { useProjectPreview } from "@/hooks/useProjectPreview";
 
 export function ProjectGrid({ projects, isLoading }: { projects: Project[], isLoading: boolean }) {
     if (isLoading) {
@@ -31,13 +31,32 @@ export function ProjectGrid({ projects, isLoading }: { projects: Project[], isLo
 
 function ProjectCard({ project }: { project: Project }) {
     const router = useRouter();
-    const workbenchNodes = useStore((state) => state.workbenchNodes);
     const { updateProject, deleteProject } = useProjects();
+    const { thumbnails: allThumbnails, triggerFetch } = useProjectPreview(project.id);
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+    const [hoverIndex, setHoverIndex] = useState<number | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+    const thumbnailRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Intersection Observer for lazy loading
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                triggerFetch(entry.isIntersecting);
+            },
+            { threshold: 0.1 }
+        );
+
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, [triggerFetch]);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -65,33 +84,55 @@ function ProjectCard({ project }: { project: Project }) {
         updateProject({ id: project.id, data: { workspaceId } });
     };
 
-    // Fallback logic: 1. DB Thumbnail -> 2. Local Workbench Node Thumbnail -> 3. Placeholder
-    let thumbnail = project.thumbnailUrl;
+    // Get thumbnail URLs from the hook's returned nodes
+    const thumbnailUrls = (allThumbnails as any[])
+        .map(n => n.project?.thumbnail)
+        .filter(Boolean);
 
-    if (!thumbnail) {
-        // Find matching workbench node (image or video) for this project
-        const matchingNode = workbenchNodes.find(n =>
-            (n.type === 'image' || n.type === 'video') && n.project?.id === project.id
-        );
+    // Fallback logic: 1. DB Thumbnail -> 2. Last Edited Workbench Image -> 3. Placeholder
+    let thumbnail = project.thumbnailUrl || thumbnailUrls[0];
 
-        if (matchingNode && (matchingNode.type === 'image' || matchingNode.type === 'video')) {
-            // Use the project thumbnail from the workbench node
-            thumbnail = matchingNode.project?.thumbnail;
-        }
-    }
+    // Determine which thumbnail to show based on hover
+    const displayThumbnail = hoverIndex !== null && thumbnailUrls[hoverIndex]
+        ? thumbnailUrls[hoverIndex]
+        : thumbnail;
+
+    // Handle mouse move to determine which zone is being hovered
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (thumbnailUrls.length <= 1) return;
+
+        const rect = thumbnailRef.current?.getBoundingClientRect();
+        if (!rect) return;
+
+        const x = e.clientX - rect.left;
+        const zoneWidth = rect.width / thumbnailUrls.length;
+        const index = Math.floor(x / zoneWidth);
+
+        setHoverIndex(Math.min(index, thumbnailUrls.length - 1));
+    };
+
+    const handleMouseLeave = () => {
+        setHoverIndex(null);
+    };
 
     return (
         <>
             <div
+                ref={containerRef}
                 className="group cursor-pointer space-y-3 relative"
                 onDoubleClick={() => router.push(`/projects/${project.id}`)}
             >
-                <div className="aspect-square bg-white rounded-lg shadow-lg border-2 border-transparent hover:border-[#6366f1] transition-all duration-200 relative overflow-hidden">
-                    {thumbnail ? (
+                <div
+                    ref={thumbnailRef}
+                    className="aspect-[4/3] bg-white rounded-lg shadow-lg border-2 border-transparent hover:border-[#6366f1] transition-all duration-200 relative overflow-hidden"
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
+                >
+                    {displayThumbnail ? (
                         <img
-                            src={thumbnail}
+                            src={displayThumbnail}
                             alt={project.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-opacity duration-150"
                             draggable={false}
                         />
                     ) : (
@@ -100,6 +141,21 @@ function ProjectCard({ project }: { project: Project }) {
                         </div>
                     )}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+
+                    {/* Hover zone indicators - only show when there are multiple images */}
+                    {thumbnailUrls.length > 1 && (
+                        <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {thumbnailUrls.map((_, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`w-1.5 h-1.5 rounded-full transition-all ${(hoverIndex !== null ? hoverIndex : 0) === idx
+                                        ? 'bg-white w-4'
+                                        : 'bg-white/50'
+                                        }`}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex items-start justify-between px-1 relative">

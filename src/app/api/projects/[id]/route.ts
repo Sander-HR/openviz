@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/auth";
-import { projects } from "@/lib/db/schema";
+import { projects, scenes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -16,9 +16,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     if (!project) return NextResponse.json({ error: "Not Found" }, { status: 404 });
 
+    // Fetch the main scene for this project
+    const [scene] = await db
+        .select()
+        .from(scenes)
+        .where(eq(scenes.projectId, id))
+        .limit(1);
+
+    // Update lastViewedAt when project is accessed
+    await db
+        .update(projects)
+        .set({ lastViewedAt: new Date() })
+        .where(eq(projects.id, id));
+
     // Add permission check here in a real app
 
-    return NextResponse.json(project);
+    return NextResponse.json({
+        ...project,
+        lastViewedAt: new Date(),
+        scene: scene ? scene.data : null,
+    });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

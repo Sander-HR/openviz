@@ -55,7 +55,8 @@ export const ProjectSchema = z.object({
     workspaceId: z.string().uuid(),
     createdAt: z.date(),
     updatedAt: z.date(),
-    thumbnailUrl: z.string().url().optional().nullable(),
+    lastViewedAt: z.date(),
+    thumbnailUrl: z.string().optional().nullable(),
 });
 
 export type Project = z.infer<typeof ProjectSchema>;

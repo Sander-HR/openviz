@@ -200,15 +200,21 @@ export const useWorkbench = () => {
             return;
         }
 
+        const sourceWidth = sourceNode.width ?? (sourceNode.scale && (sourceNode as any).project?.canvas?.width ? sourceNode.scale * (sourceNode as any).project.canvas.width : 320);
+        const sourceHeight = sourceNode.height ?? (sourceNode.scale && (sourceNode as any).project?.canvas?.height ? sourceNode.scale * (sourceNode as any).project.canvas.height : 320);
+
         if (type === 'render') {
             const newNodeId = crypto.randomUUID();
+            const nodeWidth = 320;
+            const nodeHeight = 500;
+
             const newNode = {
                 id: newNodeId,
                 type: 'render',
-                x: sourceNode.x + sourceNode.width + 100,
+                x: sourceNode.x + sourceWidth + 100,
                 y: sourceNode.y,
-                width: 320,
-                height: 500,
+                width: nodeWidth,
+                height: nodeHeight,
                 data: {
                     prompt: '',
                     stylePreset: 'Photorealistic',
@@ -223,13 +229,16 @@ export const useWorkbench = () => {
         }
 
         const newNodeId = crypto.randomUUID();
+        const nodeWidth = 320;
+        const nodeHeight = 320;
+
         const newNode = {
             id: newNodeId,
             type: 'animate',
-            x: sourceNode.x + sourceNode.width + 100,
-            y: sourceNode.y + (sourceNode.height - 320) / 2,
-            width: 320,
-            height: 320,
+            x: sourceNode.x + sourceWidth + 100,
+            y: sourceNode.y + (sourceHeight - nodeHeight) / 2,
+            width: nodeWidth,
+            height: nodeHeight,
             data: {
                 prompt: '',
                 frames: { start: sourceNode.id },
@@ -242,8 +251,14 @@ export const useWorkbench = () => {
     }, [basicBlocksMenu, workbenchNodes, addWorkbenchNode, addConnection]);
 
     const handleResize = useCallback((nodeId: string, width: number, height: number) => {
-        updateWorkbenchNode(nodeId, { width, height });
-    }, [updateWorkbenchNode]);
+        const node = workbenchNodes.find((n: any) => n.id === nodeId);
+        if (node && (node.type === 'image' || node.type === 'video') && node.project?.canvas) {
+            const scale = width / node.project.canvas.width;
+            updateWorkbenchNode(nodeId, { scale, width, height });
+        } else {
+            updateWorkbenchNode(nodeId, { width, height });
+        }
+    }, [updateWorkbenchNode, workbenchNodes]);
 
     return {
         workbenchNodes,

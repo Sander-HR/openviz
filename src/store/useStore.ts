@@ -47,7 +47,9 @@ export const useStore = create<AppState>()(
                 toolSettings: state.toolSettings,
                 renderSettings: state.renderSettings,
                 viewMode: state.viewMode,
+                currentProjectId: state.currentProjectId,
                 workbenchNodes: state.workbenchNodes,
+                projectNodes: state.projectNodes,
                 connections: state.connections,
                 activeNodeId: state.activeNodeId,
                 clipboard: state.clipboard

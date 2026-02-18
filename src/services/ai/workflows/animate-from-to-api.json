@@ -1,0 +1,219 @@
+{
+  "1": {
+    "inputs": {
+      "vae": [
+        "11",
+        0
+      ],
+      "samples": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "WanVideoDecode"
+  },
+  "2": {
+    "inputs": {
+      "model": [
+        "4",
+        0
+      ],
+      "text_embeds": [
+        "6",
+        0
+      ],
+      "image_embeds": [
+        "44",
+        0
+      ],
+      "teacache_args": [
+        "18",
+        0
+      ],
+      "slg_args": [
+        "36",
+        0
+      ],
+      "steps": 30,
+      "cfg": 6,
+      "seed": 618902714867763
+    },
+    "class_type": "WanVideoSampler"
+  },
+  "4": {
+    "inputs": {
+      "compile_args": [
+        "12",
+        0
+      ],
+      "block_swap_args": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "WanVideoModelLoader"
+  },
+  "5": {
+    "inputs": {},
+    "class_type": "WanVideoBlockSwap"
+  },
+  "6": {
+    "inputs": {
+      "t5": [
+        "8",
+        0
+      ],
+      "positive_prompt": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "WanVideoTextEncode"
+  },
+  "8": {
+    "inputs": {},
+    "class_type": "LoadWanVideoT5TextEncoder"
+  },
+  "11": {
+    "inputs": {
+      "vae_name": "wan/wrapper_Wan2_1_VAE_bf16.safetensors",
+      "precision": "bf16"
+    },
+    "class_type": "WanVideoVAELoader"
+  },
+  "12": {
+    "inputs": {
+      "backend": "inductor",
+      "fullgraph": false,
+      "mode": "default"
+    },
+    "class_type": "WanVideoTorchCompileSettings"
+  },
+  "14": {
+    "inputs": {
+      "image": "ChatGPT Image Apr 6, 2025, 09_44_41 PM.png"
+    },
+    "class_type": "LoadImage"
+  },
+  "15": {
+    "inputs": {},
+    "class_type": "LoadWanVideoClipTextEncoder"
+  },
+  "18": {
+    "inputs": {},
+    "class_type": "WanVideoTeaCache"
+  },
+  "20": {
+    "inputs": {
+      "clip_vision": [
+        "15",
+        0
+      ],
+      "image_1": [
+        "23",
+        0
+      ]
+    },
+    "class_type": "WanVideoClipVisionEncode"
+  },
+  "21": {
+    "inputs": {
+      "image": "ChatGPT Image Apr 6, 2025, 09_46_10 PM.png"
+    },
+    "class_type": "LoadImage"
+  },
+  "22": {
+    "inputs": {
+      "string": "small bird landing on a stick"
+    },
+    "class_type": "StringConstantMultiline"
+  },
+  "23": {
+    "inputs": {
+      "image": [
+        "14",
+        0
+      ],
+      "width": [
+        "25",
+        0
+      ],
+      "height": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJ"
+  },
+  "24": {
+    "inputs": {
+      "image": [
+        "21",
+        0
+      ],
+      "width": [
+        "25",
+        0
+      ],
+      "height": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJ"
+  },
+  "25": {
+    "inputs": {},
+    "class_type": "INTConstant"
+  },
+  "26": {
+    "inputs": {},
+    "class_type": "INTConstant"
+  },
+  "36": {
+    "inputs": {},
+    "class_type": "WanVideoSLG"
+  },
+  "37": {
+    "inputs": {
+      "images": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "VHS_VideoCombine"
+  },
+  "44": {
+    "inputs": {
+      "vae": [
+        "11",
+        0
+      ],
+      "clip_embeds": [
+        "20",
+        0
+      ],
+      "start_image": [
+        "23",
+        0
+      ],
+      "end_image": [
+        "24",
+        0
+      ],
+      "width": [
+        "23",
+        1
+      ],
+      "height": [
+        "23",
+        2
+      ]
+    },
+    "class_type": "WanVideoImageToVideoEncode"
+  },
+  "45": {
+    "inputs": {},
+    "class_type": "Note"
+  }
+}

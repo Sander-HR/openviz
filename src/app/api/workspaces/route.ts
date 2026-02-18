@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/auth";
-import { workspaces, workspaceMemberships, users } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { workspaces, workspaceMemberships } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
