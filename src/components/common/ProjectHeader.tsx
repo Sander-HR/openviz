@@ -6,26 +6,29 @@ import { useCurrentProject } from '../../hooks/useCurrentProject';
 
 interface ProjectHeaderProps {
     className?: string;
+    mode?: 'studio' | 'workbench';
 }
 
-export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className }) => {
+export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className, mode = 'workbench' }) => {
     const router = useRouter();
     const currentProjectId = useStore((state) => state.currentProjectId);
     const { project: dbProject, updateProjectName, isUpdating } = useCurrentProject(currentProjectId);
     const localProject = useStore((state) => state.project);
     const setLocalName = useStore((state) => state.setName);
 
-    // Use database project name if available, otherwise fall back to local store
-    const project = dbProject || localProject;
+    // Studio mode uses local store project, workbench mode uses database with fallback
+    const project = mode === 'studio' ? localProject : (dbProject || localProject);
+    const displayName = project.name;
+    const updateName = mode === 'studio' ? setLocalName : (currentProjectId && dbProject ? updateProjectName : setLocalName);
 
     const [isEditing, setIsEditing] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
-    const [editValue, setEditValue] = useState(project.name);
+    const [editValue, setEditValue] = useState(displayName);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        setEditValue(project.name);
-    }, [project.name]);
+        setEditValue(displayName);
+    }, [displayName]);
 
     useEffect(() => {
         if (isEditing && inputRef.current) {
@@ -39,15 +42,10 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className }) => {
     };
 
     const handleSave = () => {
-        if (editValue.trim() && editValue.trim() !== project.name) {
-            // Update both database and local store
-            if (currentProjectId && dbProject) {
-                updateProjectName(editValue.trim());
-            } else {
-                setLocalName(editValue.trim());
-            }
+        if (editValue.trim() && editValue.trim() !== displayName) {
+            updateName(editValue.trim());
         } else {
-            setEditValue(project.name);
+            setEditValue(displayName);
         }
         setIsEditing(false);
     };
@@ -56,7 +54,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className }) => {
         if (e.key === 'Enter') {
             handleSave();
         } else if (e.key === 'Escape') {
-            setEditValue(project.name);
+            setEditValue(displayName);
             setIsEditing(false);
         }
     };
@@ -87,13 +85,13 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className }) => {
                     <button
                         onClick={handleStartEdit}
                         disabled={isUpdating}
-                        className={`px-3 py-2 text-sm font-medium text-black transition-all duration-200 ${isHovered
-                                ? 'bg-white/90 border border-gray-200 rounded-lg shadow-lg backdrop-blur-md'
+                        className={`px-3 py-2 text-sm font-medium text-black transition-all duration-200 min-w-[150px] max-w-[300px] truncate text-left border border-transparent ${isHovered
+                                ? 'bg-white/90 border-gray-200 rounded-lg shadow-lg backdrop-blur-md'
                                 : 'bg-transparent'
                             } ${isUpdating ? 'opacity-50 cursor-wait' : ''}`}
                         title="Click to edit project name"
                     >
-                        {project.name}
+                        {displayName}
                     </button>
                 ) : (
                     <input
@@ -103,7 +101,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className }) => {
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={handleSave}
                         onKeyDown={handleKeyDown}
-                        className="px-3 py-2 text-sm font-medium text-black bg-white/90 border border-gray-200 rounded-lg shadow-lg backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-primary/50 min-w-[200px]"
+                        className="px-3 py-2 text-sm font-medium text-black bg-white/90 border border-gray-200 rounded-lg shadow-lg backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-primary/50 min-w-[150px] max-w-[300px]"
                         placeholder="Project name"
                     />
                 )}

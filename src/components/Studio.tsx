@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Toolbar } from './studio/Toolbar';
 import { RenderPanel } from './studio/RenderPanel';
@@ -11,34 +11,77 @@ import { PreviewStatus } from './studio/PreviewStatus';
 import { ProjectHeader } from './common/ProjectHeader';
 import { useStore } from '../store/useStore';
 
+const COLLAPSED_RESULTS_HEIGHT = 140;
+const RENDER_PANEL_MAX = 500;
+const RENDER_PANEL_MIN = 200;
+const RESULTS_PANEL_MIN = 100;
+const RESULTS_PANEL_MAX = 400;
+
 export const Studio: React.FC = () => {
-    const { setActiveTool, isExitingStudio, undo, redo } = useStore();
-    const [renderPanelHeight, setRenderPanelHeight] = useState(320);
-    const [resultsPanelHeight, setResultsPanelHeight] = useState(200);
+    const { setActiveTool, isExitingStudio, undo, redo, resultsPanelOpen } = useStore();
+    const [expandedRenderHeight, setExpandedRenderHeight] = useState(320);
+    const [expandedResultsHeight, setExpandedResultsHeight] = useState(200);
     const [isResizing, setIsResizing] = useState(false);
     const resizeStartY = useRef(0);
     const startRenderHeight = useRef(0);
     const startResultsHeight = useRef(0);
     const containerRef = useRef<HTMLDivElement>(null);
+    const containerHeightRef = useRef(0);
+
+    const updateContainerHeight = useCallback(() => {
+        if (containerRef.current) {
+            containerHeightRef.current = containerRef.current.clientHeight - 5;
+        }
+    }, []);
+
+    useEffect(() => {
+        updateContainerHeight();
+        window.addEventListener('resize', updateContainerHeight);
+        return () => window.removeEventListener('resize', updateContainerHeight);
+    }, [updateContainerHeight]);
+
+    const { renderPanelHeight, resultsPanelHeight } = useMemo(() => {
+        updateContainerHeight();
+        const availableHeight = containerHeightRef.current;
+
+        if (resultsPanelOpen) {
+            const totalHeight = expandedRenderHeight + expandedResultsHeight;
+            const renderHeight = Math.max(RENDER_PANEL_MIN, Math.min(RENDER_PANEL_MAX,
+                (expandedRenderHeight / totalHeight) * availableHeight));
+            const resultsHeight = Math.max(RESULTS_PANEL_MIN, Math.min(RESULTS_PANEL_MAX,
+                availableHeight - renderHeight));
+            return { renderPanelHeight: renderHeight, resultsPanelHeight: resultsHeight };
+        } else {
+            // When container height hasn't been measured yet (initial load), default to maximum
+            const renderHeight = availableHeight > 0 
+                ? Math.min(RENDER_PANEL_MAX, availableHeight - COLLAPSED_RESULTS_HEIGHT)
+                : RENDER_PANEL_MAX;
+            return {
+                renderPanelHeight: Math.max(RENDER_PANEL_MIN, renderHeight),
+                resultsPanelHeight: COLLAPSED_RESULTS_HEIGHT
+            };
+        }
+    }, [resultsPanelOpen, expandedRenderHeight, expandedResultsHeight, updateContainerHeight]);
 
     const handleResizeStart = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
+        if (!resultsPanelOpen) return;
         setIsResizing(true);
         resizeStartY.current = e.clientY;
-        startRenderHeight.current = renderPanelHeight;
-        startResultsHeight.current = resultsPanelHeight;
-    }, [renderPanelHeight, resultsPanelHeight]);
+        startRenderHeight.current = expandedRenderHeight;
+        startResultsHeight.current = expandedResultsHeight;
+    }, [resultsPanelOpen, expandedRenderHeight, expandedResultsHeight]);
 
     const handleResizeMove = useCallback((e: MouseEvent) => {
-        if (!isResizing) return;
+        if (!isResizing || !resultsPanelOpen) return;
 
         const deltaY = e.clientY - resizeStartY.current;
-        const newRenderHeight = Math.max(200, Math.min(500, startRenderHeight.current + deltaY));
-        const newResultsHeight = Math.max(100, Math.min(400, startResultsHeight.current - deltaY));
+        const newRenderHeight = Math.max(RENDER_PANEL_MIN, Math.min(RENDER_PANEL_MAX, startRenderHeight.current + deltaY));
+        const newResultsHeight = Math.max(RESULTS_PANEL_MIN, Math.min(RESULTS_PANEL_MAX, startResultsHeight.current - deltaY));
 
-        setRenderPanelHeight(newRenderHeight);
-        setResultsPanelHeight(newResultsHeight);
-    }, [isResizing]);
+        setExpandedRenderHeight(newRenderHeight);
+        setExpandedResultsHeight(newResultsHeight);
+    }, [isResizing, resultsPanelOpen]);
 
     const handleResizeEnd = useCallback(() => {
         setIsResizing(false);
@@ -118,7 +161,7 @@ export const Studio: React.FC = () => {
                     animate={isExitingStudio ? "hiddenLeft" : "visible"}
                     variants={panelVariants}
                 >
-                    <ProjectHeader />
+                    <ProjectHeader mode="studio" />
                 </motion.div>
 
                 {/* Top Toolbar */}
@@ -134,7 +177,7 @@ export const Studio: React.FC = () => {
                 {/* Main Workspace Area (Sidelines) */}
                 <div className="flex flex-1 justify-between p-4 pointer-events-none relative">
                     <motion.div
-                        className="pointer-events-none flex flex-col gap-4 fixed top-4 left-4 bottom-4 z-50 w-60"
+                        className="pointer-events-none flex flex-col gap-4 fixed top-20 left-4 bottom-4 z-50 w-60"
                         initial="visible"
                         animate={isExitingStudio ? "hiddenLeft" : "visible"}
                         variants={panelVariants}

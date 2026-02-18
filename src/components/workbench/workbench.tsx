@@ -176,7 +176,7 @@ const WorkbenchContent: React.FC = () => {
             </ReactFlow>
 
             <div className="absolute top-4 left-4 z-20">
-                <ProjectHeader />
+                <ProjectHeader mode="workbench" />
             </div>
 
             <div className="absolute bottom-4 right-4 z-20">

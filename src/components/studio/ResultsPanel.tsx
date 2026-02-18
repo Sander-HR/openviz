@@ -36,6 +36,7 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
     const [isExporting, setIsExporting] = React.useState<string | null>(null);
     const [lastPreviewedImage, setLastPreviewedImage] = useState<string | null>(null);
+    const [showFooterInCollapsed, setShowFooterInCollapsed] = useState(false);
 
     // Filter render results to show only those for the current active node
     const filteredRenderResults = renderResults.filter(group =>
@@ -140,7 +141,109 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
                 </button>
             </div>
 
-            {/* Content Area */}
+            {/* Collapsed Content - Thumbnail Grid Only */}
+            {!resultsPanelOpen && (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-[5px]">
+                        {isRendering && (
+                            <div className="grid grid-cols-4 gap-1">
+                                {[1, 2, 3, 4].map((i) => (
+                                    <div key={i} className="aspect-square bg-neutral-700 rounded-lg animate-pulse" />
+                                ))}
+                            </div>
+                        )}
+                        {!isRendering && allImages.length > 0 && (
+                            <div className="grid grid-cols-4 gap-1">
+                                {allImages.map((img, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={() => {
+                                            setLastPreviewedImage(img);
+                                            setIsPreviewVisible(true);
+                                            setPreviewingRender(img);
+                                            setShowFooterInCollapsed(true);
+                                        }}
+                                        className={cn(
+                                            "aspect-square rounded-lg overflow-hidden border transition-all cursor-pointer",
+                                            previewingRender === img
+                                                ? "border-primary shadow-lg shadow-primary/20"
+                                                : "border-neutral-800 hover:border-white/20"
+                                        )}
+                                    >
+                                        <img src={img} alt={`Result ${idx}`} className="w-full h-full object-cover" />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {!isRendering && allImages.length === 0 && (
+                            <div className="flex items-center justify-center h-20 text-xs opacity-40 text-center px-2">
+                                Generate to see results
+                            </div>
+                        )}
+                    </div>
+                    {showFooterInCollapsed && (
+                        <div className="p-[5px] border-t border-panel-border flex items-center justify-between bg-black/20">
+                            <div className="flex items-center gap-1">
+                                <button
+                                    className={cn(
+                                        "p-1.5 hover:bg-white/10 rounded-lg transition-colors",
+                                        isPreviewVisible && previewingRender ? "opacity-100 text-primary" : "opacity-60"
+                                    )}
+                                    onClick={() => {
+                                        if (previewingRender) {
+                                            setIsPreviewVisible(!isPreviewVisible);
+                                        } else if (lastPreviewedImage) {
+                                            setPreviewingRender(lastPreviewedImage);
+                                            setIsPreviewVisible(true);
+                                        }
+                                    }}
+                                    title={isPreviewVisible && previewingRender ? "Hide preview" : "Show preview"}
+                                >
+                                    <Eye size={16} />
+                                </button>
+                                <button
+                                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60"
+                                    onClick={handlePrevRender}
+                                    disabled={allImages.length === 0}
+                                    title="Previous render (←)"
+                                >
+                                    <ArrowLeft size={16} />
+                                </button>
+                                <button
+                                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60"
+                                    onClick={handleNextRender}
+                                    disabled={allImages.length === 0}
+                                    title="Next render (→)"
+                                >
+                                    <ArrowRight size={16} />
+                                </button>
+                                <button
+                                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors opacity-60"
+                                    onClick={() => previewingRender && handleDownloadImage(previewingRender)}
+                                    disabled={!previewingRender}
+                                    title="Download current"
+                                >
+                                    <Download size={16} />
+                                </button>
+                            </div>
+                            <button
+                                disabled={!previewingRender}
+                                onClick={() => previewingRender && addResultAsLayer(previewingRender)}
+                                className={cn(
+                                    "px-3 py-1 rounded-lg text-[10px] font-bold transition-all",
+                                    previewingRender
+                                        ? "bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20"
+                                        : "bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                                )}
+                            >
+                                Add
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Expanded Content Area */}
             {resultsPanelOpen && (
                 <div className="flex-1 flex flex-col overflow-hidden">
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-[5px] space-y-[5px]">

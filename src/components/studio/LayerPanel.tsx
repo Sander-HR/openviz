@@ -4,8 +4,7 @@ import {
     Eye,
     EyeOff,
     GripVertical,
-    MoreVertical,
-    ChevronDown
+    MoreVertical
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { clsx, type ClassValue } from 'clsx';
@@ -25,8 +24,7 @@ export const LayerPanel: React.FC = () => {
         addLayer,
         setActiveLayer,
         updateLayer,
-        reorderLayers,
-        setName
+        reorderLayers
     } = useStore();
     const panelRef = React.useRef<HTMLDivElement>(null);
     const [dropdownLayerId, setDropdownLayerId] = React.useState<string | null>(null);
@@ -39,20 +37,6 @@ export const LayerPanel: React.FC = () => {
             ref={panelRef}
             className="w-60 flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl overflow-hidden h-fit max-h-[calc(100vh-120px)] backdrop-blur-md bg-opacity-95 pointer-events-auto"
         >
-            {/* Project Header */}
-            <div className="p-2.5 border-b border-panel-border flex items-center justify-between group">
-                <div className="flex flex-col">
-                    <input
-                        className="bg-transparent text-white font-bold text-base outline-none border-b border-transparent focus:border-primary transition-colors w-full"
-                        value={project.name}
-                        onChange={(e) => setName(e.target.value)}
-                    />
-                </div>
-                <button className="text-text-secondary hover:text-white transition-colors">
-                    <ChevronDown size={18} />
-                </button>
-            </div>
-
             {/* Layers Header */}
             <div className="px-3 py-2 flex items-center justify-between">
                 <h3 className="text-white font-semibold text-xs uppercase tracking-wider opacity-60">Layers</h3>
