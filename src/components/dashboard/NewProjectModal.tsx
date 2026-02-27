@@ -56,7 +56,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                         </button>
 
                         <div className="p-10">
-                            <h2 className="text-3xl font-bold tracking-tight mb-8">Welcome to Vizcom</h2>
+                            <h2 className="text-3xl font-bold tracking-tight mb-8">Welcome to OpenViz</h2>
 
                             <div className="space-y-8">
                                 {/* Name Input */}
