@@ -112,6 +112,27 @@ export const Toolbar: React.FC = () => {
                 onChange={handleFileChange}
             />
 
+            <button
+                onClick={() => {
+                    if (viewMode === 'STUDIO') {
+                        const thumbnail = (window as any).getFlattenedCanvas?.();
+                        saveCurrentToWorkbench(thumbnail);
+                        setViewMode('WORKBENCH');
+                    } else {
+                        setViewMode('STUDIO');
+                    }
+                }}
+                className={cn(
+                    "p-1.5 rounded-full transition-all duration-200",
+                    viewMode === 'WORKBENCH' ? "bg-primary text-white" : "text-text-secondary hover:bg-neutral-800 hover:text-white"
+                )}
+                title={viewMode === 'STUDIO' ? "Workbench" : "Back to Studio"}
+            >
+                <IterationCcw size={16} />
+            </button>
+
+            <div className="w-px h-5 bg-panel-border mx-0.5" />
+
             <div className="flex items-center gap-0.5 px-0.5 pr-1.5 border-r border-panel-border mr-0.5">
                 {tools.map((tool) => (
                     <button
@@ -133,7 +154,7 @@ export const Toolbar: React.FC = () => {
                 {/* Color Picker Button */}
                 <div className="relative ml-0.5">
                     <button
-                        className="w-7 h-7 rounded-full border-2 border-panel-border shadow-inner p-0.5 overflow-hidden hover:scale-105 active:scale-95 transition-transform relative"
+                        className="w-5 h-5 rounded-full border border-panel-border shadow-inner p-0 overflow-hidden hover:scale-105 active:scale-95 transition-transform relative"
                         style={{ backgroundColor: toolSettings.brushColor }}
                         onClick={() => setShowColorPicker(!showColorPicker)}
                         title="Change Color"
@@ -165,6 +186,13 @@ export const Toolbar: React.FC = () => {
 
             <div className="flex items-center gap-0.5 px-0.5">
                 <button
+                    onClick={handleImportClick}
+                    className="p-1.5 rounded-full text-text-secondary hover:bg-neutral-800 hover:text-white transition-all"
+                    title="Import Image (JPG/PNG)"
+                >
+                    <Import size={16} />
+                </button>
+                <button
                     onClick={undo}
                     className="p-1.5 rounded-full text-text-secondary hover:bg-neutral-800 hover:text-white transition-all"
                     title="Undo (Ctrl+Z)"
@@ -179,35 +207,6 @@ export const Toolbar: React.FC = () => {
                     <Redo2 size={16} />
                 </button>
             </div>
-
-            <div className="w-px h-5 bg-panel-border mx-0.5" />
-
-            <button
-                onClick={handleImportClick}
-                className="p-1.5 rounded-full text-text-secondary hover:bg-neutral-800 hover:text-white transition-all"
-                title="Import Image (JPG/PNG)"
-            >
-                <Import size={16} />
-            </button>
-
-            <button
-                onClick={() => {
-                    if (viewMode === 'STUDIO') {
-                        const thumbnail = (window as any).getFlattenedCanvas?.();
-                        saveCurrentToWorkbench(thumbnail);
-                        setViewMode('WORKBENCH');
-                    } else {
-                        setViewMode('STUDIO');
-                    }
-                }}
-                className={cn(
-                    "p-1.5 rounded-full transition-all duration-200",
-                    viewMode === 'WORKBENCH' ? "bg-primary text-white" : "text-text-secondary hover:bg-neutral-800 hover:text-white"
-                )}
-                title={viewMode === 'STUDIO' ? "Workbench" : "Back to Studio"}
-            >
-                <IterationCcw size={16} />
-            </button>
         </div>
     );
 };

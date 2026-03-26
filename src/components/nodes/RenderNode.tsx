@@ -256,12 +256,11 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             className={cn(
-                "relative w-[320px] bg-[#1a1a1a] rounded-2xl shadow-2xl border-2 transition-colors pointer-events-auto flex flex-col overflow-hidden",
+                "relative w-[240px] bg-[#1a1a1a] rounded-xl shadow-2xl border-2 transition-colors pointer-events-auto flex flex-col overflow-hidden",
                 selected ? 'border-[#6366f1]' : 'border-[#333] hover:border-[#6366f1]',
                 isHoverConnectable && 'border-[#6366f1]'
             )}
         >
-            {/* Invisible target handle covering the whole node for better snap detection */}
             <Handle
                 type="target"
                 position={Position.Left}
@@ -276,25 +275,21 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                     zIndex: 0,
                 }}
             />
-             {/* Header */}
-            <div className="p-4 border-b border-[#333] bg-[#222]">
-                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Wand2 size={16} className="text-[#6366f1]" />
-                        <h3 className="text-white font-medium text-lg">Render</h3>
-                    </div>
+            <div className="px-3 py-2 border-b border-[#333] bg-[#222] rounded-t-xl overflow-hidden">
+                 <div className="flex items-center gap-2">
+                    <Wand2 size={14} className="text-[#6366f1]" />
+                    <h3 className="text-white font-medium text-sm">Render</h3>
                 </div>
             </div>
 
-            <div className="p-4 space-y-4">
-                {/* Prompt */}
-                <div className="space-y-2">
+            <div className="p-3 space-y-3">
+                <div className="space-y-1">
                     <div className="flex justify-between items-center">
-                        <label className="text-gray-400 text-xs font-bold uppercase tracking-wider">Prompt</label>
-                        <span className="text-[10px] text-gray-600">{(settings.prompt || "").length}/2000</span>
+                        <label className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Prompt</label>
+                        <span className="text-[9px] text-gray-600">{(settings.prompt || "").length}/2000</span>
                     </div>
                     <textarea
-                        className="w-full h-24 bg-[#2a2a2a] border border-[#333] rounded-xl p-3 text-sm text-white resize-none focus:outline-none focus:border-[#6366f1] placeholder-gray-600 transition-colors nodrag nowheel"
+                        className="w-full h-16 bg-[#2a2a2a] border border-[#333] rounded-lg p-2 text-xs text-white resize-none focus:outline-none focus:border-[#6366f1] placeholder-gray-600 transition-colors nodrag nowheel"
                         placeholder="Describe your design..."
                         value={settings.prompt || ''}
                         onChange={(e) => updateSettings({ prompt: e.target.value })}
@@ -302,17 +297,15 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                     />
                 </div>
 
-                {/* Settings Grid */}
                 <div className="grid grid-cols-2 gap-2">
-                    {/* Style Selector */}
                     <div className="relative">
-                         <label className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1 block">Style</label>
+                         <label className="text-gray-400 text-[9px] font-bold uppercase tracking-wider mb-1 block">Style</label>
                         <button
                             onClick={(e) => { e.stopPropagation(); setShowStyles(!showStyles); }}
-                            className="w-full flex items-center justify-between bg-[#2a2a2a] border border-[#333] px-3 py-2 rounded-lg hover:border-gray-500 transition-colors"
+                            className="w-full flex items-center justify-between bg-[#2a2a2a] border border-[#333] px-2 py-1.5 rounded-lg hover:border-gray-500 transition-colors"
                         >
-                            <span className="text-white text-xs truncate">{settings.stylePreset || 'Style'}</span>
-                            <ChevronDown size={12} className="text-gray-500" />
+                            <span className="text-white text-[11px] truncate">{settings.stylePreset || 'Style'}</span>
+                            <ChevronDown size={10} className="text-gray-500" />
                         </button>
                         {showStyles && (
                             <div className="absolute bottom-full left-0 right-0 mb-1 bg-[#2a2a2a] border border-[#333] rounded-lg shadow-xl z-50 overflow-hidden max-h-48 overflow-y-auto custom-scrollbar nowheel nodrag">
@@ -320,7 +313,7 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                                     <button
                                         key={style.id}
                                         className={cn(
-                                            "w-full px-3 py-2 text-left text-xs text-gray-300 hover:bg-[#333] hover:text-white transition-colors flex flex-col gap-0.5",
+                                            "w-full px-2 py-1.5 text-left text-[11px] text-gray-300 hover:bg-[#333] hover:text-white transition-colors flex flex-col gap-0.5",
                                             settings.stylePreset === style.name && "text-[#6366f1] bg-[#333]"
                                         )}
                                         onClick={(e) => {
@@ -337,15 +330,14 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                         )}
                     </div>
 
-                    {/* Image Count */}
                     <div className="relative">
-                        <label className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1 block">Count</label>
+                        <label className="text-gray-400 text-[9px] font-bold uppercase tracking-wider mb-1 block">Count</label>
                         <button
                             onClick={(e) => { e.stopPropagation(); setShowNumImagesDropdown(!showNumImagesDropdown); }}
-                            className="w-full flex items-center justify-between bg-[#2a2a2a] border border-[#333] px-3 py-2 rounded-lg hover:border-gray-500 transition-colors"
+                            className="w-full flex items-center justify-between bg-[#2a2a2a] border border-[#333] px-2 py-1.5 rounded-lg hover:border-gray-500 transition-colors"
                         >
-                            <span className="text-white text-xs">{settings.numImages || 1} Images</span>
-                            <ChevronDown size={12} className="text-gray-500" />
+                            <span className="text-white text-[11px]">{settings.numImages || 1} Images</span>
+                            <ChevronDown size={10} className="text-gray-500" />
                         </button>
                          {showNumImagesDropdown && (
                             <div className="absolute bottom-full left-0 right-0 mb-1 bg-[#2a2a2a] border border-[#333] rounded-lg shadow-xl z-50 overflow-hidden nowheel nodrag">
@@ -353,7 +345,7 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                                     <button
                                         key={n}
                                         className={cn(
-                                            "w-full px-3 py-2 text-left text-xs text-gray-300 hover:bg-[#333] hover:text-white transition-colors",
+                                            "w-full px-2 py-1.5 text-left text-[11px] text-gray-300 hover:bg-[#333] hover:text-white transition-colors",
                                             settings.numImages === n && "text-[#6366f1] bg-[#333]"
                                         )}
                                         onClick={(e) => {
@@ -370,13 +362,12 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                     </div>
                 </div>
 
-                {/* Influence Slider */}
                 <div>
-                     <div className="flex justify-between items-center mb-2">
-                        <label className="text-gray-400 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                            <Layers size={10} /> Influence
+                     <div className="flex justify-between items-center mb-1">
+                        <label className="text-gray-400 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                            <Layers size={9} /> Influence
                         </label>
-                        <span className="text-[#6366f1] text-xs font-mono">{Math.round((settings.drawingInfluence || 0) * 100)}%</span>
+                        <span className="text-[#6366f1] text-[11px] font-mono">{Math.round((settings.drawingInfluence || 0) * 100)}%</span>
                     </div>
                     <input
                         type="range"
@@ -385,17 +376,16 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                         step="0.01"
                         value={settings.drawingInfluence || 0}
                         onChange={(e) => updateSettings({ drawingInfluence: parseFloat(e.target.value) })}
-                        className="w-full h-1.5 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-[#6366f1] nodrag nowheel"
+                        className="w-full h-1 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-[#6366f1] nodrag nowheel"
                         onClick={(e) => e.stopPropagation()}
                     />
                 </div>
 
-                {/* Generate Button */}
                 <button
                     onClick={handleGenerate}
                     disabled={isRendering || !settings.prompt?.trim()}
                     className={cn(
-                        "w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all relative overflow-hidden group mt-2",
+                        "w-full py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all relative overflow-hidden group text-sm",
                         isRendering
                             ? "bg-[#333] text-gray-500 cursor-not-allowed"
                             : "bg-[#6366f1] hover:bg-[#5558e6] text-white shadow-lg shadow-indigo-500/20"
@@ -403,12 +393,12 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                 >
                     {isRendering ? (
                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-gray-300" />
+                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-gray-500 border-t-gray-300" />
                             <span>Generating...</span>
                         </>
                     ) : (
                         <>
-                            <Wand2 size={16} className="group-hover:rotate-12 transition-transform" />
+                            <Wand2 size={14} className="group-hover:rotate-12 transition-transform" />
                             <span>Generate</span>
                         </>
                     )}

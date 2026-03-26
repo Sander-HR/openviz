@@ -71,12 +71,13 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, isConn
                         />
                         <div 
                             className="absolute inset-0 flex items-center justify-center cursor-pointer transition-opacity duration-200"
-                            onClick={togglePlay}
                             style={{
                                 backgroundColor: isPlaying ? 'transparent' : 'rgba(0,0,0,0.3)'
                             }}
                         >
-                             <div className={`
+                             <button
+                                onClick={togglePlay}
+                                className={`
                                 w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center 
                                 hover:bg-white/30 transition-all transform hover:scale-110
                                 ${isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}
@@ -86,7 +87,7 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, isConn
                                 ) : (
                                     <Play size={24} className="text-white fill-white ml-1" />
                                 )}
-                             </div>
+                             </button>
                         </div>
 
                         {/* Fullscreen Button */}

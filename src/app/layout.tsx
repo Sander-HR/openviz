@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers/QueryProvider";
 import { WorkspaceProvider } from "@/context/WorkspaceContext";
+import { AgentationWrapper } from "@/components/AgentationWrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,6 +23,7 @@ export default function RootLayout({
                 <Providers>
                     <WorkspaceProvider>
                         {children}
+                        <AgentationWrapper />
                     </WorkspaceProvider>
                 </Providers>
             </body>

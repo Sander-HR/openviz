@@ -265,7 +265,7 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             className={cn(
-                "relative w-[320px] bg-[#1a1a1a] rounded-2xl shadow-2xl border-2 transition-colors pointer-events-auto flex flex-col overflow-hidden",
+                "relative w-[240px] bg-[#1a1a1a] rounded-xl shadow-2xl border-2 transition-colors pointer-events-auto flex flex-col overflow-hidden",
                 selected ? 'border-[#6366f1]' : 'border-[#333] hover:border-[#6366f1]',
                 isHoverConnectable && 'border-[#6366f1]'
             )}
@@ -286,41 +286,39 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
                 }}
             />
              {/* Header */}
-             <div className="p-4 border-b border-[#333] bg-[#222]">
-                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Video size={16} className="text-[#6366f1]" />
-                        <h3 className="text-white font-medium text-lg">Animate</h3>
-                    </div>
+             <div className="px-3 py-2 border-b border-[#333] bg-[#222]">
+                 <div className="flex items-center gap-2">
+                    <Video size={14} className="text-[#6366f1]" />
+                    <h3 className="text-white font-medium text-sm">Animate</h3>
                 </div>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="p-3 space-y-3">
                 {/* Frames Section */}
-                <div className="space-y-2 pointer-events-auto">
-                    <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Frames</div>
-                    <div className="flex items-center gap-2">
+                <div className="space-y-1 pointer-events-auto">
+                    <div className="text-gray-400 text-[9px] font-bold uppercase tracking-wider">Frames</div>
+                    <div className="flex items-center gap-1.5">
                         {sourceNode1 && (sourceNode1.type === 'image' || sourceNode1.type === 'video') ? (
-                            <div className="flex items-center gap-2 bg-[#2a2a2a] pl-1 pr-2 py-1 rounded-lg border border-[#333] group transition-colors hover:border-gray-600">
+                            <div className="flex items-center gap-1.5 bg-[#2a2a2a] pl-1 pr-1.5 py-1 rounded-lg border border-[#333] group transition-colors hover:border-gray-600">
                                 {sourceNode1.project?.thumbnail ? (
-                                    <img src={sourceNode1.project.thumbnail} className="w-8 h-8 rounded object-cover bg-white" alt="Start" />
+                                    <img src={sourceNode1.project.thumbnail} className="w-6 h-6 rounded object-cover bg-white" alt="Start" />
                                 ) : (
-                                    <div className="w-8 h-8 rounded bg-[#333] flex items-center justify-center">
-                                        <ImageIcon size={14} className="text-gray-500" />
+                                    <div className="w-6 h-6 rounded bg-[#333] flex items-center justify-center">
+                                        <ImageIcon size={10} className="text-gray-500" />
                                     </div>
                                 )}
-                                <span className="text-white text-xs font-medium">Start</span>
+                                <span className="text-white text-[10px] font-medium">Start</span>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleDisconnect(0); }}
-                                    className="p-1 hover:bg-[#333] rounded-md transition-colors"
+                                    className="p-0.5 hover:bg-[#333] rounded-md transition-colors"
                                 >
-                                    <X size={12} className="text-gray-500 hover:text-white" />
+                                    <X size={10} className="text-gray-500 hover:text-white" />
                                 </button>
                             </div>
                         ) : (
-                            <div className="flex-1 flex items-center gap-2 bg-[#2a2a2a]/50 px-3 py-2 rounded-lg border border-dashed border-[#333] opacity-60">
-                                <ImageIcon size={14} className="text-gray-500" />
-                                <span className="text-gray-500 text-xs">Drop Start</span>
+                            <div className="flex-1 flex items-center gap-1.5 bg-[#2a2a2a]/50 px-2 py-1.5 rounded-lg border border-dashed border-[#333] opacity-60">
+                                <ImageIcon size={10} className="text-gray-500" />
+                                <span className="text-gray-500 text-[10px]">Drop Start</span>
                             </div>
                         )}
 
@@ -328,7 +326,7 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
                             onClick={handleSwapFrames}
                             disabled={inboundConnections.length !== 2}
                             className={cn(
-                                "p-1.5 rounded-lg transition-colors",
+                                "p-1 rounded-lg transition-colors text-[11px]",
                                 inboundConnections.length === 2
                                     ? "text-gray-400 hover:text-white hover:bg-[#333] cursor-pointer"
                                     : "text-gray-700 cursor-not-allowed"
@@ -339,42 +337,41 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
                         </button>
 
                         {sourceNode2 && (sourceNode2.type === 'image' || sourceNode2.type === 'video') ? (
-                            <div className="flex items-center gap-2 bg-[#2a2a2a] pl-1 pr-2 py-1 rounded-lg border border-[#333] group transition-colors hover:border-gray-600">
+                            <div className="flex items-center gap-1.5 bg-[#2a2a2a] pl-1 pr-1.5 py-1 rounded-lg border border-[#333] group transition-colors hover:border-gray-600">
                                 {sourceNode2.project?.thumbnail ? (
-                                    <img src={sourceNode2.project.thumbnail} className="w-8 h-8 rounded object-cover bg-white" alt="End" />
+                                    <img src={sourceNode2.project.thumbnail} className="w-6 h-6 rounded object-cover bg-white" alt="End" />
                                 ) : (
-                                    <div className="w-8 h-8 rounded bg-[#333] flex items-center justify-center">
-                                        <ImageIcon size={14} className="text-gray-500" />
+                                    <div className="w-6 h-6 rounded bg-[#333] flex items-center justify-center">
+                                        <ImageIcon size={10} className="text-gray-500" />
                                     </div>
                                 )}
-                                <span className="text-white text-xs font-medium">End</span>
+                                <span className="text-white text-[10px] font-medium">End</span>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleDisconnect(1); }}
-                                    className="p-1 hover:bg-[#333] rounded-md transition-colors"
+                                    className="p-0.5 hover:bg-[#333] rounded-md transition-colors"
                                 >
-                                    <X size={12} className="text-gray-500 hover:text-white" />
+                                    <X size={10} className="text-gray-500 hover:text-white" />
                                 </button>
                             </div>
                         ) : (
-                            <div className="flex-1 flex items-center gap-2 bg-[#2a2a2a]/50 px-3 py-2 rounded-lg border border-dashed border-[#333] opacity-60">
-                                <Plus size={14} className="text-gray-500" />
-                                <span className="text-gray-500 text-xs">Add End</span>
+                            <div className="flex-1 flex items-center gap-1.5 bg-[#2a2a2a]/50 px-2 py-1.5 rounded-lg border border-dashed border-[#333] opacity-60">
+                                <Plus size={10} className="text-gray-500" />
+                                <span className="text-gray-500 text-[10px]">Add End</span>
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                    <div className="text-gray-400 text-xs font-bold uppercase tracking-wider">Settings</div>
+                <div className="space-y-1">
+                    <div className="text-gray-400 text-[9px] font-bold uppercase tracking-wider">Settings</div>
                     <div className="flex gap-2">
-                        {/* Workflow/Style Selector */}
                         <div className="relative flex-1">
                              <button 
                                 onClick={(e) => { e.stopPropagation(); setShowStyles(!showStyles); }}
-                                className="w-full bg-[#2a2a2a] text-white text-xs py-2 px-3 rounded-lg border border-[#333] flex items-center justify-between hover:border-gray-600 transition-colors"
+                                className="w-full bg-[#2a2a2a] text-white text-[11px] py-1.5 px-2 rounded-lg border border-[#333] flex items-center justify-between hover:border-gray-600 transition-colors"
                             >
-                                <span className="truncate">{settings.workflowId ? videoStyles.find(s => s.id === settings.workflowId)?.name : 'Standard Video'}</span>
-                                <Settings2 size={12} className="text-gray-500" />
+                                <span className="truncate">{settings.workflowId ? videoStyles.find(s => s.id === settings.workflowId)?.name : 'Standard'}</span>
+                                <Settings2 size={10} className="text-gray-500" />
                             </button>
                             {showStyles && (
                                 <div className="absolute top-full left-0 right-0 mt-1 bg-[#2a2a2a] border border-[#333] rounded-lg shadow-xl z-50 overflow-hidden nowheel nodrag">
@@ -382,7 +379,7 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
                                         <button
                                             key={style.id}
                                             className={cn(
-                                                "w-full px-3 py-2 text-left text-xs text-gray-300 hover:bg-[#333] hover:text-white transition-colors",
+                                                "w-full px-2 py-1.5 text-left text-[11px] text-gray-300 hover:bg-[#333] hover:text-white transition-colors",
                                                 settings.workflowId === style.id && "text-[#6366f1] bg-[#333]"
                                             )}
                                             onClick={(e) => {
@@ -398,23 +395,23 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
                             )}
                         </div>
                         
-                        <button className="w-24 bg-[#2a2a2a] text-white text-xs py-2 px-3 rounded-lg border border-[#333] flex items-center justify-between hover:border-gray-600 transition-colors">
+                        <button className="w-20 bg-[#2a2a2a] text-white text-[11px] py-1.5 px-2 rounded-lg border border-[#333] flex items-center justify-between hover:border-gray-600 transition-colors">
                             {settings.duration || '5s'}
-                            <ChevronDown size={12} className="text-gray-500" />
+                            <ChevronDown size={10} className="text-gray-500" />
                         </button>
                     </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                     <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">
-                            Prompt <span className="text-[10px] text-gray-600 font-normal">(optional)</span>
+                        <span className="text-gray-400 text-[9px] font-bold uppercase tracking-wider">
+                            Prompt <span className="text-[9px] text-gray-600 font-normal">(optional)</span>
                         </span>
-                        <button className="text-[10px] text-[#6366f1] hover:underline">Describe</button>
+                        <button className="text-[9px] text-[#6366f1] hover:underline">Describe</button>
                     </div>
                     <div className="relative">
                         <textarea
-                            className="w-full bg-[#2a2a2a] border border-[#333] rounded-xl p-3 text-white text-sm min-h-[100px] resize-none focus:outline-none focus:border-[#6366f1] placeholder-gray-600 nowheel nodrag"
+                            className="w-full bg-[#2a2a2a] border border-[#333] rounded-lg p-2 text-white text-xs min-h-[60px] resize-none focus:outline-none focus:border-[#6366f1] placeholder-gray-600 nowheel nodrag"
                             placeholder="Tell us how things should move..."
                             value={prompt}
                             onChange={(e) => updateData({ prompt: e.target.value })}
@@ -427,7 +424,7 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
                     onClick={handleAnimate}
                     disabled={isAnimating}
                     className={cn(
-                        "w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all relative overflow-hidden group",
+                        "w-full py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all relative overflow-hidden group text-sm",
                         isAnimating 
                             ? "bg-[#333] text-gray-500 cursor-not-allowed"
                             : "bg-[#6366f1] hover:bg-[#5558e6] text-white shadow-lg shadow-indigo-500/20"
@@ -435,12 +432,12 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
                 >
                     {isAnimating ? (
                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-gray-300" />
+                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-gray-500 border-t-gray-300" />
                             <span>Processing...</span>
                         </>
                     ) : (
                         <>
-                            <Play size={16} className="fill-current" />
+                            <Play size={14} className="fill-current" />
                             <span>Animate</span>
                         </>
                     )}

@@ -12,7 +12,7 @@ interface WorkbenchAnimateNodeProps {
 
 export const WorkbenchAnimateNode: React.FC<WorkbenchAnimateNodeProps> = ({ id, data, selected, isConnectable = true }) => {
     return (
-        <>
+        <div style={{ width: 'fit-content', height: 'fit-content' }}>
             <Handle
                 type="target"
                 position={Position.Left}
@@ -20,6 +20,7 @@ export const WorkbenchAnimateNode: React.FC<WorkbenchAnimateNodeProps> = ({ id, 
                 style={{
                     left: '0px',
                     top: '50%',
+                    transform: 'translate(-50%, -50%)',
                     background: '#6366f1',
                     width: '26px',
                     height: '26px',
@@ -27,11 +28,9 @@ export const WorkbenchAnimateNode: React.FC<WorkbenchAnimateNodeProps> = ({ id, 
                     cursor: 'hand',
                     zIndex: 1000,
                     opacity: selected ? 1 : 0,
-                    transformOrigin: 'center',
                     transition: 'opacity 300ms ease',
                     pointerEvents: selected ? 'auto' : 'none',
                     display: 'flex',
-                    translate: 'translateY(-50%)',
                     alignItems: 'center',
                     justifyContent: 'center',
                 }}
@@ -44,6 +43,6 @@ export const WorkbenchAnimateNode: React.FC<WorkbenchAnimateNodeProps> = ({ id, 
                     data={data}
                     selected={selected}
                 />
-        </>
+        </div>
     );
 };

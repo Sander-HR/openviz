@@ -23,15 +23,23 @@ export function useProjects() {
                 ...newProject,
                 workspaceId: currentWorkspace?.id,
             };
+            console.log("Creating project with:", projectWithWorkspace);
             const res = await fetch("/api/projects", {
                 method: "POST",
                 body: JSON.stringify(projectWithWorkspace),
             });
-            if (!res.ok) throw new Error("Failed to create project");
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                console.error("API error response:", res.status, errorData);
+                throw new Error(`Failed to create project: ${res.status} - ${JSON.stringify(errorData)}`);
+            }
             return res.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["projects", currentWorkspace?.id] });
+        },
+        onError: (error) => {
+            console.error("Error creating project:", error);
         },
     });
 

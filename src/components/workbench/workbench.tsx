@@ -18,6 +18,7 @@ import { VideoNode } from './VideoNode';
 import { WorkbenchAnimateNode } from './AnimateNode';
 import { WorkbenchRenderNode } from './RenderNode';
 import { CustomEdge } from './CustomEdge';
+import { CustomConnectionLine } from './CustomConnectionLine';
 import { PositionedMenu } from '../ContextMenu';
 import { BasicBlocksMenu } from '../nodes/BasicBlocksMenu';
 import { useWorkbench } from './hooks/useWorkbench';
@@ -98,21 +99,32 @@ const WorkbenchContent: React.FC = () => {
     }, [viewMode, activeNodeId, workbenchNodes, setCenter]);
 
     const nodes = workbenchNodes.map((node: any) => {
-        let width = node.width;
-        let height = node.height;
+        const nodeData = { ...node, onSourceClick: handleSourceClick, onResize: handleResize } as unknown as Record<string, unknown>;
 
-        if ((node.type === 'image' || node.type === 'video') && node.project?.canvas && typeof node.scale === 'number') {
-            width = node.project.canvas.width * node.scale;
-            height = node.project.canvas.height * node.scale;
+        if (node.type === 'image' || node.type === 'video') {
+            const width = node.project?.canvas && typeof node.scale === 'number'
+                ? node.project.canvas.width * node.scale
+                : node.width;
+            const height = node.project?.canvas && typeof node.scale === 'number'
+                ? node.project.canvas.height * node.scale
+                : node.height;
+
+            return {
+                id: node.id,
+                type: node.type === 'image' ? 'imageNode' : 'videoNode',
+                position: { x: node.x, y: node.y },
+                width,
+                height,
+                data: nodeData,
+                selected: selectedNodeIds.includes(node.id),
+            };
         }
 
         return {
             id: node.id,
-            type: node.type === 'image' ? 'imageNode' : node.type === 'video' ? 'videoNode' : node.type === 'animate' ? 'animateNode' : 'renderNode',
+            type: node.type === 'animate' ? 'animateNode' : 'renderNode',
             position: { x: node.x, y: node.y },
-            width,
-            height,
-            data: { ...node, onSourceClick: handleSourceClick, onResize: handleResize } as unknown as Record<string, unknown>,
+            data: nodeData,
             selected: selectedNodeIds.includes(node.id),
         };
     });
@@ -170,6 +182,7 @@ const WorkbenchContent: React.FC = () => {
                 minZoom={0.1}
                 maxZoom={2}
                 connectionRadius={60}
+                connectionLineComponent={CustomConnectionLine}
             >
                 <Background id='smalldots' variant={BackgroundVariant.Dots} gap={10} size={1} color="#c0c0c0" />
                 <Background id="fatdots" color="#191919" variant={BackgroundVariant.Dots} gap={50} size={1} />
@@ -189,7 +202,7 @@ const WorkbenchContent: React.FC = () => {
                 />
             </div>
 
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10" ref={dropdownRef}>
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20" ref={dropdownRef}>
                 <div className="relative">
                     <button
                         onClick={() => setShowFormatDropdown(!showFormatDropdown)}
@@ -201,7 +214,7 @@ const WorkbenchContent: React.FC = () => {
                     </button>
 
                     {showFormatDropdown && (
-                        <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 w-48 bg-panel border border-panel-border rounded-lg shadow-2xl backdrop-blur-md bg-opacity-95 overflow-hidden nowheel nodrag">
+                        <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 w-48 bg-panel border border-panel-border rounded-lg shadow-2xl backdrop-blur-md bg-opacity-95 overflow-hidden nowheel nodrag">
                             {sketchFormats.map((format, index) => (
                                 <button
                                     key={index}

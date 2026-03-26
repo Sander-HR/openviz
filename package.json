@@ -65,6 +65,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/ui": "^4.0.18",
+    "agentation": "^3.0.1",
     "autoprefixer": "^10.4.24",
     "drizzle-kit": "^0.18.1",
     "eslint": "^9.39.2",

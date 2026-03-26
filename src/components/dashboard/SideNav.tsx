@@ -15,11 +15,18 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Dispatch, SetStateAction } from "react";
 import { CreateWorkspaceModal } from "./CreateWorkspaceModal";
 import { useWorkspace } from "@/context/WorkspaceContext";
 
-export function SideNav() {
+type PageMode = "recents" | "myFiles";
+
+interface SideNavProps {
+    pageMode: PageMode;
+    onPageModeChange: Dispatch<SetStateAction<PageMode>>;
+}
+
+export function SideNav({ pageMode, onPageModeChange }: SideNavProps) {
     const router = useRouter();
     const { data: session } = useSession();
     const { workspaces, currentWorkspace, setCurrentWorkspace, refreshWorkspaces } = useWorkspace();
@@ -145,8 +152,18 @@ export function SideNav() {
             </div>
 
             <nav className="flex-1 px-2 space-y-0.5">
-                <NavItem icon={<Clock size={16} />} label="Recents" active />
-                <NavItem icon={<Files size={16} />} label="My Files" />
+                <NavItem
+                    icon={<Clock size={16} />}
+                    label="Recents"
+                    active={pageMode === "recents"}
+                    onClick={() => onPageModeChange("recents")}
+                />
+                <NavItem
+                    icon={<Files size={16} />}
+                    label="My Files"
+                    active={pageMode === "myFiles"}
+                    onClick={() => onPageModeChange("myFiles")}
+                />
                 <NavItem icon={<GraduationCap size={16} />} label="Learn" />
 
                 <div className="pt-6 pb-2 px-4 flex items-center justify-between group">
@@ -224,9 +241,12 @@ export function SideNav() {
     );
 }
 
-function NavItem({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
+function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) {
     return (
-        <div className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors text-sm ${active ? 'bg-[#1A1A1A] text-white' : 'hover:bg-[#1A1A1A] hover:text-white'}`}>
+        <div
+            onClick={onClick}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors text-sm ${active ? 'bg-[#1A1A1A] text-white' : 'hover:bg-[#1A1A1A] hover:text-white'}`}
+        >
             {icon}
             <span>{label}</span>
         </div>

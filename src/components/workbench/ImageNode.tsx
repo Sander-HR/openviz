@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Handle, NodeResizer, Position, useConnection } from '@xyflow/react';
+import React from 'react';
+import { Handle, NodeResizer, Position } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { ImageNode as ImageNodeType } from '../../types';
 
@@ -16,15 +16,10 @@ interface ImageNodeProps {
 }
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConnectable = true }) => {
-    const connection = useConnection();
-    const [isHovered, setIsHovered] = useState(false);
     const handleSourceClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         data.onSourceClick?.(data.id);
     };
-
-    const isHoverConnectable = connection.inProgress && isHovered &&
-        (connection.fromNode?.type === 'animateNode' || connection.fromNode?.type === 'renderNode');
 
     return (
         <>
@@ -34,9 +29,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
                 </div>
             )}
             <div
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-                className={`relative bg-white rounded-lg shadow-lg transition-all duration-200 border-2 overflow-hidden ${selected ? 'border-[#6366f1]' : 'border-transparent hover:border-[#6366f1]'} ${isHoverConnectable ? 'border-[#6366f1]' : ''}`}
+                className={`relative bg-white rounded-lg shadow-lg transition-all duration-200 overflow-hidden border-2 ${selected ? 'border-[#6366f1]' : 'border-white hover:border-[#6366f1]'}`}
                 style={{ width: '100%', height: '100%' }}
             >
                 {data.status === 'rendering' ? (

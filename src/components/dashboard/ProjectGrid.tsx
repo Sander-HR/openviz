@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, FileText, Pencil, ArrowRightLeft, Trash2 } from "lucide-react";
+import { MoreHorizontal, FileText, Pencil, ArrowRightLeft, Trash2, Folder } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Project } from "@/lib/schemas/base";
 import { useState, useRef, useEffect } from "react";
@@ -9,7 +9,26 @@ import { MoveProjectModal } from "./MoveProjectModal";
 import { useProjects } from "@/hooks/useProjects";
 import { useProjectPreview } from "@/hooks/useProjectPreview";
 
-export function ProjectGrid({ projects, isLoading }: { projects: Project[], isLoading: boolean }) {
+interface FolderItem {
+    id: string;
+    name: string;
+}
+
+interface ProjectGridProps {
+    projects: Project[];
+    isLoading: boolean;
+    showFolders?: boolean;
+    folders?: FolderItem[];
+    onFolderClick?: (folderId: string) => void;
+}
+
+export function ProjectGrid({ 
+    projects, 
+    isLoading, 
+    showFolders = false, 
+    folders = [], 
+    onFolderClick 
+}: ProjectGridProps) {
     if (isLoading) {
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
@@ -21,11 +40,133 @@ export function ProjectGrid({ projects, isLoading }: { projects: Project[], isLo
     }
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6 overflow-y-auto max-h-[calc(100vh-120px)]">
-            {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
-            ))}
+        <div className="p-6 overflow-y-auto max-h-[calc(100vh-120px)]">
+            {/* Folders section */}
+            {showFolders && folders.length > 0 && (
+                <div className="mb-8">
+                    <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Folders</div>
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {folders.map((folder) => (
+                            <FolderCard 
+                                key={folder.id} 
+                                folder={folder} 
+                                onClick={() => onFolderClick?.(folder.id)} 
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Files section */}
+            <div>
+                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">
+                    {showFolders ? 'Files' : 'Projects'}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {projects.length === 0 ? (
+                        <div className="col-span-3 py-12 text-center text-zinc-500">
+                            No projects found
+                        </div>
+                    ) : (
+                        projects.map((project) => (
+                            <ProjectCard key={project.id} project={project} />
+                        ))
+                    )}
+                </div>
+            </div>
         </div>
+    );
+}
+
+function FolderCard({ folder, onClick }: { folder: FolderItem; onClick: () => void }) {
+    const router = useRouter();
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+        <button
+            onClick={onClick}
+            onDoubleClick={() => router.push(`/dashboard?folder=${folder.id}`)}
+            draggable
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+                e.preventDefault();
+                const projectId = e.dataTransfer.getData('projectId');
+                if (projectId) {
+                    console.log('Move project', projectId, 'to folder', folder.id);
+                }
+            }}
+            className="group cursor-pointer text-left relative"
+        >
+            <div className="aspect-square bg-[#1A1A1A] rounded-lg border-2 border-[#2A2A2A] hover:border-[#6366f1] transition-all duration-200 flex items-center justify-center">
+                <Folder size={48} className="text-yellow-500/80" />
+            </div>
+            <div className="flex items-center gap-2 px-1 mt-2">
+                <Folder size={14} className="text-yellow-500 shrink-0" />
+                <span className="text-sm font-medium text-white group-hover:text-indigo-400 transition-colors truncate">
+                    {folder.name}
+                </span>
+                <div className="relative" ref={menuRef}>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setIsMenuOpen(!isMenuOpen);
+                        }}
+                        className={`p-1 text-zinc-500 hover:text-white hover:bg-[#2A2A2A] rounded transition-all ${isMenuOpen ? 'opacity-100 bg-[#2A2A2A] text-white' : 'opacity-0 group-hover:opacity-100'}`}
+                    >
+                        <MoreHorizontal size={14} />
+                    </button>
+                    {isMenuOpen && (
+                        <div className="absolute right-0 top-6 z-20 w-40 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                            <div className="p-1 space-y-0.5">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsMenuOpen(false);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:text-white hover:bg-[#252525] transition-colors"
+                                >
+                                    <Pencil size={12} />
+                                    Rename
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsMenuOpen(false);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:text-white hover:bg-[#252525] transition-colors"
+                                >
+                                    <ArrowRightLeft size={12} />
+                                    Move to...
+                                </button>
+                                <div className="h-px bg-[#2A2A2A] my-1" />
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsMenuOpen(false);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-red-400 hover:bg-[#252525] transition-colors"
+                                >
+                                    <Trash2 size={12} />
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </button>
     );
 }
 
@@ -41,6 +182,12 @@ function ProjectCard({ project }: { project: Project }) {
     const menuRef = useRef<HTMLDivElement>(null);
     const thumbnailRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Make project draggable
+    const handleDragStart = (e: React.DragEvent) => {
+        e.dataTransfer.setData('projectId', project.id);
+        e.dataTransfer.effectAllowed = 'move';
+    };
 
     // Intersection Observer for lazy loading
     useEffect(() => {
@@ -119,12 +266,12 @@ function ProjectCard({ project }: { project: Project }) {
         <>
             <div
                 ref={containerRef}
-                className="group cursor-pointer space-y-3 relative"
+                className="group cursor-pointer space-y-3 relative scale-50 origin-top-left"
                 onDoubleClick={() => router.push(`/projects/${project.id}`)}
             >
                 <div
                     ref={thumbnailRef}
-                    className="aspect-[4/3] bg-white rounded-lg shadow-lg border-2 border-transparent hover:border-[#6366f1] transition-all duration-200 relative overflow-hidden"
+                    className="aspect-[4/3] bg-white rounded-lg shadow-lg border-2 border-transparent hover:border-[#6366f1] transition-all duration-200 relative overflow-hidden flex items-center justify-center"
                     onMouseMove={handleMouseMove}
                     onMouseLeave={handleMouseLeave}
                 >
@@ -239,4 +386,3 @@ function ProjectCard({ project }: { project: Project }) {
         </>
     );
 }
-

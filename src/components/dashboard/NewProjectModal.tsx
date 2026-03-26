@@ -56,7 +56,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                         </button>
 
                         <div className="p-10">
-                            <h2 className="text-3xl font-bold tracking-tight mb-8">Welcome to Vizcom</h2>
+                            <h2 className="text-3xl font-bold tracking-tight mb-8">Welcome to OpenViz</h2>
 
                             <div className="space-y-8">
                                 {/* Name Input */}
@@ -133,8 +133,8 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                                 </div>
 
                                 <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
+                                    whileHover={{ scale: isCreating || !name.trim() ? 1 : 1.02 }}
+                                    whileTap={{ scale: isCreating || !name.trim() ? 1 : 0.98 }}
                                     onClick={handleConfirm}
                                     disabled={isCreating || !name.trim()}
                                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-xl text-lg font-bold transition-all shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-3 mt-4"

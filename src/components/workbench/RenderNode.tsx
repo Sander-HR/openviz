@@ -13,7 +13,7 @@ interface WorkbenchRenderNodeProps {
 
 export const WorkbenchRenderNode: React.FC<WorkbenchRenderNodeProps> = ({ id, data, selected, isConnectable = true }) => {
     return (
-        <>
+        <div style={{ width: 'fit-content', height: 'fit-content' }}>
             <Handle
                 type="target"
                 position={Position.Left}
@@ -21,6 +21,7 @@ export const WorkbenchRenderNode: React.FC<WorkbenchRenderNodeProps> = ({ id, da
                 style={{
                     left: '0px',
                     top: '50%',
+                    transform: 'translate(-50%, -50%)',
                     background: '#6366f1',
                     width: '26px',
                     height: '26px',
@@ -28,8 +29,6 @@ export const WorkbenchRenderNode: React.FC<WorkbenchRenderNodeProps> = ({ id, da
                     cursor: 'hand',
                     zIndex: 1000,
                     opacity: selected ? 1 : 0,
-                    transformOrigin: 'center',
-                    //transform: selected ? `translateY(-50%) scale(${1 / zoom})` : 'translateY(-50%) scale(0)',
                     transition: 'opacity 300ms ease',
                     pointerEvents: selected ? 'auto' : 'none',
                     display: 'flex',
@@ -46,6 +45,6 @@ export const WorkbenchRenderNode: React.FC<WorkbenchRenderNodeProps> = ({ id, da
                 data={data}
                 selected={selected}
             />
-        </>
+        </div>
     );
 };

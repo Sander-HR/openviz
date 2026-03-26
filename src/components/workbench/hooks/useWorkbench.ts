@@ -135,9 +135,22 @@ export const useWorkbench = () => {
 
     const handleConnect: OnConnect = useCallback((params: Connection) => {
         if (params.source && params.target) {
+            const targetNode = workbenchNodes.find((n: any) => n.id === params.target);
+            if (targetNode?.type === 'animate') {
+                const inboundConnections = connections.filter((c: any) => c.to === params.target);
+                if (inboundConnections.length >= 2) {
+                    // Remove oldest connection (first in the list) before adding new one
+                    useStore.getState().removeConnection(inboundConnections[0].id);
+                }
+            } else if (targetNode?.type === 'render') {
+                const inboundConnections = connections.filter((c: any) => c.to === params.target);
+                if (inboundConnections.length >= 1) {
+                    useStore.getState().removeConnection(inboundConnections[0].id);
+                }
+            }
             addConnection(params.source, params.target);
         }
-    }, [addConnection]);
+    }, [addConnection, workbenchNodes, connections]);
 
     const onConnectStart = useCallback((_: any, { nodeId, handleType }: any) => {
         connectionStart.current = { nodeId, handleType };
@@ -149,12 +162,23 @@ export const useWorkbench = () => {
         if (nodeElement) {
             const targetNodeId = nodeElement.getAttribute('data-id');
             const targetNode = workbenchNodes.find((n: any) => n.id === targetNodeId);
-            if (targetNode?.type === 'image' && connectionStart.current.handleType === 'target') {
+            if ((targetNode?.type === 'image' || targetNode?.type === 'animate' || targetNode?.type === 'render') && connectionStart.current.handleType === 'target') {
+                if (targetNode.type === 'animate') {
+                    const inboundConnections = connections.filter((c: any) => c.to === targetNodeId);
+                    if (inboundConnections.length >= 2) {
+                        useStore.getState().removeConnection(inboundConnections[0].id);
+                    }
+                } else if (targetNode.type === 'render') {
+                    const inboundConnections = connections.filter((c: any) => c.to === targetNodeId);
+                    if (inboundConnections.length >= 1) {
+                        useStore.getState().removeConnection(inboundConnections[0].id);
+                    }
+                }
                 addConnection(targetNode.id, connectionStart.current.nodeId);
             }
         }
         connectionStart.current = null;
-    }, [workbenchNodes, addConnection]);
+    }, [workbenchNodes, addConnection, connections]);
 
     const handleNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
         const workbenchNode = workbenchNodes.find((n: any) => n.id === node.id);
