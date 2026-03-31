@@ -94,9 +94,17 @@ function FolderCard({ folder, onClick }: { folder: FolderItem; onClick: () => vo
     }, []);
 
     return (
-        <button
+        <div
+            role="button"
+            tabIndex={0}
             onClick={onClick}
             onDoubleClick={() => router.push(`/dashboard?folder=${folder.id}`)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onClick();
+                }
+            }}
             draggable
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
@@ -106,67 +114,62 @@ function FolderCard({ folder, onClick }: { folder: FolderItem; onClick: () => vo
                     console.log('Move project', projectId, 'to folder', folder.id);
                 }
             }}
-            className="group cursor-pointer text-left relative"
+            className="group cursor-pointer text-left relative flex items-center gap-3 max-h-[50px] px-3 py-2 rounded-lg border-2 border-[#2A2A2A] hover:border-[#6366f1] transition-all duration-200"
         >
-            <div className="aspect-square bg-[#1A1A1A] rounded-lg border-2 border-[#2A2A2A] hover:border-[#6366f1] transition-all duration-200 flex items-center justify-center">
-                <Folder size={48} className="text-yellow-500/80" />
-            </div>
-            <div className="flex items-center gap-2 px-1 mt-2">
-                <Folder size={14} className="text-yellow-500 shrink-0" />
-                <span className="text-sm font-medium text-white group-hover:text-indigo-400 transition-colors truncate">
-                    {folder.name}
-                </span>
-                <div className="relative" ref={menuRef}>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            setIsMenuOpen(!isMenuOpen);
-                        }}
-                        className={`p-1 text-zinc-500 hover:text-white hover:bg-[#2A2A2A] rounded transition-all ${isMenuOpen ? 'opacity-100 bg-[#2A2A2A] text-white' : 'opacity-0 group-hover:opacity-100'}`}
-                    >
-                        <MoreHorizontal size={14} />
-                    </button>
-                    {isMenuOpen && (
-                        <div className="absolute right-0 top-6 z-20 w-40 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                            <div className="p-1 space-y-0.5">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsMenuOpen(false);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:text-white hover:bg-[#252525] transition-colors"
-                                >
-                                    <Pencil size={12} />
-                                    Rename
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsMenuOpen(false);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:text-white hover:bg-[#252525] transition-colors"
-                                >
-                                    <ArrowRightLeft size={12} />
-                                    Move to...
-                                </button>
-                                <div className="h-px bg-[#2A2A2A] my-1" />
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsMenuOpen(false);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-red-400 hover:bg-[#252525] transition-colors"
-                                >
-                                    <Trash2 size={12} />
-                                    Delete
-                                </button>
-                            </div>
+            <Folder size={24} className="text-yellow-500/80 shrink-0" />
+            <span className="text-lg font-medium text-white group-hover:text-indigo-400 transition-colors truncate">
+                {folder.name}
+            </span>
+            <div className="relative ml-auto" ref={menuRef}>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setIsMenuOpen(!isMenuOpen);
+                    }}
+                    className={`p-1 text-zinc-500 hover:text-white hover:bg-[#2A2A2A] rounded transition-all ${isMenuOpen ? 'opacity-100 bg-[#2A2A2A] text-white' : 'opacity-0 group-hover:opacity-100'}`}
+                >
+                    <MoreHorizontal size={14} />
+                </button>
+                {isMenuOpen && (
+                    <div className="absolute right-0 top-6 z-20 w-40 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                        <div className="p-1 space-y-0.5">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsMenuOpen(false);
+                                }}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:text-white hover:bg-[#252525] transition-colors"
+                            >
+                                <Pencil size={12} />
+                                Rename
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsMenuOpen(false);
+                                }}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:text-white hover:bg-[#252525] transition-colors"
+                            >
+                                <ArrowRightLeft size={12} />
+                                Move to...
+                            </button>
+                            <div className="h-px bg-[#2A2A2A] my-1" />
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsMenuOpen(false);
+                                }}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-red-400 hover:bg-[#252525] transition-colors"
+                            >
+                                <Trash2 size={12} />
+                                Delete
+                            </button>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
-        </button>
+        </div>
     );
 }
 
@@ -266,7 +269,7 @@ function ProjectCard({ project }: { project: Project }) {
         <>
             <div
                 ref={containerRef}
-                className="group cursor-pointer space-y-3 relative scale-50 origin-top-left"
+                className="group cursor-pointer space-y-3 relative"
                 onDoubleClick={() => router.push(`/projects/${project.id}`)}
             >
                 <div

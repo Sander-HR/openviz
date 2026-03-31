@@ -46,6 +46,20 @@ export const WorkspaceMembershipSchema = z.object({
 export type WorkspaceMembership = z.infer<typeof WorkspaceMembershipSchema>;
 
 /**
+ * Folder Schema
+ */
+export const FolderSchema = z.object({
+    id: z.string().uuid(),
+    name: z.string().min(1).max(100),
+    workspaceId: z.string().uuid(),
+    parentId: z.string().uuid().nullable(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+});
+
+export type Folder = z.infer<typeof FolderSchema>;
+
+/**
  * Project Schema
  */
 export const ProjectSchema = z.object({
@@ -53,6 +67,7 @@ export const ProjectSchema = z.object({
     name: z.string().min(1).max(100),
     description: z.string().max(500).optional(),
     workspaceId: z.string().uuid(),
+    folderId: z.string().uuid().optional().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
     lastViewedAt: z.date(),

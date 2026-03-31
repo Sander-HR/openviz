@@ -39,6 +39,18 @@ export const workspaceMemberships = pgTable('workspace_memberships', {
 }));
 
 /**
+ * Folders Table
+ */
+export const folders = pgTable('folders', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull(),
+    workspaceId: uuid('workspace_id').references(() => workspaces.id).notNull(),
+    parentId: uuid('parent_id'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/**
  * Projects Table
  */
 export const projects = pgTable('projects', {
@@ -46,6 +58,7 @@ export const projects = pgTable('projects', {
     name: text('name').notNull(),
     description: text('description'),
     workspaceId: uuid('workspace_id').references(() => workspaces.id).notNull(),
+    folderId: uuid('folder_id').references(() => folders.id),
     thumbnailUrl: text('thumbnail_url'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -100,8 +113,20 @@ export const workspaceMembershipsRelations = relations(workspaceMemberships, ({ 
     user: one(users, { fields: [workspaceMemberships.userId], references: [users.id] }),
 }));
 
+export const foldersRelations = relations(folders, ({ one, many }) => ({
+    workspace: one(workspaces, { fields: [folders.workspaceId], references: [workspaces.id] }),
+    parent: one(folders, {
+        fields: [folders.parentId],
+        references: [folders.id],
+        relationName: 'parentFolder',
+    }),
+    children: many(folders, { relationName: 'parentFolder' }),
+    projects: many(projects),
+}));
+
 export const projectsRelations = relations(projects, ({ one, many }) => ({
     workspace: one(workspaces, { fields: [projects.workspaceId], references: [workspaces.id] }),
+    folder: one(folders, { fields: [projects.folderId], references: [folders.id] }),
     scenes: many(scenes),
     jobs: many(jobs),
 }));

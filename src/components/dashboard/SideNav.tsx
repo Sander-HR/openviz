@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState, useRef, useEffect, Dispatch, SetStateAction } from "react";
+import { useState, useRef, useEffect } from "react";
 import { CreateWorkspaceModal } from "./CreateWorkspaceModal";
 import { useWorkspace } from "@/context/WorkspaceContext";
 
@@ -23,10 +23,9 @@ type PageMode = "recents" | "myFiles";
 
 interface SideNavProps {
     pageMode: PageMode;
-    onPageModeChange: Dispatch<SetStateAction<PageMode>>;
 }
 
-export function SideNav({ pageMode, onPageModeChange }: SideNavProps) {
+export function SideNav({ pageMode }: SideNavProps) {
     const router = useRouter();
     const { data: session } = useSession();
     const { workspaces, currentWorkspace, setCurrentWorkspace, refreshWorkspaces } = useWorkspace();
@@ -156,13 +155,13 @@ export function SideNav({ pageMode, onPageModeChange }: SideNavProps) {
                     icon={<Clock size={16} />}
                     label="Recents"
                     active={pageMode === "recents"}
-                    onClick={() => onPageModeChange("recents")}
+                    onClick={() => currentWorkspace && router.push(`/files/${currentWorkspace.id}/recents`)}
                 />
                 <NavItem
                     icon={<Files size={16} />}
                     label="My Files"
                     active={pageMode === "myFiles"}
-                    onClick={() => onPageModeChange("myFiles")}
+                    onClick={() => currentWorkspace && router.push(`/files/${currentWorkspace.id}`)}
                 />
                 <NavItem icon={<GraduationCap size={16} />} label="Learn" />
 
