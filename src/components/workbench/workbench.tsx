@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
     ReactFlow,
     Background,
@@ -9,29 +9,54 @@ import {
     useReactFlow,
     useViewport,
     SelectionMode,
+    OnNodeDrag,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Plus, ChevronDown } from 'lucide-react';
 
-import { ImageNode } from './ImageNode';
-import { VideoNode } from './VideoNode';
-import { WorkbenchAnimateNode } from './AnimateNode';
-import { WorkbenchRenderNode } from './RenderNode';
-import { CustomEdge } from './CustomEdge';
-import { CustomConnectionLine } from './CustomConnectionLine';
-import { PositionedMenu } from '../ContextMenu';
-import { BasicBlocksMenu } from '../nodes/BasicBlocksMenu';
+import { ImageNode } from '../nodes/ImageNode';
+import { VideoNode } from '../nodes/VideoNode';
+import { AnimateNode } from '../nodes/AnimateNode';
+import { RenderNode } from '../nodes/RenderNode';
+import { FreehandNode } from '../nodes/FreehandNode';
+import { ArrowNode } from '../nodes/ArrowNode';
+import { TextNode } from '../nodes/TextNode';
+import { NoteNode } from '../nodes/NoteNode';
+import { MediaNode } from '../nodes/MediaNode';
+import { CustomEdge } from '../nodes/CustomEdge';
+import { WorkbenchChrome } from './WorkbenchChrome';
 import { useWorkbench } from './hooks/useWorkbench';
+import { useWorkbenchCollabSession } from './hooks/useWorkbenchCollabSession';
 import { useStore } from '../../store/useStore';
 import { useAutoSaveScene } from '../../hooks/useAutoSaveScene';
-import { CanvasControls } from '../studio/CanvasControls';
-import { ProjectHeader } from '../common/ProjectHeader';
+import { useWorkbenchCenterOnReturn } from './hooks/useWorkbenchCenterOnReturn';
+import { useWorkbenchOneShotCreation } from './hooks/useWorkbenchOneShotCreation';
+import { getFlowModeProps } from './hooks/workbenchModeProps';
+import { useWorkbenchContextMenuActions } from './hooks/useWorkbenchContextMenuActions';
+import { useWorkbenchFreehandEraser } from './hooks/useWorkbenchFreehandEraser';
+import { useWorkbenchMediaUpload } from './hooks/useWorkbenchMediaUpload';
+import { useResizeObserverWarningSuppression } from './hooks/useResizeObserverWarningSuppression';
+import { useWorkbenchGraph } from './hooks/useWorkbenchGraph';
+import { useCollabPresencePublisher } from './hooks/useCollabPresencePublisher';
+import { useSceneStream } from './hooks/useSceneStream';
+import { CollabStatusChip } from './CollabStatusChip';
+import { CursorOverlay } from './CursorOverlay';
+import { NodeLockBadges } from './NodeLockBadges';
+import { useShallow } from 'zustand/react/shallow';
+import { WorkbenchConnectionLine } from '../nodes/WorkbenchConnectionLine';
+import { DrawingOverlay } from '@/drawing/DrawingOverlay';
+import { requestImmediateSceneSave } from '@/services/workbench/sceneSyncBus';
+import { WORKBENCH_PAN_MOUSE_BUTTON } from './hooks/workbenchViewportGestures';
 
 const nodeTypes: NodeTypes = {
     imageNode: ImageNode,
     videoNode: VideoNode,
-    animateNode: WorkbenchAnimateNode,
-    renderNode: WorkbenchRenderNode,
+    animateNode: AnimateNode,
+    renderNode: RenderNode,
+    freehandNode: FreehandNode,
+    arrowNode: ArrowNode,
+    textNode: TextNode,
+    noteNode: NoteNode,
+    mediaNode: MediaNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -39,219 +64,284 @@ const edgeTypes: EdgeTypes = {
 };
 
 const WorkbenchContent: React.FC = () => {
-    const { setCenter, zoomIn, zoomOut, fitView, setViewport } = useReactFlow();
-    const { zoom } = useViewport();
-    const { viewMode, currentProjectId } = useStore();
+    const flowWrapperRef = useRef<HTMLDivElement>(null);
+    const { setCenter, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
+    const viewport = useViewport();
+    const { viewMode, currentProjectId } = useStore(
+        useShallow((state) => ({
+            viewMode: state.viewMode,
+            currentProjectId: state.currentProjectId,
+        }))
+    );
     
     useAutoSaveScene(currentProjectId);
-    const prevViewModeRef = useRef(viewMode);
+    useSceneStream(currentProjectId);
+    const collabSession = useWorkbenchCollabSession();
+
+    // Awareness-derived collaboration state (US2): presence chips, remote
+    // cursors and soft-lock badges. References only change when the slice
+    // re-projects an awareness snapshot.
+    const nodeLocks = useStore((state) => state.nodeLocks);
+    const remoteCursors = useStore((state) => state.remoteCursors);
+    const presenceByUser = useStore((state) => state.presenceByUser);
+
+    // Publish this client's user/cursor/soft-lock set to the room and release
+    // local selections of nodes another client has locked (spec FR-015).
+    useCollabPresencePublisher({
+        provider: collabSession.provider,
+        userId: collabSession.userId,
+        userName: collabSession.userName,
+        containerRef: flowWrapperRef,
+        toWorld: screenToFlowPosition,
+    });
+
+    useResizeObserverWarningSuppression();
+
     const {
+        state: {
+            workbenchNodes,
+            connections,
+            canUndoWorkbench,
+            canRedoWorkbench,
+            activeNodeId,
+            selectedNodeIds,
+            isDrawMode,
+            activeWorkbenchTool,
+            freehandColor,
+            freehandStrokeWidth,
+        },
+        menus: {
+            contextMenu,
+            setContextMenu,
+            dropdownRef,
+            basicBlocksMenu,
+            sketchFormats,
+        },
+        handlers: {
+            handleFormatSelect,
+            handleNodesChange,
+            handleConnect,
+            onConnectStart,
+            onConnectEnd,
+            handleNodeDoubleClick,
+            handleNodeContextMenu,
+            handlePaneClick,
+            handleSourceClick,
+            handleBlockSelect,
+            handleResize,
+            handleResizeEnd,
+            handleTransientDataChange,
+            handleGestureStart,
+            handleGestureEnd,
+            handleDataChange,
+        },
+        gesture: {
+            beginWorkbenchGesture,
+            commitWorkbenchGesture,
+        },
+        actions: {
+            reorderWorkbenchNode,
+            copyToClipboard,
+            pasteFromClipboard,
+            duplicateWorkbenchNode,
+            removeWorkbenchNode,
+            setActiveWorkbenchTool,
+            setActiveNodeId,
+            setSelectedNodeIds,
+            addWorkbenchNode,
+            createOneShotNode,
+            setFreehandColor,
+            setFreehandStrokeWidth,
+            undoWorkbench,
+            redoWorkbench,
+        },
+    } = useWorkbench(
+        collabSession.active
+            ? { undoAction: collabSession.undo, redoAction: collabSession.redo }
+            : undefined
+    );
+
+    // In collaboration mode the Yjs UndoManager owns history (SC-005): the
+    // toolbar and Cmd/Ctrl+Z drive it instead of the local store history.
+    const handleUndo = collabSession.active ? collabSession.undo : undoWorkbench;
+    const handleRedo = collabSession.active ? collabSession.redo : redoWorkbench;
+    const handleCanUndo = collabSession.active ? collabSession.canUndo : canUndoWorkbench;
+    const handleCanRedo = collabSession.active ? collabSession.canRedo : canRedoWorkbench;
+    useWorkbenchCenterOnReturn({ viewMode, activeNodeId, workbenchNodes, setCenter });
+    const { nodes, edges } = useWorkbenchGraph({
         workbenchNodes,
         connections,
-        activeNodeId,
         selectedNodeIds,
-        contextMenu,
-        setContextMenu,
-        showFormatDropdown,
-        setShowFormatDropdown,
-        dropdownRef,
-        basicBlocksMenu,
-        sketchFormats,
-        handleFormatSelect,
-        handleNodesChange,
-        handleConnect,
-        onConnectStart,
-        onConnectEnd,
-        handleNodeDoubleClick,
-        handleNodeContextMenu,
-        handlePaneClick,
+        nodeLocks,
         handleSourceClick,
-        handleBlockSelect,
         handleResize,
+        handleResizeEnd,
+        handleTransientDataChange,
+        handleGestureStart,
+        handleGestureEnd,
+        handleDataChange,
+    });
+
+    const contextMenuActions = useWorkbenchContextMenuActions({
+        contextMenu,
         reorderWorkbenchNode,
         copyToClipboard,
         pasteFromClipboard,
         duplicateWorkbenchNode,
-        removeWorkbenchNode
-    } = useWorkbench();
-
-    useEffect(() => {
-        // Only center when returning from Studio to Workbench
-        if (viewMode === 'WORKBENCH' && prevViewModeRef.current === 'STUDIO' && activeNodeId) {
-            const node = workbenchNodes.find((n: any) => n.id === activeNodeId);
-            if (node) {
-                let width = node.width;
-                let height = node.height;
-                if ((node.type === 'image' || node.type === 'video') && node.project?.canvas && typeof node.scale === 'number') {
-                    width = node.project.canvas.width * node.scale;
-                    height = node.project.canvas.height * node.scale;
-                }
-                width = width ?? 256;
-                height = height ?? 256;
-
-                const centerX = node.x + width / 2;
-                const centerY = node.y + height / 2;
-                setCenter(centerX, centerY, { zoom: 1, duration: 500 });
-            }
-        }
-        // Update previous viewMode for next comparison
-        prevViewModeRef.current = viewMode;
-    }, [viewMode, activeNodeId, workbenchNodes, setCenter]);
-
-    const nodes = workbenchNodes.map((node: any) => {
-        const nodeData = { ...node, onSourceClick: handleSourceClick, onResize: handleResize } as unknown as Record<string, unknown>;
-
-        if (node.type === 'image' || node.type === 'video') {
-            const width = node.project?.canvas && typeof node.scale === 'number'
-                ? node.project.canvas.width * node.scale
-                : node.width;
-            const height = node.project?.canvas && typeof node.scale === 'number'
-                ? node.project.canvas.height * node.scale
-                : node.height;
-
-            return {
-                id: node.id,
-                type: node.type === 'image' ? 'imageNode' : 'videoNode',
-                position: { x: node.x, y: node.y },
-                width,
-                height,
-                data: nodeData,
-                selected: selectedNodeIds.includes(node.id),
-            };
-        }
-
-        return {
-            id: node.id,
-            type: node.type === 'animate' ? 'animateNode' : 'renderNode',
-            position: { x: node.x, y: node.y },
-            data: nodeData,
-            selected: selectedNodeIds.includes(node.id),
-        };
+        removeWorkbenchNode,
     });
 
-    const edges = connections.map((conn: any) => ({
-        id: conn.id,
-        source: conn.from,
-        target: conn.to,
-        type: 'customEdge',
-        style: { stroke: '#6366f1', strokeWidth: 2 },
-        animated: false,
-    }));
+    // FR-007: one-shot creation is an atomic store action (T006) — the view
+    // only builds the node payload; select + tool switch happen in one update.
+    const { handlePaneClickWithTool, handleCanvasMouseDownForArrow, handleCanvasMouseUpForArrow } =
+        useWorkbenchOneShotCreation({
+            activeWorkbenchTool,
+            screenToFlowPosition,
+            createOneShotNode,
+            handlePaneClick,
+        });
 
-    const contextMenuActions = contextMenu ? [
-        { label: 'Wrap in section', onClick: () => console.log('Wrap in section'), divider: true },
-        { label: 'Bring to front', shortcut: ']', onClick: () => reorderWorkbenchNode(contextMenu.nodeId, 'front') },
-        { label: 'Send to back', shortcut: '[', onClick: () => reorderWorkbenchNode(contextMenu.nodeId, 'back'), divider: true },
-        {
-            label: 'Copy link to selection', shortcut: 'Ctrl+L', onClick: () => {
-                navigator.clipboard.writeText(window.location.href);
-            }, divider: true
+    const { handleEraseAtPoint, onStrokeFinished, ERASER_SIZE } = useWorkbenchFreehandEraser({
+        activeWorkbenchTool,
+        workbenchNodes,
+        freehandColor,
+        freehandStrokeWidth,
+        removeWorkbenchNode,
+        addWorkbenchNode,
+        setActiveNodeId,
+        setSelectedNodeIds,
+    });
+
+    const {
+        mediaUploadInputRef,
+        isPhoneUploadModalOpen,
+        closePhoneUploadModal,
+        handleMediaUpload,
+        handleMediaUploadFromPhone,
+        handlePhoneUploadComplete,
+        handleMediaUploadChange,
+    } = useWorkbenchMediaUpload({
+        flowWrapperRef,
+        screenToFlowPosition,
+        makeOneShotNode: createOneShotNode,
+    });
+
+    const handleNodeDragStart = useCallback<OnNodeDrag>(
+        (_event, _node, nodes) => {
+            beginWorkbenchGesture('move', nodes.map((draggedNode) => draggedNode.id));
         },
-        { label: 'Copy', shortcut: 'Ctrl+C', onClick: () => copyToClipboard(contextMenu.nodeId) },
-        {
-            label: 'Paste', shortcut: 'Ctrl+V', onClick: () => {
-                const pos = { x: 100, y: 100 };
-                pasteFromClipboard(pos);
-            }
+        [beginWorkbenchGesture]
+    );
+
+    // When a node drag finishes (mouse released), commit the complete final
+    // state and sync it immediately so a reload never shows stale state.
+    const handleNodeDragStop = useCallback<OnNodeDrag>(
+        () => {
+            commitWorkbenchGesture();
+            requestImmediateSceneSave();
         },
-        { label: 'Duplicate', shortcut: 'Ctrl+D', onClick: () => duplicateWorkbenchNode(contextMenu.nodeId), divider: true },
-        { label: 'Delete', shortcut: 'Del', onClick: () => removeWorkbenchNode(contextMenu.nodeId), type: 'danger' as const },
-    ] : [];
+        [commitWorkbenchGesture]
+    );
+
+    const isDrawModeActive = activeWorkbenchTool === 'draw';
+    const isEraserModeActive = activeWorkbenchTool === 'eraser';
+    // C-3.1/C-3.2: mode-derived React Flow props from the pure contract fn (T018).
+    const flowModeProps = getFlowModeProps(activeWorkbenchTool);
 
     return (
-        <div className="w-full h-screen bg-white">
+        <div
+            ref={flowWrapperRef}
+            className="relative w-full h-screen bg-white"
+            onMouseDown={handleCanvasMouseDownForArrow}
+            onMouseUp={handleCanvasMouseUpForArrow}
+        >
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 onNodesChange={handleNodesChange}
+                onNodeDragStart={handleNodeDragStart}
+                onNodeDragStop={handleNodeDragStop}
                 onConnect={handleConnect}
                 onConnectStart={onConnectStart}
                 onConnectEnd={onConnectEnd}
                 onNodeDoubleClick={handleNodeDoubleClick}
                 onNodeContextMenu={handleNodeContextMenu}
-                onPaneClick={handlePaneClick}
+                onPaneClick={handlePaneClickWithTool}
                 deleteKeyCode={['Backspace', 'Delete']}
                 selectionMode={SelectionMode.Partial}
-                selectionOnDrag={true}
+                selectionOnDrag={flowModeProps.selectionOnDrag}
                 selectionKeyCode="Shift"
+                multiSelectionKeyCode="Shift"
+                panOnDrag={[WORKBENCH_PAN_MOUSE_BUTTON]}
+                panOnScroll={true}
+                zoomOnScroll={false}
+                zoomOnDoubleClick={false}
+                elementsSelectable={flowModeProps.elementsSelectable}
+                nodesDraggable={flowModeProps.nodesDraggable}
+                nodesConnectable={flowModeProps.nodesConnectable}
                 snapToGrid={true}
                 snapGrid={[5, 5]}
                 fitView
                 minZoom={0.1}
                 maxZoom={2}
                 connectionRadius={60}
-                connectionLineComponent={CustomConnectionLine}
+                connectionLineComponent={WorkbenchConnectionLine}
             >
-                <Background id='smalldots' variant={BackgroundVariant.Dots} gap={10} size={1} color="#c0c0c0" />
-                <Background id="fatdots" color="#191919" variant={BackgroundVariant.Dots} gap={50} size={1} />
+                <Background id='smalldots' variant={BackgroundVariant.Dots} gap={12} size={1} color="#c6cfdb" />
+                <Background id="fatdots" color="#a0afc3" variant={BackgroundVariant.Dots} gap={56} size={1.1} />
             </ReactFlow>
-
-            <div className="absolute top-4 left-4 z-20">
-                <ProjectHeader mode="workbench" />
+            {/* Awareness overlays (US2): remote cursors + soft-lock badges. */}
+            <CursorOverlay remoteCursors={remoteCursors} viewport={viewport} />
+            <NodeLockBadges nodes={nodes} nodeLocks={nodeLocks} viewport={viewport} />
+            {/* Collab session state (US3, SC-004). The PresenceIndicator chips
+                are intentionally not rendered — the component is kept for a
+                possible return (US2/SC-003). */}
+            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+                <CollabStatusChip status={collabSession.status} peers={presenceByUser} />
             </div>
-
-            <div className="absolute bottom-4 right-4 z-20">
-                <CanvasControls
-                    zoomLevel={zoom}
-                    onZoomIn={() => zoomIn({ duration: 300 })}
-                    onZoomOut={() => zoomOut({ duration: 300 })}
-                    onResetZoom={() => setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 300 })}
-                    onFitToScreen={() => fitView({ duration: 300 })}
-                />
-            </div>
-
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20" ref={dropdownRef}>
-                <div className="relative">
-                    <button
-                        onClick={() => setShowFormatDropdown(!showFormatDropdown)}
-                        className="flex items-center gap-2 px-4 py-2 bg-panel border border-panel-border rounded-full shadow-2xl backdrop-blur-md bg-opacity-90 text-text-secondary hover:text-white transition-all group"
-                    >
-                        <Plus size={20} className="group-hover:rotate-90 transition-transform" />
-                        <span className="font-medium">Add Sketch</span>
-                        <ChevronDown size={16} className={`transition-transform ${showFormatDropdown ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {showFormatDropdown && (
-                        <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 w-48 bg-panel border border-panel-border rounded-lg shadow-2xl backdrop-blur-md bg-opacity-95 overflow-hidden nowheel nodrag">
-                            {sketchFormats.map((format, index) => (
-                                <button
-                                    key={index}
-                                    onClick={() => handleFormatSelect(format.width, format.height)}
-                                    className="w-full px-4 py-3 text-left text-text-secondary hover:text-white hover:bg-panel-light transition-colors flex items-center justify-between border-b border-panel-border last:border-b-0"
-                                >
-                                    <span className="text-sm font-medium">{format.label}</span>
-                                    <span className="text-xs opacity-50">{format.width}×{format.height}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {contextMenu && (
-                <PositionedMenu
-                    x={contextMenu.x}
-                    y={contextMenu.y}
-                    open={!!contextMenu}
-                    onClose={() => setContextMenu(null)}
-                    actions={contextMenuActions}
-                />
-            )}
-
-            {basicBlocksMenu?.visible && (
-                <div
-                    className="fixed z-50"
-                    style={{
-                        left: basicBlocksMenu.x,
-                        top: basicBlocksMenu.y,
-                        transform: 'translateY(-50%)',
-                    }}
-                >
-                    <BasicBlocksMenu onSelect={handleBlockSelect} onClose={() => { }} />
-                </div>
-            )}
+            <DrawingOverlay
+                mode={isEraserModeActive ? 'erase' : isDrawModeActive || isDrawMode ? 'draw' : null}
+                wrapperRef={flowWrapperRef}
+                previewColor={freehandColor}
+                previewSize={freehandStrokeWidth}
+                eraserSize={ERASER_SIZE}
+                onEraseAtPoint={handleEraseAtPoint}
+                onStrokeFinished={onStrokeFinished}
+            />
+            <WorkbenchChrome
+                dropdownRef={dropdownRef}
+                activeTool={activeWorkbenchTool}
+                freehandColor={freehandColor}
+                freehandStrokeWidth={freehandStrokeWidth}
+                onSelectTool={setActiveWorkbenchTool}
+                onFreehandColorChange={setFreehandColor}
+                onFreehandStrokeWidthChange={setFreehandStrokeWidth}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                canUndo={handleCanUndo}
+                canRedo={handleCanRedo}
+                onMediaUpload={handleMediaUpload}
+                onMediaUploadFromPhone={handleMediaUploadFromPhone}
+                sketchFormats={sketchFormats}
+                onFormatSelect={handleFormatSelect}
+                mediaUploadInputRef={mediaUploadInputRef}
+                onMediaUploadChange={handleMediaUploadChange}
+                isPhoneUploadModalOpen={isPhoneUploadModalOpen}
+                onClosePhoneUploadModal={closePhoneUploadModal}
+                onPhoneUploadComplete={handlePhoneUploadComplete}
+                zoomLevel={viewport.zoom}
+                onZoomIn={() => zoomIn({ duration: 300 })}
+                onZoomOut={() => zoomOut({ duration: 300 })}
+                onResetZoom={() => setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 300 })}
+                onFitToScreen={() => fitView({ duration: 300 })}
+                contextMenu={contextMenu}
+                onCloseContextMenu={() => setContextMenu(null)}
+                contextMenuActions={contextMenuActions}
+                basicBlocksMenu={basicBlocksMenu}
+                onBlockSelect={handleBlockSelect}
+            />
         </div>
     );
 };

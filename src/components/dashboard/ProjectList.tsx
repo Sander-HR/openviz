@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, FileText, Folder, Pencil, ArrowRightLeft, Trash2, ExternalLink, Copy as CopyIcon, User, ChevronRight } from "lucide-react";
+import { MoreHorizontal, FileText, Folder, Pencil, ArrowRightLeft, Trash2, ExternalLink, Copy as CopyIcon, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Project } from "@/lib/schemas/base";
 import { useState, useRef, useEffect } from "react";
@@ -30,9 +30,7 @@ export function ProjectList({
     isLoading, 
     showFolders = false, 
     workspaces = [], 
-    onFolderClick,
-    folderPath = [],
-    onBreadcrumbClick
+    onFolderClick
 }: ProjectListProps) {
     if (isLoading) {
         return (

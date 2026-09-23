@@ -85,8 +85,8 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className, mode = 
                     <button
                         onClick={handleStartEdit}
                         disabled={isUpdating}
-                        className={`px-3 py-2 text-sm font-medium text-black transition-all duration-200 min-w-[150px] max-w-[300px] truncate text-left border border-transparent ${isHovered
-                                ? 'bg-white/90 border-gray-200 rounded-lg shadow-lg backdrop-blur-md'
+                        className={`px-3 py-2 text-sm font-medium text-studio-ink transition-all duration-200 min-w-[150px] max-w-[300px] truncate text-left border border-transparent ${isHovered
+                                ? 'bg-panel/95 border-panel-border rounded-lg shadow-lg backdrop-blur-md'
                                 : 'bg-transparent'
                             } ${isUpdating ? 'opacity-50 cursor-wait' : ''}`}
                         title="Click to edit project name"
@@ -101,7 +101,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className, mode = 
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={handleSave}
                         onKeyDown={handleKeyDown}
-                        className="px-3 py-2 text-sm font-medium text-black bg-white/90 border border-gray-200 rounded-lg shadow-lg backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-primary/50 min-w-[150px] max-w-[300px]"
+                        className="px-3 py-2 text-sm font-medium text-studio-ink bg-panel/95 border border-panel-border rounded-lg shadow-lg backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-primary/50 min-w-[150px] max-w-[300px]"
                         placeholder="Project name"
                     />
                 )}

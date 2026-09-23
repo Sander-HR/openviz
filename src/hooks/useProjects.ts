@@ -26,6 +26,7 @@ export function useProjects() {
             console.log("Creating project with:", projectWithWorkspace);
             const res = await fetch("/api/projects", {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(projectWithWorkspace),
             });
             if (!res.ok) {

@@ -1,14 +1,18 @@
 import { RenderService, GenerateRequest, GenerateResponse, AnimateRequest } from './types';
 import { mockRenderService } from './mockRenderService';
 import { getWorkflow, mapStyleToId, WorkflowDefinition } from './ai/workflowRegistry';
+import { generateUUID } from '@/utils/uuid';
 
 // Using Vite proxy to avoid CORS issues
 let comfyUrl = '/comfy-api';
 // We use the same protocol and host as the current page, but Vite will proxy /comfy-api to the backend
-let wsUrl = `${window.location.protocol === 'http:' ? 'ws:' : 'wss:'}//${window.location.host}/comfy-api`;
+const browserWindow = typeof window !== 'undefined' ? window : null;
+let wsUrl = browserWindow
+    ? `${browserWindow.location.protocol === 'http:' ? 'ws:' : 'wss:'}//${browserWindow.location.host}/comfy-api`
+    : 'ws://localhost/comfy-api';
 
 // Generate a persistent client ID for this session
-const client_id = crypto.randomUUID();
+const client_id = generateUUID();
 
 // Helper types for ComfyUI API responses
 interface ComfyUploadResponse {
@@ -86,6 +90,13 @@ const uploadImage = async (base64String: string, prefix = 'sketch'): Promise<str
  * Waits for generation completion via WebSocket or polls history as a fallback.
  */
 const waitForCompletion = async (promptId: string): Promise<ComfyHistoryResponse[string]> => {
+    if (
+        typeof WebSocket === 'undefined' ||
+        (typeof process !== 'undefined' && process.env.NODE_ENV === 'test')
+    ) {
+        return pollHistory(promptId);
+    }
+
     return new Promise((resolve, reject) => {
         // Use the proxied WS URL
         const socket = new WebSocket(`${wsUrl}/ws?clientId=${client_id}`);
@@ -160,7 +171,7 @@ const pollHistory = async (promptId: string): Promise<ComfyHistoryResponse[strin
         try {
             const history = await fetchHistory(promptId);
             if (history) return history;
-        } catch (e) {
+        } catch {
             // Silently retry
         }
         attempts++;
@@ -390,7 +401,7 @@ export const comfyRenderService: RenderService = {
                 console.log('✅ ComfyUI System Stats:', stats);
                 return true;
             }
-        } catch (e) {
+        } catch {
             console.warn(`⚠️ Connection to ${comfyUrl} failed, trying secondary proxy...`);
         }
 

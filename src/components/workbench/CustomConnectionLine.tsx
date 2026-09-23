@@ -1,4 +1,3 @@
-import React from 'react';
 import { getSmoothStepPath, type ConnectionLineComponentProps } from '@xyflow/react';
 
 export const CustomConnectionLine = ({

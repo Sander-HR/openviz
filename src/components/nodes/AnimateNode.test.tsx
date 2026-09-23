@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { AnimateNode } from './AnimateNode';
 import { useStore } from '../../store/useStore';
 import { renderService } from '../../services/renderService';
@@ -70,7 +71,9 @@ describe('AnimateNode logic', () => {
 
         // 2. Render Component
         const { getByText } = render(
-            <AnimateNode id="animate-id" data={animateNodeData as any} selected={true} />
+            <ReactFlowProvider>
+                <AnimateNode id="animate-id" data={animateNodeData as any} selected={true} />
+            </ReactFlowProvider>
         );
 
         // 3. Trigger Animation
@@ -85,5 +88,7 @@ describe('AnimateNode logic', () => {
             end_image: 'thumb2.png',
             prompt: 'test prompt'
         }));
+        expect(mockStore.addWorkbenchNode).toHaveBeenCalledTimes(1);
+        expect(mockStore.addConnection).not.toHaveBeenCalled();
     });
 });

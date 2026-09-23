@@ -11,7 +11,9 @@ import {
     ChevronDown,
     Search,
     LogOut,
-    Check
+    Check,
+    Menu,
+    X
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -32,6 +34,7 @@ export function SideNav({ pageMode }: SideNavProps) {
     const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
     const workspaceDropdownRef = useRef<HTMLDivElement>(null);
     const userDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -45,8 +48,15 @@ export function SideNav({ pageMode }: SideNavProps) {
                 setIsUserDropdownOpen(false);
             }
         }
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setIsMobileNavOpen(false);
+        };
         document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        document.addEventListener("keydown", handleEscape);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener("keydown", handleEscape);
+        };
     }, []);
 
     const handleCreateWorkspace = async (name: string) => {
@@ -67,8 +77,19 @@ export function SideNav({ pageMode }: SideNavProps) {
         }
     };
 
+    const closeMobileNav = () => setIsMobileNavOpen(false);
+
     return (
-        <div className="w-64 bg-[#0A0A0A] border-r border-[#1A1A1A] flex flex-col h-screen text-zinc-400">
+        <>
+            <button type="button" aria-label="Open navigation menu" aria-expanded={isMobileNavOpen} aria-controls="dashboard-navigation" onClick={() => setIsMobileNavOpen(true)} className="fixed left-3 top-3 z-40 flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[#2A2A2A] bg-[#151515]/95 text-zinc-300 shadow-lg backdrop-blur-md transition-colors hover:bg-[#222] hover:text-white md:hidden">
+                <Menu size={20} />
+            </button>
+            {isMobileNavOpen && <button type="button" aria-label="Close navigation menu" onClick={closeMobileNav} className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] md:hidden" />}
+            <div id="dashboard-navigation" aria-label="Dashboard navigation" className={`fixed inset-y-0 left-0 z-50 flex w-[min(19rem,calc(100vw-2rem))] flex-col bg-[#0A0A0A] text-zinc-400 shadow-2xl transition-transform duration-200 ease-out md:static md:z-auto md:w-64 md:translate-x-0 md:border-r md:border-[#1A1A1A] md:shadow-none ${isMobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>
+                <div className="flex items-center justify-between border-b border-[#1A1A1A] px-4 py-3 md:hidden">
+                    <span className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">OpenViz</span>
+                    <button type="button" aria-label="Close navigation menu" onClick={closeMobileNav} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-[#1A1A1A] hover:text-white"><X size={20} /></button>
+                </div>
             <div className="p-4 relative">
                 {/* Workspace Selector */}
                 <div
@@ -155,13 +176,13 @@ export function SideNav({ pageMode }: SideNavProps) {
                     icon={<Clock size={16} />}
                     label="Recents"
                     active={pageMode === "recents"}
-                    onClick={() => currentWorkspace && router.push(`/files/${currentWorkspace.id}/recents`)}
+                    onClick={() => { if (currentWorkspace) router.push(`/files/${currentWorkspace.id}/recents`); closeMobileNav(); }}
                 />
                 <NavItem
                     icon={<Files size={16} />}
                     label="My Files"
                     active={pageMode === "myFiles"}
-                    onClick={() => currentWorkspace && router.push(`/files/${currentWorkspace.id}`)}
+                    onClick={() => { if (currentWorkspace) router.push(`/files/${currentWorkspace.id}`); closeMobileNav(); }}
                 />
                 <NavItem icon={<GraduationCap size={16} />} label="Learn" />
 
@@ -182,9 +203,7 @@ export function SideNav({ pageMode }: SideNavProps) {
 
             <div className="p-2 space-y-0.5 border-t border-[#1A1A1A]">
                 <NavItem icon={<Trash2 size={16} />} label="Trash" />
-                <div onClick={() => router.push('/settings')}>
-                    <NavItem icon={<Settings size={16} />} label="Settings" />
-                </div>
+                <NavItem icon={<Settings size={16} />} label="Settings" onClick={() => { router.push('/settings'); closeMobileNav(); }} />
                 <NavItem icon={<HelpCircle size={16} />} label="Help & feedback" />
             </div>
 
@@ -236,19 +255,21 @@ export function SideNav({ pageMode }: SideNavProps) {
                 onClose={() => setIsCreateModalOpen(false)}
                 onConfirm={handleCreateWorkspace}
             />
-        </div>
+            </div>
+        </>
     );
 }
 
 function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) {
     return (
-        <div
+        <button
+            type="button"
             onClick={onClick}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors text-sm ${active ? 'bg-[#1A1A1A] text-white' : 'hover:bg-[#1A1A1A] hover:text-white'}`}
+            className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${active ? 'bg-[#1A1A1A] text-white' : 'hover:bg-[#1A1A1A] hover:text-white'}`}
         >
             {icon}
             <span>{label}</span>
-        </div>
+        </button>
     );
 }
 

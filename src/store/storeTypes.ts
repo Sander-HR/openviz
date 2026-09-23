@@ -1,4 +1,32 @@
-import { Project, ToolSettings, RenderSettings, RenderGroup, ViewMode, WorkbenchNode, Connection, ToolType, AspectRatio, Layer } from '../types';
+import type { WorkbenchGestureKind, WorkbenchGestureTransaction } from './workbenchGestureHistory';
+import {
+    Project,
+    ToolSettings,
+    RenderSettings,
+    RenderGroup,
+    ViewMode,
+    WorkbenchNode,
+    ImageNode,
+    Connection,
+    ToolType,
+    WorkbenchToolType,
+    TextWorkbenchNode,
+    NoteWorkbenchNode,
+    ArrowWorkbenchNode,
+    MediaWorkbenchNode,
+    AspectRatio,
+    Layer,
+    NodeLockState,
+    PresenceState,
+} from '../types';
+import type { CollabPresencePeer, CollabRemoteAwarenessEntry, CollabRemoteCursorState } from '@/types/collab.types';
+
+export interface WorkbenchHistorySnapshot {
+    workbenchNodes: WorkbenchNode[];
+    connections: Connection[];
+    selectedNodeIds: string[];
+    activeNodeId: string | null;
+}
 
 export interface AppState {
     project: Project;
@@ -21,6 +49,23 @@ export interface AppState {
     selectedNodeIds: string[];
     clipboard: WorkbenchNode[] | null;
     isExitingStudio: boolean;
+    currentSceneVersion: number;
+    sceneHydrated: boolean;
+    /** True while a real-time collaboration session owns this scene's writes. */
+    collabSessionActive: boolean;
+    nodeLocks: Record<string, NodeLockState>;
+    presenceByUser: Record<string, CollabPresencePeer>;
+    /** Remote cursor markers keyed by awareness client id. */
+    remoteCursors: Record<string, CollabRemoteCursorState>;
+    /** Projects a full awareness snapshot into presence/cursors/remote locks. */
+    applyRemoteAwareness: (entries: CollabRemoteAwarenessEntry[], localClientId: number) => void;
+    isDrawMode: boolean;
+    activeWorkbenchTool: WorkbenchToolType;
+    freehandColor: string;
+    freehandStrokeWidth: number;
+    workbenchHistory: WorkbenchHistorySnapshot[];
+    workbenchHistoryIndex: number;
+    activeWorkbenchGesture: WorkbenchGestureTransaction | null;
 
     history: Project[];
     historyIndex: number;
@@ -80,9 +125,21 @@ export interface AppState {
     // Workbench Actions
     setViewMode: (mode: ViewMode) => void;
     addWorkbenchNode: (node: WorkbenchNode) => void;
-    addConnection: (fromId: string, toId: string) => void;
+    createOneShotNode: (
+        node: ImageNode | TextWorkbenchNode | NoteWorkbenchNode | ArrowWorkbenchNode | MediaWorkbenchNode
+    ) => void;
+    addConnection: (
+        fromId: string,
+        toId: string,
+        sourceHandle?: string | null,
+        targetHandle?: string | null
+    ) => void;
     removeConnection: (id: string) => void;
     updateWorkbenchNode: (id: string, updates: Partial<WorkbenchNode>) => void;
+    updateWorkbenchNodeTransient: (id: string, updates: Partial<WorkbenchNode>) => void;
+    beginWorkbenchGesture: (kind: WorkbenchGestureKind, affectedNodeIds?: string[]) => void;
+    commitWorkbenchGesture: () => void;
+    cancelWorkbenchGesture: () => void;
     removeWorkbenchNode: (id?: string) => void;
     duplicateWorkbenchNode: (id?: string) => void;
     reorderWorkbenchNode: (id: string, direction: 'front' | 'back') => void;
@@ -99,4 +156,20 @@ export interface AppState {
     setProjectNodes: (projectId: string, nodes: WorkbenchNode[]) => void;
     setConnections: (connections: Connection[]) => void;
     setCurrentProjectId: (id: string | null) => void;
+    setCurrentSceneVersion: (version: number) => void;
+    setSceneHydrated: (hydrated: boolean) => void;
+    setCollabSessionActive: (active: boolean) => void;
+    setNodeLockState: (lock: NodeLockState) => void;
+    clearNodeLockState: (nodeId: string) => void;
+    upsertPresenceState: (presence: PresenceState) => void;
+    clearPresenceState: (userId: string) => void;
+    clearCollaborationState: () => void;
+    setDrawMode: (isDrawMode: boolean) => void;
+    toggleDrawMode: () => void;
+    setActiveWorkbenchTool: (tool: WorkbenchToolType) => void;
+    setFreehandColor: (color: string) => void;
+    setFreehandStrokeWidth: (strokeWidth: number) => void;
+    undoLastFreehandNode: () => void;
+    undoWorkbench: () => void;
+    redoWorkbench: () => void;
 }

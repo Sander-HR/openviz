@@ -7,12 +7,12 @@ const getWindowsHostIp = () => {
     try {
         // This is the most reliable way to get the host IP in WSL2
         return execSync("ip route show | grep default | awk '{print $3}'").toString().trim();
-    } catch (e) {
+    } catch {
         return '127.0.0.1';
     }
 }
 
-const hostIp = getWindowsHostIp();
+getWindowsHostIp();
 const targetUrl = `http://localhost:9191`;
 const targetUrlSecondary = `http://localhost:9191`;
 

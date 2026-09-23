@@ -192,29 +192,33 @@ export default function FolderPage({ params }: { params: Promise<{ workspaceId: 
         <div className="flex h-screen bg-[#0F0F0F] text-white w-full">
             <SideNav pageMode="myFiles" />
 
-            <main className="flex-1 flex flex-col overflow-hidden w-full">
-                <header className="h-14 border-b border-[#1A1A1A] flex items-center justify-between px-6 shrink-0 w-full">
+            <main className="min-w-0 flex-1 flex flex-col overflow-hidden w-full">
+                <header className="flex min-h-16 items-center justify-between gap-3 border-b border-[#1A1A1A] px-4 py-3 pl-16 shrink-0 w-full md:h-14 md:px-6 md:py-0">
                     <div className="flex items-center gap-4">
                         {renderTitle()}
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <div className="hidden sm:block">
                         <FilterDropdown
                             label="Sort"
                             options={sortOptions}
                             value={sortBy}
                             onChange={setSortBy}
                         />
+                        </div>
+                        <div className="hidden sm:block">
                         <FilterDropdown
                             label="Anyone"
                             options={ownerOptions}
                             value={ownerFilter}
                             onChange={setOwnerFilter}
                         />
+                        </div>
 
-                        <div className="w-[1px] h-4 bg-[#2A2A2A] mx-2" />
+                        <div className="hidden h-4 w-[1px] bg-[#2A2A2A] mx-2 sm:block" />
 
-                        <div className="flex bg-[#1A1A1A] rounded-lg p-0.5 border border-[#2A2A2A]">
+                        <div className="hidden bg-[#1A1A1A] rounded-lg p-0.5 border border-[#2A2A2A] sm:flex">
                             <button
                                 onClick={() => setViewMode("grid")}
                                 className={`p-1 rounded transition-colors ${viewMode === "grid" ? "bg-[#2A2A2A] text-white" : "text-zinc-500 hover:text-white"}`}
@@ -234,7 +238,7 @@ export default function FolderPage({ params }: { params: Promise<{ workspaceId: 
                             className="flex items-center gap-2 px-4 py-1.5 bg-[#1A1A1A] hover:bg-[#252525] border border-[#2A2A2A] rounded-lg text-xs font-medium transition-all"
                         >
                             <FolderPlus size={14} />
-                            Create Folder
+                            <span className="hidden md:inline">Create Folder</span>
                         </button>
 
                         <button
@@ -245,7 +249,8 @@ export default function FolderPage({ params }: { params: Promise<{ workspaceId: 
                             {isCreating ? "Creating..." : (
                                 <>
                                     <Plus size={14} />
-                                    Create new file
+                                    <span className="hidden sm:inline">Create new file</span>
+                                    <span className="sm:hidden">New</span>
                                 </>
                             )}
                         </button>

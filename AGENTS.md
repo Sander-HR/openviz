@@ -8,14 +8,22 @@ This repository contains **OpenViz**, a React-based design application powered b
 - **Logic**: All `useEffect` and `fetch` calls belong in `use[Feature].ts` hooks.
 
 ## Build & Dev
-- **Development**: `npm run dev` (Starts Vite server)
-- **Build**: `npm run build` (Runs `tsc` and `vite build`)
-- **Lint**: `npm run lint` (ESLint check for TS/TSX)
+- **Development**: `pnpm run dev` (Starts Vite server)
+- **Build**: `pnpm run build` (Runs `tsc` and `vite build`)
+- **Lint**: `pnpm run lint` (ESLint check for TS/TSX)
 
 ## Testing
-- **Run Tests**: `npm test` (Uses Vitest)
-- **Test UI**: `npm run test:ui` (Vitest UI)
-- **Single Test**: `npx vitest path/to/file.test.ts`
+- **Run Tests**: `pnpm test` (Uses Vitest)
+- **CI Run**: `pnpm run test:ci` (headless + coverage gate)
+- **Test UI**: `pnpm run test:ui` (Vitest UI)
+- **Single Test**: `pnpm exec vitest path/to/file.test.ts`
+
+## Spec-Driven Development (Spec Kit)
+Governing doc: [.specify/memory/constitution.md](.specify/memory/constitution.md) — supersedes all other practices.
+- **New idea** → `/speckit.assess.intake "..." slug=<slug>` → `research` → `define` → `shape` → `decide`. Only a **go** verdict proceeds to spec. Reports: `.specify/assessments/<slug>/`.
+- **Feature** → create branch `NNN-slug` via `/speckit.git.feature <name>`, then `/speckit.specify` → `clarify` → `plan` → `tasks` → `analyze` → `implement` → `converge` (repeat until Converged). Specs: `specs/NNN-feature/`.
+- **TDD layering**: logic (services/hooks/stores/utils) = strict red-green, test file first; components = behavior tests from spec acceptance criteria before implementation. Coverage floor may never regress.
+- Auto-commit after speckit commands is enabled (conventional style) — config: `.specify/extensions/git/git-config.yml`.
 
 ## Critical Rules
 **Type Safety**: No `any`. No `@ts-ignore`. Run `tsc` to verify.
@@ -48,3 +56,13 @@ This repository contains **OpenViz**, a React-based design application powered b
 - [React Flow](./AGENTS/reactflow.md) - Node graph system patterns for workbench
 - [Services & API](./AGENTS/services-api.md) - API integration
 - [AI Interaction](./AGENTS/ai-interaction.md) - ComfyUI guidelines
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

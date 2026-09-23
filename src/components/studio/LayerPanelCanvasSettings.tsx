@@ -60,7 +60,6 @@ export const LayerPanelCanvasSettings: React.FC = () => {
     const handleEyedropper = async () => {
         if ('EyeDropper' in window) {
             try {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const eyeDropper = new (window as any).EyeDropper();
                 const result = await eyeDropper.open();
                 setBackgroundColor(result.sRGBHex);

@@ -1,26 +1,47 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/auth";
-import { projects, scenes } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { projects, scenes, workspaceMemberships } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+
+async function canAccessProject(projectId: string, userId: string) {
+    const [project] = await db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, projectId));
+
+    if (!project) {
+        return { project: null, allowed: false };
+    }
+
+    const membership = await db
+        .select()
+        .from(workspaceMemberships)
+        .where(
+            and(
+                eq(workspaceMemberships.workspaceId, project.workspaceId),
+                eq(workspaceMemberships.userId, userId)
+            )
+        )
+        .limit(1);
+
+    return { project, allowed: membership.length > 0 };
+}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const [project] = await db
-        .select()
-        .from(projects)
-        .where(eq(projects.id, id));
-
+    const { project, allowed } = await canAccessProject(id, session.user.id);
     if (!project) return NextResponse.json({ error: "Not Found" }, { status: 404 });
+    if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     // Fetch the main scene for this project
     const [scene] = await db
         .select()
         .from(scenes)
-        .where(eq(scenes.projectId, id))
+        .where(and(eq(scenes.projectId, id), eq(scenes.isMain, true)))
         .limit(1);
 
     // Update lastViewedAt when project is accessed
@@ -29,12 +50,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         .set({ lastViewedAt: new Date() })
         .where(eq(projects.id, id));
 
-    // Add permission check here in a real app
-
     return NextResponse.json({
         ...project,
         lastViewedAt: new Date(),
         scene: scene ? scene.data : null,
+        sceneVersion: scene?.version ?? 0,
     });
 }
 
@@ -43,9 +63,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const body = await req.json();
+    const { project, allowed } = await canAccessProject(id, session.user.id);
+    if (!project) return NextResponse.json({ error: "Not Found" }, { status: 404 });
+    if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    // In a real app, verify project ownership/workspace membership here
+    const body = await req.json();
 
     const [updated] = await db
         .update(projects)
@@ -66,7 +88,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // In a real app, verify project ownership/permissions here
+    const { project, allowed } = await canAccessProject(id, session.user.id);
+    if (!project) return NextResponse.json({ error: "Not Found" }, { status: 404 });
+    if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const [deleted] = await db
         .delete(projects)

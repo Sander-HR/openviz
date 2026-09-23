@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-// @vitest-environment jsdom
 import { comfyRenderService } from './renderService';
 
 // Mock the fetch call

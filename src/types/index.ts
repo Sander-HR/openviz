@@ -1,5 +1,6 @@
 export type AspectRatio = '16:9' | '4:3' | '1:1' | '9:16' | '3:4' | 'square' | 'landscape' | 'portrait';
 export type ToolType = 'select' | 'brush' | 'eraser' | 'circle' | 'rectangle' | 'line' | 'paintbucket' | 'transform';
+export type WorkbenchToolType = 'select' | 'draw' | 'eraser' | 'arrow' | 'text' | 'note' | 'media';
 export type LayerType = 'sketch' | 'image' | 'render';
 export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay';
 export type ViewMode = 'STUDIO' | 'WORKBENCH';
@@ -58,7 +59,7 @@ export interface Project {
     thumbnail?: string;
 }
 
-export type NodeType = 'image' | 'animate' | 'render' | 'video';
+export type NodeType = 'image' | 'animate' | 'render' | 'video' | 'freehand' | 'arrow' | 'text' | 'note' | 'media';
 
 export interface BaseNode {
     id: string;
@@ -107,12 +108,71 @@ export interface RenderNode extends BaseNode {
     data: RenderSettings;
 }
 
-export type WorkbenchNode = ImageNode | AnimateNode | RenderNode | VideoNode;
+export interface FreehandNode extends BaseNode {
+    type: 'freehand';
+    data: {
+        path: string;
+        width: number;
+        height: number;
+        color: string;
+        strokeWidth: number;
+    };
+}
+
+export interface ArrowWorkbenchNode extends BaseNode {
+    type: 'arrow';
+    data: {
+        start: { x: number; y: number };
+        end: { x: number; y: number };
+        control: { x: number; y: number };
+        strokeColor: string;
+        strokeWidth: number;
+    };
+}
+
+export interface TextWorkbenchNode extends BaseNode {
+    type: 'text';
+    data: {
+        text: string;
+        fontSize: number;
+        color: string;
+    };
+}
+
+export interface NoteWorkbenchNode extends BaseNode {
+    type: 'note';
+    data: {
+        text: string;
+        colorVariant: 'yellow';
+    };
+}
+
+export interface MediaWorkbenchNode extends BaseNode {
+    type: 'media';
+    data: {
+        src: string;
+        alt: string;
+        mimeType: string;
+    };
+}
+
+export type WorkbenchNode =
+    | ImageNode
+    | AnimateNode
+    | RenderNode
+    | VideoNode
+    | FreehandNode
+    | ArrowWorkbenchNode
+    | TextWorkbenchNode
+    | NoteWorkbenchNode
+    | MediaWorkbenchNode;
 
 export interface Connection {
     id: string;
     from: string; // Node ID
     to: string;   // Node ID
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
 }
 
 export interface ToolSettings {
@@ -148,3 +208,57 @@ export interface RenderGroup {
     sourceNodeId?: string;
 }
 
+export interface SceneData {
+    nodes: WorkbenchNode[];
+    connections: Connection[];
+}
+
+export type ScenePatchRequest = {
+    data: SceneData;
+    expectedVersion: number;
+};
+
+export type ScenePatchResponse = {
+    scene: SceneData;
+    version: number;
+};
+
+export type SceneEventType =
+    | 'scene.node.created'
+    | 'scene.node.updated'
+    | 'scene.node.deleted'
+    | 'scene.connection.created'
+    | 'scene.connection.deleted'
+    | 'scene.selection.locked'
+    | 'scene.selection.unlocked'
+    | 'scene.presence.updated';
+
+export interface SceneEvent<TPayload = unknown> {
+    type: SceneEventType;
+    projectId: string;
+    timestamp: number;
+    payload: TPayload;
+}
+
+export interface NodeLockState {
+    nodeId: string;
+    userId: string;
+    userName?: string;
+    /**
+     * Optional TTL for time-based locks. Awareness-derived soft locks are
+     * ephemeral (they live exactly as long as the peer's awareness state) and
+     * leave this unset.
+     */
+    expiresAt?: number;
+}
+
+export interface PresenceState {
+    userId: string;
+    userName?: string;
+    selectedNodeIds: string[];
+    cursor?: {
+        x: number;
+        y: number;
+    };
+    updatedAt: number;
+}

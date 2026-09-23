@@ -30,11 +30,31 @@ dist-ssr
 # Agent documentation
 # AGENTS.md
 # AGENTS/
+# Local agent tool configuration
+.pi
+.opencode
 
-# Environment files
+# Environment files and local secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.docker.example
 
+# Private key and credential files
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+.secrets/
+secrets/
+credentials/
+
+# vitest coverage reports
+coverage/
+
+# Next.js build output and dependencies
 .next
 node_modules/
+.tsbuildinfo

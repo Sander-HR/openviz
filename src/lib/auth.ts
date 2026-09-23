@@ -15,6 +15,11 @@ const queryClient = postgres(process.env.DATABASE_URL!);
 export const db = drizzle(queryClient, { schema });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+    // The app can be exposed through a remote proxy/tunnel. With no
+    // NEXTAUTH_URL set, Auth.js derives the origin from the incoming
+    // request's Host header, so all redirects stay relative to the URL
+    // the browser actually used.
+    trustHost: true,
     adapter: DrizzleAdapter(db),
     session: { strategy: "jwt" },
     providers: [

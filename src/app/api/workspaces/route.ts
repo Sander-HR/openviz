@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/auth";
 import { workspaces, workspaceMemberships } from "@/lib/db/schema";
+import { ensureUserBootstrap } from "@/lib/services/bootstrap";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -18,6 +19,13 @@ export async function GET() {
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const userId = session.user.id;
+
+    await ensureUserBootstrap(db, {
+        userId,
+        email: session.user.email ?? null,
+        name: session.user.name ?? null,
+        image: session.user.image ?? null,
+    });
 
     const userWorkspaces = await db
         .select({

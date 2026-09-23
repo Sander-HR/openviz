@@ -27,8 +27,8 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange }) => 
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
 
-        let x = Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
-        let y = Math.max(0, Math.min((clientY - rect.top) / rect.height, 1));
+        const x = Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
+        const y = Math.max(0, Math.min((clientY - rect.top) / rect.height, 1));
 
         const ns = x * 100;
         const nv = (1 - y) * 100;
@@ -44,7 +44,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange }) => 
         const rect = hueRef.current.getBoundingClientRect();
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
 
-        let x = Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
+        const x = Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
 
         const nh = x * 360;
         const newHsv = { ...hsv, h: nh };

@@ -186,12 +186,6 @@ function ProjectCard({ project }: { project: Project }) {
     const thumbnailRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Make project draggable
-    const handleDragStart = (e: React.DragEvent) => {
-        e.dataTransfer.setData('projectId', project.id);
-        e.dataTransfer.effectAllowed = 'move';
-    };
-
     // Intersection Observer for lazy loading
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -240,7 +234,7 @@ function ProjectCard({ project }: { project: Project }) {
         .filter(Boolean);
 
     // Fallback logic: 1. DB Thumbnail -> 2. Last Edited Workbench Image -> 3. Placeholder
-    let thumbnail = project.thumbnailUrl || thumbnailUrls[0];
+    const thumbnail = project.thumbnailUrl || thumbnailUrls[0];
 
     // Determine which thumbnail to show based on hover
     const displayThumbnail = hoverIndex !== null && thumbnailUrls[hoverIndex]

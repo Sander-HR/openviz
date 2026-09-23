@@ -2,14 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "Inter";
+  src:
+    local("Inter Variable"),
+    local("Inter"),
+    url("/fonts/Inter-Variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src:
+    local("Inter Italic Variable"),
+    local("Inter Italic"),
+    local("Inter"),
+    url("/fonts/Inter-Italic-Variable.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --ov-bg: #0f1218;
+  --ov-fg: #f4f7fb;
+  --ov-accent: #2f8cff;
+  --ov-accent-strong: #136ae0;
+  --ov-panel: #121a25;
+  --ov-panel-border: #263247;
+  --ov-muted: #9fb1cc;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color: var(--ov-fg);
+  background-color: var(--ov-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -19,10 +53,21 @@
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1200px 400px at 20% -20%, rgba(47, 140, 255, 0.18), transparent 50%),
+    radial-gradient(800px 380px at 88% -30%, rgba(109, 176, 255, 0.15), transparent 50%),
+    var(--ov-bg);
+  color: var(--ov-fg);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
 #root {

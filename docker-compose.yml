@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: openviz-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-openviz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openviz}
+      POSTGRES_DB: ${POSTGRES_DB:-openviz}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - openviz_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-openviz} -d ${POSTGRES_DB:-openviz}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: openviz-redis
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - openviz_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: openviz-app
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - openviz_node_modules:/workspace/node_modules
+      - openviz_pnpm_store:/root/.local/share/pnpm
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://openviz:openviz@postgres:5432/openviz}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-docker-dev-secret-change-me}
+      DEV_ADMIN_ID: ${DEV_ADMIN_ID:-00000000-0000-0000-0000-000000000000}
+      DEV_ADMIN_EMAIL: ${DEV_ADMIN_EMAIL:-admin@example.com}
+      DEV_ADMIN_NAME: ${DEV_ADMIN_NAME:-Demo Admin}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-openviz-demo-password}
+      NEXT_PUBLIC_DEMO_PASSWORD: ${NEXT_PUBLIC_DEMO_PASSWORD:-openviz-demo-password}
+      NEXT_PUBLIC_DEV_ADMIN_EMAIL: ${NEXT_PUBLIC_DEV_ADMIN_EMAIL:-admin@example.com}
+      VITE_USE_MOCK_RENDER: ${VITE_USE_MOCK_RENDER:-true}
+      NEXT_PUBLIC_USE_MOCK_RENDER: ${NEXT_PUBLIC_USE_MOCK_RENDER:-true}
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${APP_HOST_PORT:-3000}:3000"
+    command: ["bash", "scripts/dev-container.sh"]
+
+volumes:
+  openviz_postgres_data:
+  openviz_redis_data:
+  openviz_node_modules:
+  openviz_pnpm_store:

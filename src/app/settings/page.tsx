@@ -55,7 +55,7 @@ export default function SettingsPage() {
     ];
 
     return (
-        <div className="flex h-screen w-full bg-[#0A0A0A] text-zinc-400 font-sans">
+        <div className="flex h-screen w-full bg-[#0A0A0A] text-zinc-400">
             {/* Sidebar */}
             <div className="w-64 border-r border-[#1A1A1A] flex flex-col p-4 bg-[#0A0A0A]">
                 <div className="mb-6">
