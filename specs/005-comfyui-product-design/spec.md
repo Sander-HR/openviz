@@ -8,6 +8,12 @@
 
 **Input**: User request: Implement the complete product-design interface using current ComfyUI model families, including all workflow categories, local and hosted execution, and automatic hardware-aware model tiers.
 
+## Clarifications
+
+### Session 2026-09-25
+
+- Q: Should the OpenAI-compatible image endpoint (including its per-endpoint FIFO queue, 1–3 concurrency limit, and Unsloth progress/cancel integration) be formally in scope for this feature specification? → A: Yes — fully in scope, including the endpoint concurrency setting exposed in the Settings → AI & Compute UI.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Generate product concepts (Priority: P1)
@@ -114,11 +120,13 @@ A designer can use local ComfyUI, a hosted GPU target, or a hybrid fallback with
 - **FR-013**: The system MUST provide accessible keyboard-operable controls, labels, status announcements, and error messages for the workflow interface.
 - **FR-014**: The system MUST support output sizes and aspect ratios appropriate to product design and marketing use cases.
 - **FR-015**: The system MUST never silently substitute an incompatible model; fallback choices require explicit configuration or a clearly surfaced automatic-mode decision.
+- **FR-016**: The system MUST support an OpenAI-compatible image generation endpoint as an execution-protocol adapter alongside ComfyUI, accepting both `url` and base64 (`b64_json`) image outputs from the provider.
+- **FR-017**: The system MUST queue media jobs per configured endpoint in FIFO order and limit simultaneous requests to a user-configurable integer between 1 and 3 (default 2); the setting MUST be exposed in Settings → AI & Compute and apply to all media jobs sharing that endpoint.
 
 ### Key Entities
 
 - **Product workflow**: A versioned task graph with purpose, supported model families, dependency manifest, input contract, and adjustable parameters.
-- **Execution target**: Local ComfyUI, hosted ComfyUI, or hybrid target with endpoint, capabilities, authentication state, and health status.
+- **Execution target**: Local ComfyUI, hosted ComfyUI, hybrid target, or an OpenAI-compatible image endpoint adapter, each with endpoint, capabilities, authentication state, and health status.
 - **Hardware profile**: Available VRAM, system memory, acceleration backend, and compatible precision/quantization tiers.
 - **Generation job**: User request, workflow version, model tier, inputs, lifecycle state, progress, and outputs.
 - **Product reference**: An image or render used as the identity source for later edits, variants, or animation.
@@ -147,8 +155,8 @@ A designer can use local ComfyUI, a hosted GPU target, or a hybrid fallback with
 
 ## Assumptions
 
-- ComfyUI remains the execution protocol and workflow JSON remains the source format for backend graphs.
-- The first release supports local ComfyUI, a configured hosted ComfyUI-compatible endpoint, and hybrid fallback; provider-specific APIs are adapters, not UI concerns.
+- ComfyUI remains the primary workflow execution protocol and workflow JSON remains the source format for backend graphs; an OpenAI-compatible image endpoint is supported as a provider adapter (FR-016), not a UI concern.
+- The first release supports local ComfyUI, a configured hosted ComfyUI-compatible endpoint, hybrid fallback, and the OpenAI-compatible image endpoint adapter; provider-specific APIs are adapters, not UI concerns.
 - The implementation is hardware-agnostic but requires either detected local capability or a user-configured hardware profile.
 - Model licenses and commercial-use restrictions must be shown in dependency metadata; the application does not redistribute restricted model weights.
 - Existing auth, project, image-upload, and generation persistence mechanisms are reused where possible; if they cannot store the required workflow lineage, a generated Drizzle migration and typed persistence service are added.

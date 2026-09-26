@@ -2,6 +2,32 @@
 set -Eeuo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+RUNTIME_DIR="$PWD/.run"
+PID_FILE="$RUNTIME_DIR/openviz-dev.pid"
+LOCK_DIR="$RUNTIME_DIR/openviz-dev.lock"
+
+mkdir -p "$RUNTIME_DIR"
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  if [[ -f "$PID_FILE" ]]; then
+    existing_pid="$(cat "$PID_FILE")"
+    echo "[dev] OpenViz development server is already running (launcher PID $existing_pid)." >&2
+  else
+    echo "[dev] Another OpenViz development launcher is starting. Try again shortly." >&2
+  fi
+  exit 1
+fi
+
+printf '%s\n' "$$" > "$PID_FILE"
+
+remove_runtime_state() {
+  if [[ -f "$PID_FILE" ]] && [[ "$(cat "$PID_FILE")" == "$$" ]]; then
+    rm -f "$PID_FILE"
+  fi
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+
+trap remove_runtime_state EXIT
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "[dev] Docker is required. Start Docker Desktop and try again."
@@ -114,7 +140,7 @@ cleanup() {
         running=1
       fi
     done
-    [[ $running -eq 0 ]] && return
+    [[ $running -eq 0 ]] && break
     sleep 1
   done
 
@@ -125,6 +151,8 @@ cleanup() {
       kill -KILL "$pid" 2>/dev/null || true
     fi
   done
+
+  remove_runtime_state
 }
 
 handle_signal() {
@@ -137,7 +165,6 @@ handle_signal() {
 trap 'handle_signal INT' INT
 trap 'handle_signal TERM' TERM
 trap cleanup EXIT
-
 if port_in_use "$APP_PORT"; then
   APP_PORT="$(resolve_port "Next.js" "$APP_PORT")"
 fi
@@ -171,7 +198,8 @@ while [[ -n "${NEXT_PID:-}" || -n "${COLLAB_PID:-}" ]]; do
 done
 
 if [[ -z "${NEXT_PID:-}" && -z "${COLLAB_PID:-}" ]]; then
-  echo "[dev] Both OpenViz development servers were already running. Press Ctrl-C to stop this launcher."
+  echo "[dev] Both OpenViz development servers are already running outside this launcher."
+  exit 0
 fi
 while true; do
   sleep 3600

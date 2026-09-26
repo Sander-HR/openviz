@@ -58,3 +58,6 @@ coverage/
 .next
 node_modules/
 .tsbuildinfo
+
+# Local development launcher state
+.run/

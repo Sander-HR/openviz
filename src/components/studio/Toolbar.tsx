@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     Circle,
     Eraser,
@@ -133,6 +133,7 @@ export const Toolbar: React.FC = () => {
         addLayer,
         updateLayer,
         saveCurrentToWorkbench,
+        setViewMode,
         viewMode,
         currentProjectId,
     } = useStore(
@@ -145,11 +146,13 @@ export const Toolbar: React.FC = () => {
             addLayer: state.addLayer,
             updateLayer: state.updateLayer,
             saveCurrentToWorkbench: state.saveCurrentToWorkbench,
+            setViewMode: state.setViewMode,
             viewMode: state.viewMode,
             currentProjectId: state.currentProjectId,
         }))
     );
     const router = useRouter();
+    const pathname = usePathname();
     const [showColorPicker, setShowColorPicker] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -204,17 +207,24 @@ export const Toolbar: React.FC = () => {
     };
 
     const handleToggleWorkbench = () => {
-        if (!currentProjectId) return;
+        // The URL is the source of truth for project workspaces. Fall back to
+        // it while the store is still hydrating so this button cannot become a
+        // no-op when the toolbar renders before currentProjectId is available.
+        const projectId = currentProjectId ?? pathname.match(/^\/projects\/([^/]+)/)?.[1];
+        if (!projectId) return;
+
         if (viewMode === "STUDIO") {
             const flattenedCanvas = (window as CanvasFlattenWindow).getFlattenedCanvas?.();
             if (flattenedCanvas) {
                 saveCurrentToWorkbench(flattenedCanvas);
             }
-            router.push(`/projects/${currentProjectId}/workbench`);
+            setViewMode("WORKBENCH");
+            router.push(`/projects/${projectId}/workbench`);
             return;
         }
 
-        router.push(`/projects/${currentProjectId}/studio`);
+        setViewMode("STUDIO");
+        router.push(`/projects/${projectId}/studio`);
     };
 
     return (

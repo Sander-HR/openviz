@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowRight, ChevronDown, ImageIcon, Mic, MoreHorizontal, Sparkles, Shuffle, Wand2 } from 'lucide-react';
+import { ChevronDown, MoreHorizontal, Sparkles, Shuffle, Wand2 } from 'lucide-react';
+import { PromptComposerCard } from './PromptComposerCard';
 
 interface ModifyPanelProps {
     height: number;
@@ -52,17 +53,7 @@ export const ModifyPanel: React.FC<ModifyPanelProps> = ({ height: _height, refer
                 <button type="button" aria-label="Modify menu" className="flex h-8 w-8 items-center justify-center rounded-lg text-viz-muted transition-colors hover:bg-white/10 hover:text-white"><MoreHorizontal size={16} aria-hidden="true" /></button>
             </header>
             {!isCollapsed && <div id="studio-modify-content" className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3 custom-scrollbar">
-                <div className="rounded-lg border border-viz-border bg-viz-surface">
-                    <label htmlFor="studio-modify-prompt" className="sr-only">What are you creating?</label>
-                    <textarea id="studio-modify-prompt" aria-label="Modify prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="What are you creating?" className="min-h-9 w-full resize-none bg-transparent p-2 text-xs text-white outline-none placeholder:text-white/35" />
-                    <div className="flex items-center justify-between px-2 py-1.5">
-                        <div className="flex gap-1.5">
-                            <button type="button" aria-label="Add image reference" className="flex h-6 w-6 items-center justify-center rounded-lg bg-viz-border text-viz-muted transition-colors hover:text-white"><ImageIcon size={12} /></button>
-                            <button type="button" aria-label="Use microphone" className="flex h-6 w-6 items-center justify-center rounded-lg bg-viz-border text-viz-muted transition-colors hover:text-white"><Mic size={12} /></button>
-                        </div>
-                        <button type="submit" aria-label="Generate" disabled={!prompt.trim()} className="flex h-6 w-6 items-center justify-center rounded-lg bg-viz-accent text-white transition-colors hover:bg-viz-accent/80 disabled:cursor-not-allowed disabled:opacity-30"><ArrowRight size={16} /></button>
-                    </div>
-                </div>
+                <PromptComposerCard id="studio-modify-prompt" label="Modify prompt" value={prompt} onChange={setPrompt} onSubmit={() => { if (prompt.trim()) onGenerate?.(prompt.trim()); }} />
                 {referenceImage && <div className="mt-3 flex items-center gap-2 text-xs text-viz-muted"><img src={referenceImage} alt="Product reference" className="h-8 w-8 rounded object-cover" /><span>Selected product reference</span></div>}
                 <label htmlFor="studio-modify-outputs" className="mt-4 flex items-center justify-between text-xs"><span className="text-white/90">Outputs</span><select id="studio-modify-outputs" value={outputs} onChange={(event) => setOutputs(Number(event.target.value))} className="h-8 rounded-lg bg-viz-surface px-3 text-xs font-medium text-white outline-none"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
                 <label htmlFor="studio-modify-mode" className="mt-3 flex items-center justify-between text-xs"><span className="text-white/90">Mode</span><select id="studio-modify-mode" value={mode} onChange={(event) => setMode(event.target.value)} className="h-8 rounded-lg bg-viz-surface px-3 text-xs font-medium text-white outline-none"><option>Standard</option><option>Precise</option><option>Creative</option></select></label>

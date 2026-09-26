@@ -38,6 +38,8 @@ pnpm run dev
 
 `pnpm run dev` starts PostgreSQL and Redis through Docker, then starts Next.js and the collaboration WebSocket server. `pnpm run setup:container` performs setup without starting the development server and is intended for scripted or container environments. `pnpm run init` is an alias for `pnpm run setup`.
 
+Use `pnpm run stop` to stop the host development processes and the PostgreSQL/Redis Compose services without removing volumes. Use `pnpm run restart` to perform a foreground stop-and-start cycle. For Compose-only shutdown, use `pnpm run docker:down`.
+
 ## Prerequisites
 
 - Node.js 18+

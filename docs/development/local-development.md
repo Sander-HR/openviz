@@ -21,6 +21,8 @@ pnpm run dev
 
 The setup command validates configuration, prepares the database, and seeds local defaults. `pnpm run dev` starts PostgreSQL and Redis through Docker, then starts Next.js and the collaboration WebSocket server. See [environment variables](../operations/environment-variables.md) for configuration guidance.
 
+Use `pnpm run stop` to gracefully stop the host development processes and the PostgreSQL/Redis Compose services. It preserves Docker volumes. Use `pnpm run restart` for a foreground stop-and-start cycle with logs attached. Both commands track the OpenViz launcher by PID and do not kill unrelated processes by port or process name. Use `pnpm run docker:down` when you only need to stop the Compose stack.
+
 If Next.js or the collaboration server is already listening on its configured port, the dev launcher checks the listener's working directory before reusing it. A listener from another project is left untouched and OpenViz automatically uses the next available port. Set `OPENVIZ_PORT_CONFLICT=error` to fail instead. You can select alternate ports with `PORT` and `COLLAB_PORT`.
 
 ## ComfyUI

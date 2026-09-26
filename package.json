@@ -6,6 +6,8 @@
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "dev": "bash scripts/dev.sh",
+    "stop": "bash scripts/stop.sh",
+    "restart": "bash scripts/restart.sh",
     "build": "NODE_OPTIONS='--max-old-space-size=16384' next build --webpack",
     "start": "next start",
     "lint": "eslint",

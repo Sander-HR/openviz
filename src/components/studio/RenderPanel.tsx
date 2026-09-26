@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, ChevronDown, Wand2, Palette, ImageIcon, ChevronLeft, ChevronRight, Info, MoreHorizontal } from 'lucide-react';
+import { Plus, ChevronDown, Wand2, Palette, ChevronLeft, ChevronRight, Info, MoreHorizontal } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { renderService } from '../../services/renderService';
 import { getRenderStyles } from '../../services/ai/workflowRegistry';
+import { PromptComposerCard } from './PromptComposerCard';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -117,14 +118,7 @@ export const RenderPanel: React.FC<RenderPanelProps> = ({ height, collapsed, onC
                         <button type="button" aria-label="Next prompt suggestion" className="flex h-7 w-7 items-center justify-center text-white/45 hover:text-white"><ChevronRight size={14} /></button>
                         <button type="button" className="text-xs text-viz-accent hover:text-white transition-colors">Describe</button>
                     </div>
-                    <textarea
-                        aria-label="What are you creating?"
-                        className="h-24 w-full resize-none rounded-lg border border-viz-border bg-viz-surface p-2.5 text-xs outline-none transition-all placeholder:text-viz-muted focus:ring-1 focus:ring-viz-accent"
-                        placeholder="What are you creating?"
-                        value={renderSettings.prompt}
-                        onChange={(e) => setRenderPrompt(e.target.value)}
-                    />
-                    <div className="flex items-center gap-1 text-viz-muted"><button type="button" aria-label="Add prompt reference" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 hover:text-white transition-colors"><ImageIcon size={14} /></button><button type="button" aria-label="Use microphone" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 hover:text-white transition-colors"><Wand2 size={14} /></button></div>
+                    <PromptComposerCard id="studio-render-prompt" label="What are you creating?" value={renderSettings.prompt} onChange={setRenderPrompt} onSubmit={handleGenerate} />
                 </div>
 
                 {/* Style Section */}
