@@ -158,6 +158,17 @@ export interface ArrowWorkbenchNode extends BaseNode {
     };
 }
 
+/** Shared text formatting fields used by the text/note formatting toolbar. */
+export interface TextFormattingData {
+    fontSize?: number;
+    fontWeight?: number;
+    fontStyle?: 'normal' | 'italic';
+    underline?: boolean;
+    align?: 'left' | 'center' | 'right';
+    fontFamily?: string;
+    color?: string;
+}
+
 export interface TextWorkbenchNode extends BaseNode {
     type: 'text';
     data: {
@@ -166,6 +177,9 @@ export interface TextWorkbenchNode extends BaseNode {
         color: string;
         fontWeight?: number;
         fontStyle?: 'normal' | 'italic';
+        underline?: boolean;
+        align?: 'left' | 'center' | 'right';
+        fontFamily?: string;
     };
 }
 
@@ -174,7 +188,7 @@ export interface NoteWorkbenchNode extends BaseNode {
     data: {
         text: string;
         colorVariant: 'yellow';
-    };
+    } & TextFormattingData;
 }
 
 export interface MediaWorkbenchNode extends BaseNode {

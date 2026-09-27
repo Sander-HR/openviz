@@ -3,6 +3,7 @@ import { NodeResizer } from '@xyflow/react';
 
 import { NoteWorkbenchNode } from '@/types';
 import { cn, resizeHandleClassName } from './nodeUi';
+import { TextFormattingToolbar } from './TextFormattingToolbar';
 
 interface NoteNodeData extends NoteWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -24,6 +25,25 @@ export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, h
     const [nodeSize, setNodeSize] = useState({ width: width || 220, height: height || 180 });
     const textValue = useMemo(() => data.data?.text ?? '', [data.data?.text]);
 
+    const textColor = data.data?.color ?? '#78350f';
+    const rawFontSize = data.data?.fontSize;
+    const fontSize = typeof rawFontSize === 'number' && Number.isFinite(rawFontSize) ? Math.max(12, rawFontSize) : 16;
+    const fontWeight = data.data?.fontWeight ?? 400;
+    const fontStyle = data.data?.fontStyle ?? 'normal';
+    const underline = data.data?.underline === true;
+    const align = data.data?.align ?? 'left';
+    const fontFamily = data.data?.fontFamily;
+
+    const textStyle: React.CSSProperties = {
+        color: textColor,
+        fontSize,
+        fontWeight,
+        fontStyle,
+        textDecoration: underline ? 'underline' : undefined,
+        textAlign: align,
+        fontFamily,
+    };
+
     useEffect(() => {
         if (width && height && width > 0 && height > 0) {
             setNodeSize({ width, height });
@@ -44,16 +64,24 @@ export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, h
             )}
             onDoubleClick={() => setIsEditing(true)}
         >
+            {selected && (
+                <TextFormattingToolbar
+                    state={{ fontSize, color: textColor, fontWeight, fontStyle, underline, align, fontFamily }}
+                    onChange={(patch) => data.onDataChange?.(id, patch)}
+                />
+            )}
+
             {isEditing ? (
                 <textarea
                     ref={textareaRef}
                     value={textValue}
                     onChange={(event) => data.onDataChange?.(id, { text: event.target.value })}
                     onBlur={() => setIsEditing(false)}
-                    className="nodrag nowheel font-note min-h-0 w-full flex-1 resize-none bg-transparent p-3 text-base leading-relaxed text-amber-900 outline-none"
+                    className="nodrag nowheel font-note min-h-0 w-full flex-1 resize-none bg-transparent p-3 leading-relaxed outline-none"
+                    style={textStyle}
                 />
             ) : (
-                <div className="font-note min-h-0 w-full flex-1 whitespace-pre-wrap overflow-hidden p-3 text-base leading-relaxed text-amber-900">
+                <div className="font-note min-h-0 w-full flex-1 whitespace-pre-wrap overflow-hidden p-3 leading-relaxed" style={textStyle}>
                     {textValue || 'Note'}
                 </div>
             )}

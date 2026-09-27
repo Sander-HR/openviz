@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@xyflow/react', () => ({
@@ -63,5 +63,77 @@ describe('NoteNode editing (C-3.1)', () => {
 
         rerender(<NoteNode id="note-1" data={makeData('Better idea', onDataChange)} selected={true} />);
         expect(container.textContent).toContain('Better idea');
+    });
+});
+
+describe('NoteNode formatting toolbar', () => {
+    it('is hidden when the note is not selected', () => {
+        const { queryByTitle } = render(<NoteNode id="note-1" data={makeData()} selected={false} />);
+        expect(queryByTitle('Bold')).toBeNull();
+        expect(queryByTitle('More')).toBeNull();
+    });
+
+    it('shows color, font, size, bold, underline, align and more controls when selected', () => {
+        const { getByTitle, getByLabelText } = render(<NoteNode id="note-1" data={makeData()} selected={true} />);
+        expect(getByLabelText('Text color')).toBeTruthy();
+        expect(getByTitle('Font')).toBeTruthy();
+        expect(getByTitle('Size')).toBeTruthy();
+        expect(getByTitle('Bold')).toBeTruthy();
+        expect(getByTitle('Underline')).toBeTruthy();
+        expect(getByTitle('Align')).toBeTruthy();
+        expect(getByTitle('More')).toBeTruthy();
+    });
+
+    it('toggles bold through onDataChange', () => {
+        const onDataChange = vi.fn();
+        const { getByTitle } = render(<NoteNode id="note-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        fireEvent.click(getByTitle('Bold'));
+        expect(onDataChange).toHaveBeenCalledWith('note-1', { fontWeight: 700 });
+    });
+
+    it('toggles underline through onDataChange', () => {
+        const onDataChange = vi.fn();
+        const { getByTitle } = render(<NoteNode id="note-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        fireEvent.click(getByTitle('Underline'));
+        expect(onDataChange).toHaveBeenCalledWith('note-1', { underline: true });
+    });
+
+    it('opens a popover with 12 preset swatches from the color button', () => {
+        const { getByLabelText } = render(<NoteNode id="note-1" data={makeData()} selected={true} />);
+        expect(screen.queryByLabelText('Color #ef4444')).toBeNull();
+
+        fireEvent.click(getByLabelText('Text color'));
+        expect(screen.getByLabelText('Color #ef4444')).toBeTruthy();
+        expect(screen.getAllByLabelText(/^Color #/)).toHaveLength(12);
+    });
+
+    it('picks a preset swatch through onDataChange', () => {
+        const onDataChange = vi.fn();
+        const { getByLabelText } = render(<NoteNode id="note-1" data={makeData('', onDataChange)} selected={true} />);
+
+        fireEvent.click(getByLabelText('Text color'));
+        fireEvent.click(screen.getByLabelText('Color #22c55e'));
+        expect(onDataChange).toHaveBeenCalledWith('note-1', { color: '#22c55e' });
+    });
+
+    it('picks a font size from the size menu', () => {
+        const onDataChange = vi.fn();
+        render(<NoteNode id="note-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        // Radix DropdownMenu.Trigger opens on pointerdown (button 0).
+        fireEvent.pointerDown(screen.getByTitle('Size'), { button: 0 });
+        fireEvent.click(screen.getByText('32px'));
+        expect(onDataChange).toHaveBeenCalledWith('note-1', { fontSize: 32 });
+    });
+
+    it('picks an alignment from the align menu', () => {
+        const onDataChange = vi.fn();
+        render(<NoteNode id="note-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        fireEvent.pointerDown(screen.getByTitle('Align'), { button: 0 });
+        fireEvent.click(screen.getByText('Align center'));
+        expect(onDataChange).toHaveBeenCalledWith('note-1', { align: 'center' });
     });
 });
