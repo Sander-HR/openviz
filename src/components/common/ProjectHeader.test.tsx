@@ -11,7 +11,7 @@ const { storeState, routerPush } = vi.hoisted(() => ({
         project: { name: 'Test Project' },
         setName: () => {},
     },
-    routerPush: () => {},
+    routerPush: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -70,5 +70,19 @@ describe('ProjectHeader app menu', () => {
         // Active row carries an extra <Check> icon: [Moon, Check] vs [Sun]
         expect(darkRow?.querySelectorAll('svg')).toHaveLength(2);
         expect(lightRow?.querySelectorAll('svg')).toHaveLength(1);
+    });
+
+    it('routes to the dashboard from the Home menu item (no standalone home button)', async () => {
+        render(<ProjectHeader />);
+
+        // The home action lives inside the OpenViz dropdown, not as a
+        // separate floating button next to the project name.
+        expect(screen.queryByTitle('Go Home (Dashboard)')).not.toBeInTheDocument();
+
+        openAppMenu();
+        const homeItem = await screen.findByText(/Home/i);
+        fireEvent.click(homeItem);
+
+        expect(routerPush).toHaveBeenCalledWith('/dashboard');
     });
 });

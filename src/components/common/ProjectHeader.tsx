@@ -118,17 +118,14 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className, mode = 
                             onClick={() => router.push('/settings')}
                         />
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <MenuItemRow                            label="Home (Dashboard)"
+                            icon={Home}
+                            onClick={() => router.push('/dashboard')}
+                        />
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* Home Button */}
-            <button
-                onClick={() => router.push('/dashboard')}
-                className="w-9 h-9 flex items-center justify-center bg-panel border border-panel-border rounded-full shadow-2xl backdrop-blur-md bg-opacity-90 text-text-secondary hover:text-white transition-all group"
-                title="Go Home (Dashboard)"
-            >
-                <Home size={16} className="group-hover:scale-110 transition-transform" />
-            </button>
 
             {/* Project Name Display/Editor */}
             <div className="relative">
