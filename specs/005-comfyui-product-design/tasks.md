@@ -57,8 +57,8 @@ description: "Implementation tasks for ComfyUI product design workflows"
 - [X] T020 Write failing persistence contract tests first in `src/services/ai/generationJobPersistence.test.ts` for preflight failure retention, terminal states, output lineage, retry linkage, and reload recovery.
 - [X] T020A Implement the durable lineage persistence boundary in `src/services/ai/generationJobPersistence.ts` and the typed integration with the existing `src/app/api/jobs/[id]/route.ts`, reusing existing generation/project storage or adding a generated Drizzle migration; persist job inputs before queue submission and link retries/outputs according to `contracts/generation-persistence.md`.
 - [X] T020B Implement `src/store/slices/productDesignSlice.ts` and the typed generation-job service in `src/services/ai/generationJobService.ts`; retain prompts, references, masks, target/tier decisions, dependency snapshots, progress, errors, outputs, and retry inputs.
-- [ ] T021 Write failing render-service compatibility tests first in `src/services/renderService.productWorkflow.test.ts` for legacy presets and the new target adapter facade.
-- [ ] T022 Migrate `src/services/renderService.ts` to delegate through the execution-target/product-generation boundary while preserving existing `generate`, `animate`, connection health, proxy behavior, and legacy request payloads; remove untyped error handling introduced by the migration.
+- [X] T021 Write failing render-service compatibility tests first in `src/services/renderService.productWorkflow.test.ts` for legacy presets and the new target adapter facade.
+- [X] T022 Migrate `src/services/renderService.ts` to delegate through the execution-target/product-generation boundary while preserving existing `generate`, `animate`, connection health, proxy behavior, and legacy request payloads; remove untyped error handling introduced by the migration.
 
 ### Settings and capability UI foundation
 
@@ -241,3 +241,4 @@ Checkbox state was reconciled against the codebase during a `/speckit-analyze` r
 - **T018B/T018C added** — FR-016 (OpenAI-compatible image adapter, `openAIImageTarget.ts`) and FR-017 (per-endpoint FIFO queue, `generationQueue.ts` + Settings → AI & Compute concurrency) were implemented after this file was written and previously had no task coverage.
 - **T024 split** — `AIComputeSettings.tsx` is done; the four sibling panels moved to T024A.
 - **T036 split** — `ModifyNode.tsx` exists with all controls inlined; extraction into named subcomponents moved to T036A.
+- **T021/T022 completed (2026-09-27)** — compatibility tests written first in `renderService.productWorkflow.test.ts`, then `renderService.ts` was split: ComfyUI internals moved to `comfyuiRenderService.ts`, the OpenAI-compatible image provider (queue, size helpers, target-backed generate/health) moved to `openAIImageRenderService.ts`. `renderService.ts` is now a thin protocol-routing facade that re-exports the legacy names; untyped `catch (error: any)` handling was replaced with an `errorMessage(error: unknown)` helper.
