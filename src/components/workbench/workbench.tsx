@@ -31,7 +31,6 @@ import { useAutoSaveScene } from '../../hooks/useAutoSaveScene';
 import { useWorkbenchCenterOnReturn } from './hooks/useWorkbenchCenterOnReturn';
 import { useWorkbenchOneShotCreation } from './hooks/useWorkbenchOneShotCreation';
 import { getFlowModeProps } from './hooks/workbenchModeProps';
-import { useWorkbenchContextMenuActions } from './hooks/useWorkbenchContextMenuActions';
 import { useWorkbenchFreehandEraser } from './hooks/useWorkbenchFreehandEraser';
 import { useWorkbenchMediaUpload } from './hooks/useWorkbenchMediaUpload';
 import { useResizeObserverWarningSuppression } from './hooks/useResizeObserverWarningSuppression';
@@ -42,12 +41,14 @@ import { CollabStatusChip } from './CollabStatusChip';
 import { ComputePopover } from '@/components/product-design/ComputePopover';
 import { CursorOverlay } from './CursorOverlay';
 import { NodeLockBadges } from './NodeLockBadges';
+import { WorkbenchOverlayLayer } from './WorkbenchOverlayLayer';
 import { useShallow } from 'zustand/react/shallow';
 import { WorkbenchConnectionLine } from '../nodes/WorkbenchConnectionLine';
 import { WorkbenchCanvasBackground } from './WorkbenchCanvasBackground';
 import { useWorkbenchThemeStore } from '../../store/slices/workbenchThemeSlice';
 import { DrawingOverlay } from '@/drawing/DrawingOverlay';
 import { cn } from '@/lib/utils';
+import type { WorkbenchNode } from '@/types';
 import { requestImmediateSceneSave } from '@/services/workbench/sceneSyncBus';
 import { WORKBENCH_PAN_MOUSE_BUTTON } from './hooks/workbenchViewportGestures';
 import {
@@ -153,10 +154,7 @@ const WorkbenchContent: React.FC = () => {
             commitWorkbenchGesture,
         },
         actions: {
-            reorderWorkbenchNode,
-            copyToClipboard,
             pasteFromClipboard,
-            duplicateWorkbenchNode,
             removeWorkbenchNode,
             setActiveWorkbenchTool,
             setActiveNodeId,
@@ -251,14 +249,21 @@ const WorkbenchContent: React.FC = () => {
         [currentProjectId]
     );
 
-    const contextMenuActions = useWorkbenchContextMenuActions({
-        contextMenu,
-        reorderWorkbenchNode,
-        copyToClipboard,
-        pasteFromClipboard,
-        duplicateWorkbenchNode,
-        removeWorkbenchNode,
-    });
+    // US2: the right-click menu is the data-driven "more" menu (T031) rendered
+    // by the overlay layer; it acts on the whole selection when the clicked
+    // node is selected, otherwise on the single node.
+    const contextMenuNodes = React.useMemo<WorkbenchNode[]>(() => {
+        if (!contextMenu) return [];
+        if (selectedNodeIds.includes(contextMenu.nodeId)) {
+            return workbenchNodes.filter((node) => selectedNodeIds.includes(node.id));
+        }
+        return workbenchNodes.filter((node) => node.id === contextMenu.nodeId);
+    }, [contextMenu, selectedNodeIds, workbenchNodes]);
+
+    const handleContextMenuPaste = useCallback(() => {
+        if (!contextMenu) return;
+        pasteFromClipboard(screenToFlowPosition({ x: contextMenu.x, y: contextMenu.y }));
+    }, [contextMenu, pasteFromClipboard, screenToFlowPosition]);
 
     // FR-007: one-shot creation is an atomic store action (T006) — the view
     // only builds the node payload; select + tool switch happen in one update.
@@ -366,6 +371,13 @@ const WorkbenchContent: React.FC = () => {
             {/* Awareness overlays (US2): remote cursors + soft-lock badges. */}
             <CursorOverlay remoteCursors={remoteCursors} viewport={viewport} />
             <NodeLockBadges nodes={nodes} nodeLocks={nodeLocks} viewport={viewport} />
+            {/* Floating selection toolbar + more menu (US2, ui-translation §5). */}
+            <WorkbenchOverlayLayer
+                contextMenu={contextMenu}
+                onCloseContextMenu={() => setContextMenu(null)}
+                contextNodes={contextMenuNodes}
+                onPaste={handleContextMenuPaste}
+            />
             {/* Collab session state (US3, SC-004). The PresenceIndicator chips
                 are intentionally not rendered — the component is kept for a
                 possible return (US2/SC-003). */}
@@ -415,9 +427,6 @@ const WorkbenchContent: React.FC = () => {
                     setViewport({ x: cx - flowX * targetZoom, y: cy - flowY * targetZoom, zoom: targetZoom }, { duration: 300 });
                 }}
                 onFitToScreen={() => fitView({ duration: 300 })}
-                contextMenu={contextMenu}
-                onCloseContextMenu={() => setContextMenu(null)}
-                contextMenuActions={contextMenuActions}
                 basicBlocksMenu={basicBlocksMenu}
                 onBlockSelect={handleBlockSelect}
             />

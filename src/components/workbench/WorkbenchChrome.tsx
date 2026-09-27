@@ -2,8 +2,6 @@ import React from 'react';
 import type { ChangeEvent, RefObject } from 'react';
 
 
-import type { ContextMenuAction } from '@/components/ContextMenu';
-import { PositionedMenu } from '../ContextMenu';
 import { ProjectHeader } from '../common/ProjectHeader';
 import { CanvasControls } from '../studio/CanvasControls';
 import { WorkbenchToolbar } from './WorkbenchToolbar';
@@ -11,8 +9,6 @@ import { PhoneUploadModal } from './PhoneUploadModal';
 import { BasicBlocksMenu } from '../nodes/BasicBlocksMenu';
 import type { BasicBlocksMenuState } from './hooks/useWorkbenchBlockCreation';
 import type { WorkbenchToolType } from '@/types';
-
-type ContextMenuState = { x: number; y: number; nodeId: string } | null;
 
 interface WorkbenchChromeProps {
     dropdownRef: RefObject<HTMLDivElement>;
@@ -41,9 +37,6 @@ interface WorkbenchChromeProps {
     /** Absolute zoom presets (25/50/75/100%) from the percentage popover. */
     onSetZoom?: (zoom: number) => void;
     onFitToScreen: () => void;
-    contextMenu: ContextMenuState;
-    onCloseContextMenu: () => void;
-    contextMenuActions: ContextMenuAction[];
     basicBlocksMenu: BasicBlocksMenuState;
     onBlockSelect: (type: 'modify' | 'animate' | 'variate' | 'render') => void;
 }
@@ -80,9 +73,6 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
     onZoomOut,
     onSetZoom,
     onFitToScreen,
-    contextMenu,
-    onCloseContextMenu,
-    contextMenuActions,
     basicBlocksMenu,
     onBlockSelect,
 }) => (
@@ -135,16 +125,6 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
                 onFitToScreen={onFitToScreen}
             />
         </div>
-
-        {contextMenu && (
-            <PositionedMenu
-                x={contextMenu.x}
-                y={contextMenu.y}
-                open={!!contextMenu}
-                onClose={onCloseContextMenu}
-                actions={contextMenuActions}
-            />
-        )}
 
         {basicBlocksMenu?.visible && (
             <div

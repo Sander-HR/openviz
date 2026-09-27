@@ -59,6 +59,9 @@ export function useWorkbenchNodeHandlers({
         const flowNodes = buildFlowNodes(workbenchNodes, selectedNodeIds);
         applyNodeChanges(changes as NodeChange[], flowNodes);
         const nextSelectedNodeIds = new Set(selectedNodeIds);
+        // US2 overlay anchoring (§5): the last node clicked in this batch is
+        // the "active" node — only it anchors the floating toolbar/panel.
+        let activeNodeId: string | null = null;
 
         changes.forEach((change) => {
             if (change.type === 'dimensions') {
@@ -89,6 +92,7 @@ export function useWorkbenchNodeHandlers({
                 }
                 if (change.selected) {
                     nextSelectedNodeIds.add(change.id);
+                    activeNodeId = change.id;
                 } else {
                     nextSelectedNodeIds.delete(change.id);
                 }
@@ -99,7 +103,10 @@ export function useWorkbenchNodeHandlers({
         if (nextSelection.length !== selectedNodeIds.length || nextSelection.some((id) => !selectedNodeIds.includes(id))) {
             setSelectedNodeIds(nextSelection);
         }
-    }, [updateWorkbenchNodeTransient, removeWorkbenchNode, setSelectedNodeIds, selectedNodeIds, workbenchNodes]);
+        if (activeNodeId && activeNodeId !== useStore.getState().activeNodeId) {
+            setActiveNodeId(activeNodeId);
+        }
+    }, [updateWorkbenchNodeTransient, removeWorkbenchNode, setSelectedNodeIds, setActiveNodeId, selectedNodeIds, workbenchNodes]);
 
     const handleNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
         if (isRemotelyLocked(node.id)) return;
