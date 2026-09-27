@@ -9,6 +9,16 @@ import { renderService } from '../../services/renderService';
 vi.mock('../../store/useStore');
 vi.mock('../../services/renderService');
 
+const connectionState = { inProgress: false, fromNode: null };
+
+vi.mock('@xyflow/react', async () => {
+    const actual = await vi.importActual<typeof import('@xyflow/react')>('@xyflow/react');
+    return {
+        ...actual,
+        useConnection: () => connectionState,
+    };
+});
+
 describe('AnimateNode logic', () => {
     const mockStore = {
         setActiveNodeId: vi.fn(),

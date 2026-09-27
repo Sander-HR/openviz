@@ -3,11 +3,29 @@ import {
     BaseEdge,
     EdgeLabelRenderer,
     getSmoothStepPath,
+    Position,
     useViewport,
     type EdgeProps,
 } from '@xyflow/react';
 import { Minus } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+
+const CONNECTOR_RADIUS = 13;
+
+function extendEndpointToNodeEdge(x: number, y: number, position: Position) {
+    switch (position) {
+        case Position.Left:
+            return { x: x + CONNECTOR_RADIUS, y };
+        case Position.Right:
+            return { x: x - CONNECTOR_RADIUS, y };
+        case Position.Top:
+            return { x, y: y + CONNECTOR_RADIUS };
+        case Position.Bottom:
+            return { x, y: y - CONNECTOR_RADIUS };
+        default:
+            return { x, y };
+    }
+}
 
 export const CustomEdge = ({
     id,
@@ -28,12 +46,14 @@ export const CustomEdge = ({
     }
 
     const { zoom } = useViewport();
+    const edgeSource = extendEndpointToNodeEdge(sourceX, sourceY, sourcePosition);
+    const edgeTarget = extendEndpointToNodeEdge(targetX, targetY, targetPosition);
     const [edgePath, labelX, labelY] = getSmoothStepPath({
-        sourceX,
-        sourceY,
+        sourceX: edgeSource.x,
+        sourceY: edgeSource.y,
         sourcePosition,
-        targetX,
-        targetY,
+        targetX: edgeTarget.x,
+        targetY: edgeTarget.y,
         targetPosition,
         borderRadius: 15,
     });

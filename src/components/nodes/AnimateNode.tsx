@@ -1,9 +1,8 @@
 import React from 'react';
-import { Handle, Position } from '@xyflow/react';
 import { ChevronDown, Image as ImageIcon, Play, Plus, Settings2, Video, X } from 'lucide-react';
 import { AnimateNode as AnimateNodeType, ImageNode, VideoNode, WorkbenchNode } from '../../types';
 import { useAnimateNodeActions } from './hooks/useAnimateNodeActions';
-import { cn, elevatedFullNodeTargetHandleStyle, imageLikeHandleStyle, nodeCardClass, NodeCardHeader, nodeCardBodyClass } from './nodeUi';
+import { cn, nodeCardClass, NodeCardHeader, nodeCardBodyClass, NodeTargetHandle } from './nodeUi';
 
 interface AnimateNodeProps {
     id: string;
@@ -45,22 +44,7 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
             onMouseLeave={() => setIsHovered(false)}
             className={cn(nodeCardClass(selected), isHoverConnectable && 'border-viz-accent')}
         >
-            <Handle
-                type="target"
-                position={Position.Left}
-                id="animate-target-visible"
-                style={{
-                    ...imageLikeHandleStyle,
-                    left: 0,
-                    top: '50%',
-                    zIndex: 11000,
-                    opacity: selected ? 1 : 0,
-                    pointerEvents: selected ? 'auto' : 'none',
-                }}
-            >
-                <Plus size={16} color="white" strokeWidth={3} className="pointer-events-none" />
-            </Handle>
-            <Handle type="target" position={Position.Left} style={elevatedFullNodeTargetHandleStyle} />
+            <NodeTargetHandle id="animate-target-visible" selected={selected} />
 
             <NodeCardHeader icon={Video} label="Animate" />
 

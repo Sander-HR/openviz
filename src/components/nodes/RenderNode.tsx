@@ -1,9 +1,8 @@
 import React from 'react';
-import { Handle, Position } from '@xyflow/react';
-import { ChevronDown, Layers, Plus, Wand2 } from 'lucide-react';
+import { ChevronDown, Layers, Wand2 } from 'lucide-react';
 import { RenderNode as RenderNodeType } from '../../types';
 import { useRenderNodeGeneration } from './hooks/useRenderNodeGeneration';
-import { cn, elevatedFullNodeTargetHandleStyle, imageLikeHandleStyle, nodeCardClass, NodeCardHeader, nodeCardBodyClass } from './nodeUi';
+import { cn, nodeCardClass, NodeCardHeader, nodeCardBodyClass, NodeTargetHandle } from './nodeUi';
 
 interface RenderNodeProps {
     id: string;
@@ -32,22 +31,7 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
             onMouseLeave={() => setIsHovered(false)}
             className={cn(nodeCardClass(selected), isHoverConnectable && 'border-viz-accent')}
         >
-            <Handle
-                type="target"
-                position={Position.Left}
-                id="render-target-visible"
-                style={{
-                    ...imageLikeHandleStyle,
-                    left: 0,
-                    top: '50%',
-                    zIndex: 11000,
-                    opacity: selected ? 1 : 0,
-                    pointerEvents: selected ? 'auto' : 'none',
-                }}
-            >
-                <Plus size={16} color="white" strokeWidth={3} className="pointer-events-none" />
-            </Handle>
-            <Handle type="target" position={Position.Left} style={elevatedFullNodeTargetHandleStyle} />
+            <NodeTargetHandle id="render-target-visible" selected={selected} />
 
             <NodeCardHeader icon={Wand2} label="Render" />
 

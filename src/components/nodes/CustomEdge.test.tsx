@@ -112,3 +112,20 @@ describe('CustomEdge hover behavior', () => {
         storeState.activeNodeId = null;
     });
 });
+
+describe('CustomEdge endpoint attachment', () => {
+    it('extends horizontal endpoints by the connector radius', () => {
+        const { container } = renderEdge({
+            sourceX: 100,
+            sourceY: 100,
+            targetX: 300,
+            targetY: 100,
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+        });
+
+        const path = edgePath(container);
+        expect(path.getAttribute('d')).toContain('M87');
+        expect(path.getAttribute('d')).toContain('L313');
+    });
+});

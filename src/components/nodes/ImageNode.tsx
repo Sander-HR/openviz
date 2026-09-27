@@ -82,8 +82,6 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
                     zIndex: 1000,
                     opacity: selected || isHovered ? 1 : 0,
                     pointerEvents: 'auto',
-                    width: 24,
-                    height: 24,
                 }}
                 isConnectable={isConnectable}
                 onClick={handleSourceClick}

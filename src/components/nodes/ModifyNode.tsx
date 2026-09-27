@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Handle, Position, useConnection } from '@xyflow/react';
-import { ChevronDown, ImageIcon, Layers, Plus, Wand2 } from 'lucide-react';
+import { useConnection } from '@xyflow/react';
+import { ChevronDown, ImageIcon, Layers, Wand2 } from 'lucide-react';
 import type { ModifyNode as ModifyNodeType } from '@/types';
-import { cn, elevatedFullNodeTargetHandleStyle, imageLikeHandleStyle, nodeCardClass, NodeCardHeader, nodeCardBodyClass } from './nodeUi';
+import { cn, nodeCardClass, NodeCardHeader, nodeCardBodyClass, NodeTargetHandle } from './nodeUi';
 import { ReferenceChips } from './modify/ReferenceChips';
 
 interface ModifyNodeData extends ModifyNodeType {
@@ -38,22 +38,7 @@ export const ModifyNode: React.FC<ModifyNodeProps> = ({ id, data, selected }) =>
 
     return (
         <div className={cn(nodeCardClass(selected), isConnectable && 'border-viz-accent')}>
-            <Handle
-                type="target"
-                position={Position.Left}
-                id="modify-target-visible"
-                style={{
-                    ...imageLikeHandleStyle,
-                    left: 0,
-                    top: '50%',
-                    zIndex: 11000,
-                    opacity: selected ? 1 : 0,
-                    pointerEvents: selected ? 'auto' : 'none',
-                }}
-            >
-                <Plus size={16} color="white" strokeWidth={3} className="pointer-events-none" />
-            </Handle>
-            <Handle type="target" position={Position.Left} style={elevatedFullNodeTargetHandleStyle} />
+            <NodeTargetHandle id="modify-target-visible" selected={selected} />
 
             <NodeCardHeader icon={Wand2} label="Modify" badge={<span className="rounded-full bg-viz-surface px-2 py-1 text-[10px] font-medium text-viz-muted">AI EDIT</span>} />
 
