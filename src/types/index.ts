@@ -1,3 +1,5 @@
+import type { BackgroundHandling, VaryMode, ViewName } from './workbenchParity.types';
+
 export type AspectRatio = '16:9' | '4:3' | '1:1' | '9:16' | '3:4' | 'square' | 'landscape' | 'portrait';
 export type ToolType = 'select' | 'brush' | 'eraser' | 'circle' | 'rectangle' | 'line' | 'paintbucket' | 'transform';
 export type WorkbenchToolType = 'select' | 'hand' | 'draw' | 'eraser' | 'arrow' | 'text' | 'note' | 'media';
@@ -62,7 +64,7 @@ export interface Project {
     thumbnail?: string;
 }
 
-export type NodeType = 'image' | 'modify' | 'animate' | 'render' | 'video' | 'freehand' | 'arrow' | 'text' | 'note' | 'media' | 'variate' | 'new-view' | 'extract';
+export type NodeType = 'image' | 'modify' | 'animate' | 'render' | 'video' | 'freehand' | 'arrow' | 'text' | 'note' | 'media' | 'variate' | 'new-view' | 'extract' | 'section';
 
 export interface BaseNode {
     id: string;
@@ -182,6 +184,45 @@ export interface MediaWorkbenchNode extends BaseNode {
     };
 }
 
+// US5 node types (data-model.md "WorkbenchNode (extended)"). Shells land in
+// US3 (T036); generation bodies arrive with the renderService ops in US5.
+export interface VariateWorkbenchNode extends BaseNode {
+    type: 'variate';
+    data: {
+        prompt: string;
+        count: 2 | 4 | 8;
+        varyMode?: VaryMode;
+    };
+}
+
+export interface NewViewWorkbenchNode extends BaseNode {
+    type: 'new-view';
+    data: {
+        prompt: string;
+        /** null = "Select a view" placeholder; Generate disabled until set (FR-007). */
+        view: ViewName | null;
+    };
+}
+
+export interface ExtractWorkbenchNode extends BaseNode {
+    type: 'extract';
+    data: {
+        prompt: string;
+        extractPrompt?: string;
+        backgroundHandling: BackgroundHandling;
+    };
+}
+
+// US3 (T036): lightweight grouping container for the add-node menu's Section
+// entry. Membership/wrapping behavior ("Wrap in section") is deferred; v1 only
+// needs a creatable, selectable placeholder card.
+export interface SectionWorkbenchNode extends BaseNode {
+    type: 'section';
+    data: {
+        label: string;
+    };
+}
+
 export type WorkbenchNode =
     | ImageNode
     | ModifyNode
@@ -192,7 +233,11 @@ export type WorkbenchNode =
     | ArrowWorkbenchNode
     | TextWorkbenchNode
     | NoteWorkbenchNode
-    | MediaWorkbenchNode;
+    | MediaWorkbenchNode
+    | VariateWorkbenchNode
+    | NewViewWorkbenchNode
+    | ExtractWorkbenchNode
+    | SectionWorkbenchNode;
 
 export interface Connection {
     id: string;

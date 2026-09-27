@@ -27,7 +27,11 @@ type WorkbenchFlowNodeType =
     | "arrowNode"
     | "textNode"
     | "noteNode"
-    | "mediaNode";
+    | "mediaNode"
+    | "variateNode"
+    | "newViewNode"
+    | "extractNode"
+    | "sectionNode";
 
 function mapNodeType(node: WorkbenchNode): WorkbenchFlowNodeType {
     if (node.type === "image") return "imageNode";
@@ -39,6 +43,12 @@ function mapNodeType(node: WorkbenchNode): WorkbenchFlowNodeType {
     if (node.type === "text") return "textNode";
     if (node.type === "note") return "noteNode";
     if (node.type === "media") return "mediaNode";
+    // US3 (T036): the new generation/section shells map to their own types
+    // instead of falling through to the renderNode fallback.
+    if (node.type === "variate") return "variateNode";
+    if (node.type === "new-view") return "newViewNode";
+    if (node.type === "extract") return "extractNode";
+    if (node.type === "section") return "sectionNode";
     return "renderNode";
 }
 

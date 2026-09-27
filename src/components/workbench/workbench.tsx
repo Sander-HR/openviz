@@ -22,6 +22,10 @@ import { ArrowNode } from '../nodes/ArrowNode';
 import { TextNode } from '../nodes/TextNode';
 import { NoteNode } from '../nodes/NoteNode';
 import { MediaNode } from '../nodes/MediaNode';
+import { VariateNode } from '../nodes/VariateNode';
+import { NewViewNode } from '../nodes/NewViewNode';
+import { ExtractNode } from '../nodes/ExtractNode';
+import { SectionNode } from '../nodes/SectionNode';
 import { CustomEdge } from '../nodes/CustomEdge';
 import { WorkbenchChrome } from './WorkbenchChrome';
 import { useWorkbench } from './hooks/useWorkbench';
@@ -30,6 +34,7 @@ import { useStore } from '../../store/useStore';
 import { useAutoSaveScene } from '../../hooks/useAutoSaveScene';
 import { useWorkbenchCenterOnReturn } from './hooks/useWorkbenchCenterOnReturn';
 import { useWorkbenchOneShotCreation } from './hooks/useWorkbenchOneShotCreation';
+import { useWorkbenchAddNodeCreation } from './hooks/useWorkbenchAddNodeCreation';
 import { getFlowModeProps } from './hooks/workbenchModeProps';
 import { useWorkbenchFreehandEraser } from './hooks/useWorkbenchFreehandEraser';
 import { useWorkbenchMediaUpload } from './hooks/useWorkbenchMediaUpload';
@@ -68,6 +73,10 @@ const nodeTypes: NodeTypes = {
     textNode: TextNode,
     noteNode: NoteNode,
     mediaNode: MediaNode,
+    variateNode: VariateNode,
+    newViewNode: NewViewNode,
+    extractNode: ExtractNode,
+    sectionNode: SectionNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -80,10 +89,17 @@ const WorkbenchContent: React.FC = () => {
     const { setCenter, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
     const viewport = useViewport();
     const latestViewportRef = useRef<Viewport>(viewport);
-    const { viewMode, currentProjectId } = useStore(
+    const {
+        viewMode,
+        currentProjectId,
+        createOneShotNode,
+        createSketchWithFormat,
+    } = useStore(
         useShallow((state) => ({
             viewMode: state.viewMode,
             currentProjectId: state.currentProjectId,
+            createOneShotNode: state.createOneShotNode,
+            createSketchWithFormat: state.createSketchWithFormat,
         }))
     );
     const sceneHydrated = useStore((state) => state.sceneHydrated);
@@ -91,6 +107,22 @@ const WorkbenchContent: React.FC = () => {
     useAutoSaveScene(currentProjectId);
     useSceneStream(currentProjectId);
     const collabSession = useWorkbenchCollabSession();
+
+    // US3 (T035): media upload flows are declared before useWorkbench so the
+    // I / keyboard shortcuts can route into them (ui-translation §6).
+    const {
+        mediaUploadInputRef,
+        isPhoneUploadModalOpen,
+        closePhoneUploadModal,
+        handleMediaUpload,
+        handleMediaUploadFromPhone,
+        handlePhoneUploadComplete,
+        handleMediaUploadChange,
+    } = useWorkbenchMediaUpload({
+        flowWrapperRef,
+        screenToFlowPosition,
+        makeOneShotNode: createOneShotNode,
+    });
 
     // Awareness-derived collaboration state (US2): presence chips, remote
     // cursors and soft-lock badges. References only change when the slice
@@ -160,17 +192,31 @@ const WorkbenchContent: React.FC = () => {
             setActiveNodeId,
             setSelectedNodeIds,
             addWorkbenchNode,
-            createOneShotNode,
             setFreehandColor,
             setFreehandStrokeWidth,
             undoWorkbench,
             redoWorkbench,
         },
-    } = useWorkbench(
-        collabSession.active
+    } = useWorkbench({
+        ...(collabSession.active
             ? { undoAction: collabSession.undo, redoAction: collabSession.redo }
-            : undefined
-    );
+            : {}),
+        // US3 (ui-translation §6): I / keyboard shortcuts route into the
+        // existing media upload flows.
+        onUploadImage: handleMediaUpload,
+        onUploadFromPhone: handleMediaUploadFromPhone,
+    });
+
+    // US3 (T035): add-node menu routing — canvas-center creation for every
+    // non-legacy kind; sketch/media reuse the existing flows.
+    const { handleCreateNode } = useWorkbenchAddNodeCreation({
+        flowWrapperRef,
+        screenToFlowPosition,
+        addWorkbenchNode,
+        createOneShotNode,
+        createSketchWithFormat,
+        onMediaUpload: handleMediaUpload,
+    });
 
     // In collaboration mode the Yjs UndoManager owns history (SC-005): the
     // toolbar and Cmd/Ctrl+Z drive it instead of the local store history.
@@ -286,20 +332,6 @@ const WorkbenchContent: React.FC = () => {
         setSelectedNodeIds,
     });
 
-    const {
-        mediaUploadInputRef,
-        isPhoneUploadModalOpen,
-        closePhoneUploadModal,
-        handleMediaUpload,
-        handleMediaUploadFromPhone,
-        handlePhoneUploadComplete,
-        handleMediaUploadChange,
-    } = useWorkbenchMediaUpload({
-        flowWrapperRef,
-        screenToFlowPosition,
-        makeOneShotNode: createOneShotNode,
-    });
-
     const handleNodeDragStart = useCallback<OnNodeDrag>(
         (_event, _node, nodes) => {
             beginWorkbenchGesture('move', nodes.map((draggedNode) => draggedNode.id));
@@ -408,6 +440,7 @@ const WorkbenchContent: React.FC = () => {
                 canRedo={handleCanRedo}
                 onMediaUpload={handleMediaUpload}
                 onMediaUploadFromPhone={handleMediaUploadFromPhone}
+                onCreateNode={handleCreateNode}
                 sketchFormats={sketchFormats}
                 onFormatSelect={handleFormatSelect}
                 mediaUploadInputRef={mediaUploadInputRef}

@@ -18,6 +18,10 @@ import { useWorkbenchNodeHandlers } from './useWorkbenchNodeHandlers';
 export interface UseWorkbenchOptions {
     undoAction?: () => void;
     redoAction?: () => void;
+    /** US3 (ui-translation §6): `I` starts the image upload flow directly. */
+    onUploadImage?: () => void;
+    /** US3 (ui-translation §6): `/` opens the phone-upload flow. */
+    onUploadFromPhone?: () => void;
 }
 
 export const useWorkbench = (options?: UseWorkbenchOptions) => {
@@ -163,6 +167,8 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         resetView,
         zoomTo100,
         clearSelection,
+        onUploadImage: options?.onUploadImage ?? (() => {}),
+        onUploadFromPhone: options?.onUploadFromPhone ?? (() => {}),
     });
 
     return {

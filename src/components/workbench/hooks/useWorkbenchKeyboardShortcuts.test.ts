@@ -30,6 +30,8 @@ function baseOptions() {
         resetView: vi.fn(),
         zoomTo100: vi.fn(),
         clearSelection: vi.fn(),
+        onUploadImage: vi.fn(),
+        onUploadFromPhone: vi.fn(),
     };
 }
 
@@ -181,5 +183,45 @@ describe('useWorkbenchKeyboardShortcuts — pre-existing bindings unchanged (FR-
         renderHook(() => useWorkbenchKeyboardShortcuts(options));
         pressKey('Backspace');
         expect(options.removeWorkbenchNode).not.toHaveBeenCalled();
+    });
+});
+
+describe('useWorkbenchKeyboardShortcuts — upload shortcuts (US3, ui-translation §6)', () => {
+    it('pressing I starts the image upload flow directly', () => {
+        const options = makeOptions();
+        renderHook(() => useWorkbenchKeyboardShortcuts(options));
+        pressKey('i');
+        expect(options.onUploadImage).toHaveBeenCalledTimes(1);
+    });
+
+    it('pressing / opens the phone-upload flow', () => {
+        const options = makeOptions();
+        renderHook(() => useWorkbenchKeyboardShortcuts(options));
+        pressKey('/');
+        expect(options.onUploadFromPhone).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores I and / while typing in an input', () => {
+        const options = makeOptions();
+        renderHook(() => useWorkbenchKeyboardShortcuts(options));
+        const el = document.createElement('input');
+        document.body.appendChild(el);
+        el.focus();
+
+        act(() => {
+            el.dispatchEvent(new KeyboardEvent('keydown', { key: 'i', bubbles: true }));
+            el.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
+        });
+        expect(options.onUploadImage).not.toHaveBeenCalled();
+        expect(options.onUploadFromPhone).not.toHaveBeenCalled();
+    });
+
+    it('ignores modifier-combined I and / (FR-017)', () => {
+        const options = makeOptions();
+        renderHook(() => useWorkbenchKeyboardShortcuts(options));
+        pressKey('i', { metaKey: true });
+        pressKey('/', { ctrlKey: true });
+        expect(options.onUploadImage).not.toHaveBeenCalled();
+        expect(options.onUploadFromPhone).not.toHaveBeenCalled();
     });
 });

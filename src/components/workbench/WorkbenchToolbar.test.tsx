@@ -29,6 +29,7 @@ function renderToolbar(
     const onMediaUpload = vi.fn();
     const onMediaUploadFromPhone = vi.fn();
     const onFormatSelect = vi.fn();
+    const onCreateNode = vi.fn();
     const utils = render(
         <WorkbenchToolbar
             activeTool={activeTool}
@@ -45,9 +46,10 @@ function renderToolbar(
             onMediaUploadFromPhone={onMediaUploadFromPhone}
             sketchFormats={sketchFormats}
             onFormatSelect={onFormatSelect}
+            onCreateNode={onCreateNode}
         />
     );
-    return { onSelectTool, onMediaUpload, onMediaUploadFromPhone, onFormatSelect, ...utils };
+    return { onSelectTool, onMediaUpload, onMediaUploadFromPhone, onFormatSelect, onCreateNode, ...utils };
 }
 
 describe('WorkbenchToolbar — structure (C-1)', () => {
@@ -96,6 +98,34 @@ describe('WorkbenchToolbar — click activation (C-2.1)', () => {
         const { onSelectTool } = renderToolbar('select');
         fireEvent.click(screen.getByTitle('Select (V)'));
         expect(onSelectTool).toHaveBeenCalledWith('select');
+    });
+});
+
+describe('WorkbenchToolbar — Add-node trigger (US3, ui-translation §3.1)', () => {
+    it('renders the Add node button as the FIRST toolbar button', () => {
+        renderToolbar();
+
+        const addButton = screen.getByTitle('Add node');
+        const selectButton = screen.getByTitle('Select (V)');
+        // The Add trigger precedes every tool button in document order.
+        expect(selectButton.compareDocumentPosition(addButton) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    });
+
+    it('opening the Add node menu reveals the upload rows and type grid', () => {
+        renderToolbar();
+        // Radix DropdownMenu.Trigger opens on pointerdown (button 0).
+        fireEvent.pointerDown(screen.getByTitle('Add node'), { button: 0 });
+
+        expect(screen.getByText('Upload an image')).toBeTruthy();
+        expect(screen.getByText('Instant Render')).toBeTruthy();
+    });
+
+    it('selecting a type from the Add node menu routes to its creation flow', () => {
+        const { onCreateNode } = renderToolbar();
+        fireEvent.pointerDown(screen.getByTitle('Add node'), { button: 0 });
+        fireEvent.click(screen.getByText('Variate'));
+
+        expect(onCreateNode).toHaveBeenCalledWith('variate');
     });
 });
 

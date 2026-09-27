@@ -25,6 +25,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 
 import { ColorPicker } from '@/components/studio/ColorPicker';
+import { AddNodeMenu, type AddNodeKind } from './AddNodeMenu';
 import { WorkbenchToolType } from '@/types';
 
 type SketchFormat = {
@@ -48,6 +49,8 @@ type WorkbenchToolbarProps = {
     onMediaUploadFromPhone: () => void;
     sketchFormats: SketchFormat[];
     onFormatSelect: (width: number, height: number) => void;
+    /** Add-node menu (US3): routes a chosen type to its creation flow. */
+    onCreateNode: (kind: AddNodeKind) => void;
 };
 
 const clampStrokeWidth = (value: number, min = 1, max = 64): number => {
@@ -87,6 +90,7 @@ export const WorkbenchToolbar: React.FC<WorkbenchToolbarProps> = ({
     onMediaUploadFromPhone,
     sketchFormats,
     onFormatSelect,
+    onCreateNode,
 }) => {
     const [showColorMenu, setShowColorMenu] = useState(false);
     const [isCreateNewOpen, setIsCreateNewOpen] = useState(false);
@@ -112,6 +116,9 @@ export const WorkbenchToolbar: React.FC<WorkbenchToolbarProps> = ({
             )}
 
             <div className="pointer-events-auto z-[40] flex items-center gap-0.5 rounded-xl2 border border-viz-border bg-viz-panel/90 p-1 shadow-viz backdrop-blur-md">
+                {/* US3 (ui-translation §3.1): the add-node menu is the FIRST
+                    toolbar button; it owns its own Radix trigger + content. */}
+                <AddNodeMenu onUploadImage={onMediaUpload} onUploadFromPhone={onMediaUploadFromPhone} onCreateNode={onCreateNode} />
                 {TOOL_CONFIG.map((tool) => {
                     const Icon = tool.icon;
                     const isActive = activeTool === tool.id;

@@ -5,6 +5,7 @@ import type { ChangeEvent, RefObject } from 'react';
 import { ProjectHeader } from '../common/ProjectHeader';
 import { CanvasControls } from '../studio/CanvasControls';
 import { WorkbenchToolbar } from './WorkbenchToolbar';
+import type { AddNodeKind } from './AddNodeMenu';
 import { PhoneUploadModal } from './PhoneUploadModal';
 import { BasicBlocksMenu } from '../nodes/BasicBlocksMenu';
 import type { BasicBlocksMenuState } from './hooks/useWorkbenchBlockCreation';
@@ -39,6 +40,8 @@ interface WorkbenchChromeProps {
     onFitToScreen: () => void;
     basicBlocksMenu: BasicBlocksMenuState;
     onBlockSelect: (type: 'modify' | 'animate' | 'variate' | 'render') => void;
+    /** Add-node menu (US3): routes a chosen type to its creation flow. */
+    onCreateNode: (kind: AddNodeKind) => void;
 }
 
 /**
@@ -75,6 +78,7 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
     onFitToScreen,
     basicBlocksMenu,
     onBlockSelect,
+    onCreateNode,
 }) => (
     <>
         <input
@@ -112,6 +116,7 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
                     onMediaUploadFromPhone={onMediaUploadFromPhone}
                     sketchFormats={sketchFormats}
                     onFormatSelect={onFormatSelect}
+                    onCreateNode={onCreateNode}
                 />
             </div>
         </div>
