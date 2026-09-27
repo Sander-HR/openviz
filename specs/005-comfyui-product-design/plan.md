@@ -102,10 +102,12 @@ src/
 │   ├── dependencyPreflight.ts
 │   ├── modelTierSelector.ts
 │   ├── generationJobService.ts
+│   ├── generationQueue.ts
 │   └── targets/
 │       ├── localComfyTarget.ts
 │       ├── hostedComfyTarget.ts
-│       └── hybridTarget.ts
+│       ├── hybridTarget.ts
+│       └── openAIImageTarget.ts
 ├── store/
 │   └── slices/productDesignSlice.ts
 ├── components/
@@ -157,6 +159,14 @@ tests/ or colocated *.test.ts(x)
 - Compute configuration: Settings → AI & Compute is the primary location for local/hosted/hybrid connections, hardware profiles, model dependencies, and diagnostics. The Workbench shows only a small status indicator; it does not host the configuration panel.
 - Modify surfaces: implement both a Workbench `ModifyNode` created from an image plus handle and a Studio `ModifyPanel` in the right sidebar.
 - First-release controls: direct prompt/preservation instructions, `@` image references, red annotations, masks, aspect ratio, and task/mode selection.
+
+## OpenAI-Compatible Image Endpoint (FR-016 / FR-017)
+
+Added by the 2026-09-25 clarification; implemented in commits `34274a5` and `a04d04e`.
+
+- **Adapter**: `src/services/ai/targets/openAIImageTarget.ts` implements the `ExecutionTargetAdapter` contract against an Unsloth UI Backend–style OpenAI-compatible endpoint (reference spec: `docs/architecture/openai-api.json`). It routes text-only requests to `/v1/images/generations` and image-conditioned requests (init/reference/mask) to `/api/inference/images/generate`, and normalizes both `url` and `b64_json` outputs (`b64_json` becomes a data URL). Qwen Image 2.1 dimensions are normalized to 32-divisibility, a superset of the spec's multiple-of-16 rule.
+- **Queue**: `src/services/ai/generationQueue.ts` provides per-endpoint FIFO queues with concurrency clamped to 1–3 (default 2). The setting is exposed in Settings → AI & Compute (`AIComputeSettings.tsx` → `aiComputeSlice.setEndpointConcurrency`) and applied by `renderService` via `setConcurrency` before enqueueing, so it covers all media jobs sharing an endpoint.
+- **Model**: the adapter is synchronous (submit caches outputs; cancel is a no-op), which matches the provider's request/response behavior. This is documented here rather than in a separate contract file.
 
 ## Implementation Sequencing Notes
 
