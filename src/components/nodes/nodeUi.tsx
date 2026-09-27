@@ -48,6 +48,22 @@ export function nodeCardBodyClass(): string {
     return 'space-y-3 p-3';
 }
 
+// Media nodes (image/video) use a headerless frame: the media title floats
+// above the card when selected (pre-shell behavior), so an inline header is
+// not added — it would shrink the media area and duplicate the title.
+/** Headerless card frame for media nodes (fills its sized wrapper). */
+export function mediaNodeFrameClass(selected: boolean): string {
+    return cn(
+        'h-full w-full rounded-xl2 border border-viz-border bg-viz-panel shadow-viz overflow-hidden',
+        selected && 'ring-2 ring-viz-accent',
+    );
+}
+
+/** Floating title rendered above a media node while selected. */
+export function mediaNodeTitleClass(): string {
+    return 'absolute -top-4 left-0 right-0 truncate px-1 text-left text-xs text-viz-accent';
+}
+
 // Handles restyled to the token set (bg-viz-panel, 2px viz-border).
 export const imageLikeHandleStyle: CSSProperties = {
     background: '#242425',

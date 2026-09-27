@@ -1,10 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NodeResizer } from '@xyflow/react';
-import { Play, Pause, Maximize2, X, Video } from 'lucide-react';
+import { Play, Pause, Maximize2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VideoNode as VideoNodeType } from '../../types';
-import { nodeCardClass, NodeCardHeader } from './nodeUi';
+import { mediaNodeFrameClass } from './nodeUi';
 
 interface VideoNodeData extends VideoNodeType {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -48,11 +48,9 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width,
     };
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`${nodeCardClass(selected)} flex flex-col`}>
-            <NodeCardHeader icon={Video} label="Video" />
-
+        <div style={{ width: nodeSize.width, height: nodeSize.height }}>
             <div
-                className="relative min-h-0 flex-1 bg-black overflow-hidden"
+                className={mediaNodeFrameClass(selected)}
             >
                 {data.status === 'rendering' ? (
                     <div className="w-full h-full bg-gray-900 flex flex-col items-center justify-center animate-pulse">

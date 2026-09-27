@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Handle, NodeResizer, Position, useConnection } from '@xyflow/react';
-import { Image as ImageIcon, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { ImageNode as ImageNodeType } from '../../types';
-import { cn, imageLikeHandleStyle, nodeCardClass, NodeCardHeader } from './nodeUi';
+import { cn, imageLikeHandleStyle, mediaNodeFrameClass, mediaNodeTitleClass } from './nodeUi';
 
 interface ImageNodeData extends ImageNodeType {
     onSourceClick?: (nodeId: string) => void;
@@ -40,14 +40,18 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
 
     return (
         <div
-            className={cn(nodeCardClass(selected), 'flex flex-col', isHoverConnectable && 'border-viz-accent')}
+            className="relative"
             style={{ width: nodeSize.width, height: nodeSize.height }}
         >
-            <NodeCardHeader icon={ImageIcon} label={data.name} />
+            {selected && (
+                <div className={mediaNodeTitleClass()}>
+                    {data.name}
+                </div>
+            )}
             <div
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className="relative min-h-0 flex-1 bg-white"
+                className={cn(mediaNodeFrameClass(selected), isHoverConnectable && 'border-viz-accent')}
             >
                 {data.status === 'rendering' ? (
                     <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center animate-pulse">
