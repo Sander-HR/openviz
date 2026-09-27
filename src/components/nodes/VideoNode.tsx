@@ -4,7 +4,7 @@ import { NodeResizer } from '@xyflow/react';
 import { Play, Pause, Maximize2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VideoNode as VideoNodeType } from '../../types';
-import { mediaNodeFrameClass } from './nodeUi';
+import { mediaNodeFrameClass, resizeHandleClassName } from './nodeUi';
 
 interface VideoNodeData extends VideoNodeType {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -114,11 +114,10 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width,
                 minHeight={100}
                 keepAspectRatio={true}
                 color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#242425',
-                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                     transform: `scale(1)`,

@@ -3,7 +3,7 @@ import { Image as ImageIcon, ImageOff } from 'lucide-react';
 import { NodeResizer } from '@xyflow/react';
 
 import { MediaWorkbenchNode } from '@/types';
-import { nodeCardClass, NodeCardHeader } from './nodeUi';
+import { nodeCardClass, NodeCardHeader, resizeHandleClassName } from './nodeUi';
 
 interface MediaNodeData extends MediaWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -31,7 +31,7 @@ export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width,
     }, [width, height]);
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`${nodeCardClass(selected)} flex flex-col`}>
+        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`${nodeCardClass(selected, 'rounded')} flex flex-col`}>
             <NodeCardHeader icon={ImageIcon} label="Media" />
 
             <div className="relative min-h-0 flex-1 bg-white">
@@ -58,11 +58,10 @@ export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width,
                 minWidth={120}
                 minHeight={80}
                 color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#242425',
-                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

@@ -115,7 +115,7 @@ export const WorkbenchToolbar: React.FC<WorkbenchToolbarProps> = ({
                 />
             )}
 
-            <div className="pointer-events-auto z-[40] flex items-center gap-0.5 rounded-xl2 border border-viz-border bg-viz-panel/90 p-1 shadow-viz backdrop-blur-md">
+            <div className="pointer-events-auto z-[40] flex items-center gap-1.5 rounded-xl2 bg-viz-panel p-1 shadow-viz">
                 {/* US3 (ui-translation §3.1): the add-node menu is the FIRST
                     toolbar button; it owns its own Radix trigger + content. */}
                 <AddNodeMenu onUploadImage={onMediaUpload} onUploadFromPhone={onMediaUploadFromPhone} onCreateNode={onCreateNode} />
@@ -241,7 +241,7 @@ export const WorkbenchToolbar: React.FC<WorkbenchToolbarProps> = ({
             </div>
 
             {isDrawTool && (
-                <div className="pointer-events-auto z-[40] flex items-center gap-3 rounded-xl2 border border-viz-border bg-viz-panel/90 px-3 py-2 shadow-viz backdrop-blur-md">
+                <div className="pointer-events-auto z-[40] flex items-center gap-3 rounded-xl2 bg-viz-panel px-3 py-2 shadow-viz">
                     <span className="text-xs font-medium text-viz-muted">Thickness</span>
                     <input
                         type="range"

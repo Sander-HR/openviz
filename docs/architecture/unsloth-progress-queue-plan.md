@@ -2,7 +2,7 @@
 
 **Generated**: 2026-09-25
 **Estimated Complexity**: High
-**Status**: In progress; queue foundation and endpoint concurrency setting implemented
+**Status**: In progress; queue foundation, endpoint concurrency setting, OpenAPI capability probing (Task 1.2), and live compute-status visibility implemented
 
 ## Overview
 
@@ -34,7 +34,7 @@ The OpenAI-compatible route does not return a job ID and rejects `stream: true`,
 
 ## Sprint 1: Provider capability and progress API
 
-**Implementation status**: Base64 output support is complete from the preceding fix. Capability discovery and live Unsloth progress polling remain for the next increment.
+**Implementation status**: Base64 output support is complete from the preceding fix. OpenAPI capability probing (Task 1.2) is implemented as optional discovery in `src/services/ai/targets/openApiDiscovery.ts` and surfaced in the live workbench compute popup (see [compute-endpoint-status.md](./compute-endpoint-status.md)). Live Unsloth progress polling (Task 1.3) remains for the next increment.
 
 **Goal**: Establish typed, tested Unsloth capability detection and progress polling without changing the generation UI.
 
@@ -62,6 +62,7 @@ The OpenAI-compatible route does not return a job ID and rejects `stream: true`,
   - The endpoint root is derived safely when the configured URL ends in `/v1`.
   - No API key is logged or persisted in probe errors.
 - **Validation**: Mock responses for supported, unsupported, malformed, unauthorized, and unreachable OpenAPI documents.
+- **Implementation status** (implemented): Endpoint-root derivation (`resolveOpenApiUrl`, strips trailing `/vN`), probe outcomes `supported` / `unavailable` / `unauthorized` / `network` / `malformed`, capability flags for progress telemetry, load progress, and cancellation, Bearer header only when a key is configured and keyless mode is off, 5 s timeout, and per-endpoint caching. Implemented in `src/services/ai/targets/openApiDiscovery.ts` with unit tests; wired into the compute popup via `useAIComputeStatus`. Remaining gap vs. plan: probing currently feeds the status UI only — generation progress polling (Task 1.3) still needs to consume these capability flags.
 
 ### Task 1.3: Implement Unsloth progress and cancellation methods
 
@@ -76,7 +77,7 @@ The OpenAI-compatible route does not return a job ID and rejects `stream: true`,
 
 ## Sprint 2: Queue and concurrency coordinator
 
-**Implementation status**: Client-side FIFO throttling and the per-endpoint concurrency setting are implemented. Server-backed coordination and recovery remain for the next increment.
+**Implementation status**: Client-side FIFO throttling and the per-endpoint concurrency setting are implemented. The client queue is exposed as `imageApiQueue` in `renderService` and surfaced live in the workbench compute popup (labeled "OpenViz queue" to make its session scope explicit). Server-backed coordination, recovery, and a shared cross-tab view remain for the next increment (Task 2.1 / Task 4.3).
 
 **Goal**: Ensure no more than the configured number of image generations are active and make queue behavior independent of presentation components.
 

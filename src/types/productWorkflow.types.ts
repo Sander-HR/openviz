@@ -162,6 +162,16 @@ export interface ProductWorkflowRequest {
     modelTier?: ModelTier;
     seed?: number;
     parameters: Record<string, WorkflowValue>;
+    /** Resolved data URL used by native Unsloth image-conditioned generation. */
+    initImage?: string;
+    /** Resolved data URL mask; white pixels are repainted by the backend. */
+    maskImage?: string;
+    /** Resolved source/reference images in graph connection order. */
+    referenceImages?: string[];
+    /** Explicit native diffusion workflow for image-conditioned generation. */
+    imageWorkflow?: 'edit' | 'reference';
+    /** Resolution used to encode native reference images. */
+    referenceResolution?: 512 | 1024 | 2048;
 }
 
 export interface WorkflowValidationIssue {

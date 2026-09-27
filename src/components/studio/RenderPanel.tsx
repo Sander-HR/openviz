@@ -42,6 +42,7 @@ export const RenderPanel: React.FC<RenderPanelProps> = ({ height, collapsed, onC
         if (collapsed === undefined) setInternalCollapsed(nextCollapsed);
     };
     const [createMode, setCreateMode] = useState<'render' | 'refine'>('render');
+    const [generationError, setGenerationError] = useState<string | undefined>();
 
     const availableStyles = getRenderStyles();
     const styleGroups = [
@@ -52,6 +53,7 @@ export const RenderPanel: React.FC<RenderPanelProps> = ({ height, collapsed, onC
     const handleGenerate = async () => {
         if (!renderSettings?.prompt?.trim()) return;
         setRendering(true);
+        setGenerationError(undefined);
 
         try {
             const canvasData = (window as any).getFlattenedCanvas ? (window as any).getFlattenedCanvas() : "";
@@ -63,7 +65,7 @@ export const RenderPanel: React.FC<RenderPanelProps> = ({ height, collapsed, onC
             const response = await renderService.generate({
                 ...renderSettings,
                 workflowId, // Pass explicit ID if found
-                init_image: canvasData,
+                init_image: renderSettings.referenceImage || canvasData,
                 width: project.canvas.width,
                 height: project.canvas.height
             });
@@ -71,9 +73,13 @@ export const RenderPanel: React.FC<RenderPanelProps> = ({ height, collapsed, onC
             if (response.success && response.images.length > 0) {
                 addRenderResultGroup(renderSettings, response.images, project.canvas.width, project.canvas.height, activeNodeId || undefined);
                 setResultsPanelOpen(true);
+            } else {
+                setGenerationError(response.error ?? 'Image generation failed.');
             }
 
         } catch (error) {
+            const message = error instanceof Error ? error.message : 'Image generation failed.';
+            setGenerationError(message);
             console.error("Generation failed", error);
         } finally {
             setRendering(false);
@@ -191,6 +197,12 @@ export const RenderPanel: React.FC<RenderPanelProps> = ({ height, collapsed, onC
                     <div className="flex items-center gap-1 border-b border-white/15 pb-2 text-[11px] font-semibold">Styles <Info size={11} className="text-white/45" /></div>
                     {styleGroups.map((group) => <div key={group.label} className="pt-2"><h3 className="mb-1 text-[10px] font-medium text-white/55">{group.label}</h3><div className="space-y-0.5">{group.styles.map((style, index) => <button key={style.id} type="button" aria-pressed={renderSettings.stylePreset === style.name} className={cn("flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left transition hover:bg-white/10", renderSettings.stylePreset === style.name && "bg-white/10")} onClick={() => { setRenderStyle(style.name); setShowStyles(false); }}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white shadow-inner ${['bg-gradient-to-br from-amber-300 via-red-500 to-blue-500', 'bg-gradient-to-br from-white via-neutral-400 to-neutral-700', 'bg-gradient-to-br from-neutral-100 via-neutral-300 to-white', 'bg-gradient-to-br from-rose-300 via-cyan-400 to-sky-500', 'bg-gradient-to-br from-cyan-300 via-yellow-400 to-neutral-700', 'bg-gradient-to-br from-orange-300 via-red-600 to-neutral-800', 'bg-gradient-to-br from-neutral-300 via-slate-600 to-neutral-900'][index % 7]}`}><Palette size={13} /></span><span className="min-w-0 flex-1 truncate text-[10px] font-medium">{style.name}</span>{index < 3 && <span className="rounded bg-white/10 px-1 py-0.5 text-[8px] text-viz-muted">V2</span>}<MoreHorizontal size={13} className="shrink-0 text-white/65" /></button>)}</div></div>)}
                 </div>
+            )}
+
+            {generationError && (
+                <p role="alert" className="mx-3 mb-2 rounded-md border border-rose-400/30 bg-rose-950/40 px-2 py-1.5 text-[10px] text-rose-200">
+                    {generationError}
+                </p>
             )}
 
             {/* Generate Button Wrapper */}

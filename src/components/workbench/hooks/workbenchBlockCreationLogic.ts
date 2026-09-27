@@ -53,7 +53,7 @@ export function createRenderNodeFromSource(sourceNode: WorkbenchNode, id: string
         x: sourceNode.x + sourceWidth + 100,
         y: sourceNode.y,
         width: 320,
-        height: 500,
+        height: 390,
         data: {
             prompt: '',
             stylePreset: 'Photorealistic',

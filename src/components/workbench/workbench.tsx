@@ -414,7 +414,7 @@ const WorkbenchContent: React.FC = () => {
                 are intentionally not rendered — the component is kept for a
                 possible return (US2/SC-003). */}
             <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-                <ComputePopover target="Local ComfyUI" tier="Auto" onOpenSettings={() => { window.location.href = '/settings'; }} />
+                <ComputePopover />
                 <CollabStatusChip status={collabSession.status} peers={presenceByUser} />
             </div>
             <DrawingOverlay

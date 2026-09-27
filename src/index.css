@@ -36,6 +36,7 @@
   --ov-muted: #808085;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-sans);
+  --font-note: "Comic Sans MS", "Bradley Hand", "Segoe Print", "Chalkboard SE", cursive;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   font-family: var(--font-sans);
@@ -100,6 +101,18 @@ select {
     background-size: 8px 8px;
     background-position: 0 0, 0 4px, 4px 4px, 4px 0;
     background-color: #ffffff;
+  }
+
+  .font-note {
+    font-family: var(--font-note);
+  }
+
+  .resize-handle {
+    @apply bg-white;
+  }
+
+  .react-flow.dark .resize-handle {
+    @apply bg-viz-surface;
   }
 }
 

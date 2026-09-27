@@ -76,7 +76,7 @@ export function createExampleSceneData(): SceneData {
         x: 520,
         y: 150,
         width: 320,
-        height: 500,
+        height: 390,
         data: {
             prompt: "A photoreal product render with soft studio lighting",
             stylePreset: "Photorealistic",

@@ -100,6 +100,67 @@ function parseImageOutputs(body: unknown): GenerationOutput[] {
     });
 }
 
+function parseSize(size: string | undefined, width: number, height: number): { width: number; height: number } {
+    const match = size?.match(/^(\d+)x(\d+)$/);
+    return match ? { width: Number(match[1]), height: Number(match[2]) } : { width, height };
+}
+
+function normalizeNativeImageDimensions(
+    dimensions: { width: number; height: number },
+    model: string,
+): { width: number; height: number } {
+    // Qwen Image 2.1 requires both dimensions to be divisible by 32.
+    // Keep the requested aspect ratio as closely as possible while satisfying
+    // the backend contract instead of allowing a 16-aligned canvas size through.
+    if (/qwen[-_ ]image[-_ ]2\.1/i.test(model)) {
+        return {
+            width: Math.max(32, Math.round(dimensions.width / 32) * 32),
+            height: Math.max(32, Math.round(dimensions.height / 32) * 32),
+        };
+    }
+    return dimensions;
+}
+
+function endpointRoot(endpoint: string): string {
+    return endpoint.replace(/\/v\d+$/i, '');
+}
+
+function resolveNativeImageUrl(endpoint: string, url: string): string {
+    const normalizedUrl = url.replace(/\/$/, '');
+    const galleryPath = normalizedUrl.match(/^(\/api\/inference\/images\/gallery\/[^/]+)(?:\/file)?$/);
+    const resolvedPath = galleryPath ? `${galleryPath[1]}/file` : normalizedUrl;
+    if (/^(?:data:|https?:\/\/)/.test(resolvedPath)) return resolvedPath;
+    return `${endpointRoot(endpoint)}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`;
+}
+
+function parseNativeImageOutputs(body: unknown, endpoint: string): GenerationOutput[] {
+    const images = asRecord(body).images;
+    if (!Array.isArray(images)) return [];
+    return images.flatMap((entry, index) => {
+        const record = asRecord(entry);
+        return typeof record.url === 'string'
+            ? [{ url: resolveNativeImageUrl(endpoint, record.url), index, contentType: 'image/png' }]
+            : [];
+    });
+}
+
+async function materializeNativeImageOutputs(
+    outputs: GenerationOutput[],
+    options: OpenAIImageTargetOptions,
+    fetcher: Fetcher,
+): Promise<GenerationOutput[]> {
+    return Promise.all(outputs.map(async (output) => {
+        if (!/^https?:\/\//.test(output.url) || typeof URL.createObjectURL !== 'function') return output;
+
+        const response = await fetcher(output.url, { headers: headers(options) });
+        if (!response.ok) {
+            throw new Error(`Rendered image download failed (${response.status}).`);
+        }
+        const blob = await response.blob();
+        return { ...output, url: URL.createObjectURL(blob) };
+    }));
+}
+
 export function createOpenAIImageTarget(options: OpenAIImageTargetOptions): ExecutionTargetAdapter {
     const endpoint = normalizeEndpoint(options.endpoint);
     const fetcher = options.fetcher ?? fetch;
@@ -141,7 +202,7 @@ export function createOpenAIImageTarget(options: OpenAIImageTargetOptions): Exec
                 availableModels: cachedModels,
                 availableNodeTypes: [],
                 supportedPrecisions: [],
-                supportedWorkflows: ['image-generation'],
+                supportedWorkflows: ['image-generation', 'image-edit'],
             };
         },
 
@@ -156,21 +217,53 @@ export function createOpenAIImageTarget(options: OpenAIImageTargetOptions): Exec
         },
 
         async submit(request: ProductWorkflowRequest): Promise<SubmittedJob> {
-            const response = await fetcher(`${endpoint}/images/generations`, {
-                method: 'POST',
-                headers: headers(options, true),
-                body: JSON.stringify({
+            const hasInputImage = Boolean(request.initImage);
+            const referenceImages = request.referenceImages?.filter((image) => image.trim().length > 0) ?? [];
+            const hasImageConditions = hasInputImage || referenceImages.length > 0 || Boolean(request.maskImage);
+            const targetUrl = hasImageConditions
+                ? `${endpointRoot(endpoint)}/api/inference/images/generate`
+                : `${endpoint}/images/generations`;
+            const dimensions = normalizeNativeImageDimensions(
+                parseSize(options.size, request.width, request.height),
+                options.model,
+            );
+            const payload = hasImageConditions
+                ? {
+                    prompt: request.prompt,
+                    model: options.model,
+                    width: dimensions.width,
+                    height: dimensions.height,
+                    batch_size: request.batchSize,
+                    ...(request.initImage ? { init_image: request.initImage } : {}),
+                    mask_image: request.maskImage,
+                    ...(referenceImages.length > 0 ? { reference_images: referenceImages } : {}),
+                    ...(request.referenceResolution ? { reference_resolution: request.referenceResolution } : {}),
+                    workflow: request.imageWorkflow ?? (referenceImages.length > 0 ? 'reference' : 'edit'),
+                    ...(request.negativePrompt ? { negative_prompt: request.negativePrompt } : {}),
+                    ...(request.seed !== undefined ? { seed: request.seed } : {}),
+                }
+                : {
                     model: options.model,
                     prompt: request.prompt,
+                    n: request.batchSize,
                     size: options.size ?? `${request.width}x${request.height}`,
-                }),
+                };
+            const response = await fetcher(targetUrl, {
+                method: 'POST',
+                headers: headers(options, true),
+                body: JSON.stringify(payload),
             });
             const body = await readJson(response);
             if (!response.ok) {
                 const suffix = response.status === 401 || response.status === 403 ? ' Check the API key and Authorization header.' : '';
                 throw new Error(`${errorMessage(body, `Image generation failed (${response.status}).`)}${suffix}`);
             }
-            cachedOutputs = parseImageOutputs(body);
+            const parsedOutputs = hasImageConditions
+                ? parseNativeImageOutputs(body, endpoint)
+                : parseImageOutputs(body);
+            cachedOutputs = hasInputImage
+                ? await materializeNativeImageOutputs(parsedOutputs, options, fetcher)
+                : parsedOutputs;
             if (cachedOutputs.length === 0) throw new Error('The image API returned no usable image URLs.');
             return { jobId: `image-api-${Date.now()}`, targetId: options.id };
         },
@@ -189,4 +282,4 @@ export function createOpenAIImageTarget(options: OpenAIImageTargetOptions): Exec
     };
 }
 
-export { parseModels, parseImageOutputs };
+export { normalizeNativeImageDimensions, parseModels, parseImageOutputs, parseNativeImageOutputs };

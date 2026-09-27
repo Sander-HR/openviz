@@ -90,7 +90,7 @@ function buildRenderNode(center: CenterPoint): RenderNode {
         x: center.x - 160,
         y: center.y - 250,
         width: 320,
-        height: 500,
+        height: 390,
         data: { prompt: '', stylePreset: 'Photorealistic', drawingInfluence: 0.65, numImages: 1 },
     };
 }

@@ -164,6 +164,8 @@ export interface TextWorkbenchNode extends BaseNode {
         text: string;
         fontSize: number;
         color: string;
+        fontWeight?: number;
+        fontStyle?: 'normal' | 'italic';
     };
 }
 

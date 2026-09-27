@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NodeResizer } from '@xyflow/react';
-import { Type } from 'lucide-react';
+import { Bold, ChevronDown, Italic } from 'lucide-react';
 
 import { TextWorkbenchNode } from '@/types';
-import { nodeCardClass, NodeCardHeader } from './nodeUi';
+import { cn, nodeCardClass, resizeHandleClassName } from './nodeUi';
 
 interface TextNodeData extends TextWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -26,6 +26,8 @@ export const TextNode: React.FC<TextNodeProps> = ({ id, data, selected, width, h
     const textValue = useMemo(() => data.data?.text ?? '', [data.data?.text]);
     const textColor = data.data?.color ?? '#111827';
     const fontSize = Number.isFinite(data.data?.fontSize) ? Math.max(12, data.data.fontSize) : 24;
+    const fontWeight = data.data?.fontWeight ?? 400;
+    const fontStyle = data.data?.fontStyle ?? 'normal';
 
     useEffect(() => {
         if (width && height && width > 0 && height > 0) {
@@ -40,8 +42,20 @@ export const TextNode: React.FC<TextNodeProps> = ({ id, data, selected, width, h
     }, [isEditing]);
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={nodeCardClass(selected)} onDoubleClick={() => setIsEditing(true)}>
-            <NodeCardHeader icon={Type} label="Text" />
+        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={cn(nodeCardClass(false), 'border-transparent bg-transparent shadow-none')} onDoubleClick={() => setIsEditing(true)}>
+            <span className="sr-only">Text</span>
+            {selected && (
+                <div className="nodrag nopan pointer-events-auto absolute -top-11 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-xl2 border border-viz-border bg-viz-panel px-1.5 py-1 shadow-viz">
+                    <button type="button" title="Bold" aria-pressed={fontWeight >= 700} onClick={() => data.onDataChange?.(id, { fontWeight: fontWeight >= 700 ? 400 : 700 })} className="rounded-lg p-1.5 text-viz-muted hover:bg-viz-surface hover:text-white"><Bold size={14} /></button>
+                    <button type="button" title="Italic" aria-pressed={fontStyle === 'italic'} onClick={() => data.onDataChange?.(id, { fontStyle: fontStyle === 'italic' ? 'normal' : 'italic' })} className="rounded-lg p-1.5 text-viz-muted hover:bg-viz-surface hover:text-white"><Italic size={14} /></button>
+                    <div className="mx-0.5 h-5 w-px bg-viz-border" />
+                    <label className="sr-only" htmlFor={`text-size-${id}`}>Text size</label>
+                    <select id={`text-size-${id}`} value={fontSize} onChange={(event) => data.onDataChange?.(id, { fontSize: Number(event.target.value) })} className="h-7 rounded-lg border-0 bg-transparent px-1 text-xs text-white outline-none focus:ring-1 focus:ring-viz-accent">
+                        {[16, 20, 24, 32, 40, 48, 64].map((size) => <option key={size} value={size}>{size}px</option>)}
+                    </select>
+                    <ChevronDown size={12} className="-ml-2 text-viz-muted" />
+                </div>
+            )}
 
             {isEditing ? (
                 <textarea
@@ -51,12 +65,12 @@ export const TextNode: React.FC<TextNodeProps> = ({ id, data, selected, width, h
                     onBlur={() => setIsEditing(false)}
                     rows={1}
                     className="nodrag nowheel min-h-0 w-full flex-1 resize-none bg-transparent p-2 outline-none"
-                    style={{ color: textColor, fontSize }}
+                    style={{ color: textColor, fontSize, fontWeight, fontStyle }}
                 />
             ) : (
                 <div
-                    className="min-h-0 w-full flex-1 whitespace-pre-wrap overflow-hidden p-2"
-                    style={{ color: textColor, fontSize }}
+                    className="min-h-0 w-full flex-1 whitespace-pre-wrap overflow-hidden p-0"
+                    style={{ color: textColor, fontSize, fontWeight, fontStyle }}
                 >
                     {textValue || <span className="text-viz-muted">Double-click to edit</span>}
                 </div>
@@ -67,11 +81,10 @@ export const TextNode: React.FC<TextNodeProps> = ({ id, data, selected, width, h
                 minWidth={120}
                 minHeight={44}
                 color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#242425',
-                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

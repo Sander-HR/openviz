@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NodeResizer } from '@xyflow/react';
 
 import { FreehandNode as FreehandNodeType } from '@/types';
+import { resizeHandleClassName } from './nodeUi';
 
 interface FreehandNodeData extends FreehandNodeType {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -53,11 +54,10 @@ export const FreehandNode: React.FC<FreehandNodeProps> = ({ id, data, selected, 
                 minWidth={10}
                 minHeight={10}
                 color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#242425',
-                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

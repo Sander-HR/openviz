@@ -59,6 +59,14 @@ function getNodeSize(node: WorkbenchNode) {
     let width = fallbackWidth;
     let height = fallbackHeight;
 
+    // Render controls use a compact fixed shell sized to their controls rather
+    // than inheriting the historical 500px placeholder height. Keep the React
+    // Flow hitbox tight so empty space below Generate cannot block nodes.
+    if (node.type === "render") {
+        width = 320;
+        height = 390;
+    }
+
     if (
         (node.type === "image" || node.type === "video") &&
         typeof node.scale === "number" &&

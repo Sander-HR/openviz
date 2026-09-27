@@ -7,7 +7,7 @@ import {
     buildArrowPath,
     clampPointToBox,
 } from '@/services/workbench/arrowGeometry';
-import { cn } from './nodeUi';
+import { cn, resizeHandleClassName } from './nodeUi';
 
 interface ArrowNodeData extends ArrowWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -141,11 +141,10 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
                 minWidth={80}
                 minHeight={60}
                 color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#242425',
-                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

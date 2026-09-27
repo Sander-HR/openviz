@@ -41,4 +41,9 @@ Dashboard / Studio / Workbench
 - `src/types/` contains shared domain types.
 - `src/app/` contains Next.js routes and pages.
 
+## Related architecture notes
+
+- [Compute endpoint status](./compute-endpoint-status.md) — live workbench compute popup: probed routes, capability discovery, refresh behavior, and queue scope.
+- [Unsloth progress & queue plan](./unsloth-progress-queue-plan.md) — roadmap for progress telemetry, cancellation, and server-backed queue coordination.
+
 Detailed engineering rules are maintained in [`AGENTS/`](../../AGENTS/) and the governing process is defined in [the constitution](../../.specify/memory/constitution.md).

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Handle, NodeResizer, Position, useConnection } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { ImageNode as ImageNodeType } from '../../types';
-import { cn, imageLikeHandleStyle, mediaNodeFrameClass, mediaNodeTitleClass } from './nodeUi';
+import { cn, imageLikeHandleStyle, mediaNodeFrameClass, mediaNodeTitleClass, resizeHandleClassName } from './nodeUi';
 
 interface ImageNodeData extends ImageNodeType {
     onSourceClick?: (nodeId: string) => void;
@@ -62,7 +62,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
                     <img
                         src={data.project.thumbnail}
                         alt={data.name}
-                        className="w-full h-full object-cover"
+                        className="block h-full w-full object-cover"
                         draggable={false}
                     />
                 ) : (
@@ -93,12 +93,11 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
                 minWidth={100}
                 minHeight={100}
                 keepAspectRatio={true}
-                color="#ffffff"
+                color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#242425',
-                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

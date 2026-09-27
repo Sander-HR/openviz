@@ -4,7 +4,8 @@ import { getWorkflow, mapStyleToId, WorkflowDefinition } from './ai/workflowRegi
 import { generateUUID } from '@/utils/uuid';
 import { createOpenAIImageTarget } from './ai/targets/openAIImageTarget';
 import { useStore } from '@/store/useStore';
-import { createGenerationQueue } from '@/services/ai/generationQueue';
+import { createGenerationQueue, type GenerationQueueSnapshot } from '@/services/ai/generationQueue';
+import { composeStylePrompt } from './ai/stylePromptRegistry';
 
 // Using Vite proxy to avoid CORS issues
 let comfyUrl = '/comfy-api';
@@ -323,7 +324,7 @@ export const comfyRenderService: RenderService = {
 
             // 3. Execute
             const imageUrls = await executeWorkflow(workflow, {
-                prompt: request.prompt,
+                prompt: composeStylePrompt(request.prompt, request.stylePreset),
                 initImage: uploadedFileName,
                 width: request.width,
                 height: request.height,
@@ -433,6 +434,17 @@ export const comfyRenderService: RenderService = {
 
 const openAIImageGenerationQueue = createGenerationQueue();
 
+/**
+ * Read-only access to the client-side OpenAI-compatible image queue. The
+ * workbench Compute popup uses this to surface live active/queued counts;
+ * it is scoped to this browser session, not a server-wide queue.
+ */
+export const imageApiQueue = {
+    getSnapshot: (endpoint: string) => openAIImageGenerationQueue.getSnapshot(endpoint),
+    subscribe: (listener: (snapshot: GenerationQueueSnapshot) => void) =>
+        openAIImageGenerationQueue.subscribe(listener),
+};
+
 const openAIImageRenderService: RenderService = {
     async generate(request: GenerateRequest): Promise<GenerateResponse> {
         const settings = useStore.getState().computeSettings;
@@ -453,11 +465,15 @@ const openAIImageRenderService: RenderService = {
             try {
                 const submitted = await target.submit({
                     workflowId: request.workflowId ?? 'image-generation',
-                    prompt: request.prompt,
+                    prompt: composeStylePrompt(request.prompt, request.stylePreset),
                     references: [],
                     width: request.width,
                     height: request.height,
                     batchSize: request.numImages ?? 1,
+                    initImage: request.init_image || undefined,
+                    referenceImages: request.referenceImages,
+                    imageWorkflow: request.imageWorkflow,
+                    referenceResolution: request.referenceResolution,
                     parameters: {
                         stylePreset: request.stylePreset,
                         drawingInfluence: request.drawingInfluence,
@@ -502,6 +518,18 @@ export function normalizeImageApiSize(width: number, height: number): string {
     const normalizedWidth = Math.max(16, Math.round(width / 16) * 16);
     const normalizedHeight = Math.max(16, Math.round(height / 16) * 16);
     return `${normalizedWidth}x${normalizedHeight}`;
+}
+
+/**
+ * Scale a render to a bounded long edge while preserving its aspect ratio.
+ * Native diffusion accepts dimensions in multiples of 16.
+ */
+export function downscaleImageApiDimensions(width: number, height: number, maxLongEdge = 512): { width: number; height: number } {
+    const scale = Math.min(1, maxLongEdge / Math.max(width, height));
+    return {
+        width: Math.max(256, Math.round((width * scale) / 16) * 16),
+        height: Math.max(256, Math.round((height * scale) / 16) * 16),
+    };
 }
 
 /**

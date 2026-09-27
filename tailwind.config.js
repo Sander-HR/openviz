@@ -10,6 +10,7 @@ export default {
             fontFamily: {
                 sans: ['var(--font-sans)', 'Inter', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
                 display: ['var(--font-display)', 'var(--font-sans)', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                note: ['var(--font-note)', 'cursive'],
                 mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
             },
             colors: {

@@ -5,6 +5,9 @@ export interface GenerateRequest extends RenderSettings {
     width: number;
     height: number;
     projectId?: string;
+    referenceImages?: string[];
+    imageWorkflow?: 'edit' | 'reference';
+    referenceResolution?: 512 | 1024 | 2048;
 }
 
 export interface GenerateResponse {
