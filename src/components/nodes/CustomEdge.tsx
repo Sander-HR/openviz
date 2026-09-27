@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
     BaseEdge,
     EdgeLabelRenderer,
@@ -44,21 +45,28 @@ export const CustomEdge = ({
     const removeConnection = useStore((state) => state.removeConnection);
     const activeNodeId = useStore((state) => state.activeNodeId);
 
+    // FR-007: hover reveals the delete control and highlights the edge.
+    const [isHovered, setIsHovered] = useState(false);
+
     const onEdgeClick = () => {
         removeConnection(id);
     };
 
-    const isDeleteButtonVisible = selected || source === activeNodeId || target === activeNodeId;
+    const isDeleteButtonVisible =
+        selected || isHovered || source === activeNodeId || target === activeNodeId;
 
     return (
         <>
             <BaseEdge
                 path={edgePath}
                 markerEnd={markerEnd}
-                style={{ ...style, stroke: isDeleteButtonVisible ? '#3b82f6' : '#475569' }}
+                style={{ ...style, stroke: isDeleteButtonVisible ? '#4C4CEF' : '#475569' }}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
             />
             {isDeleteButtonVisible && (
                 <EdgeLabelRenderer>
+                    {/* Dynamic midpoint transform requires inline positioning; static styling is in classes. */}
                     <div
                         className="nodrag nopan"
                         style={{
@@ -69,19 +77,8 @@ export const CustomEdge = ({
                     >
                         <button
                             onClick={onEdgeClick}
-                            style={{
-                                width: '26px',
-                                height: '26px',
-                                backgroundColor: '#6366f1',
-                                border: '3px solid white',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                padding: 0,
-                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                            }}
+                            aria-label={`Delete connection ${id}`}
+                            className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-full border-2 border-viz-bg bg-viz-accent p-0 shadow-viz"
                         >
                             <Minus size={12} color="white" strokeWidth={2} />
                         </button>

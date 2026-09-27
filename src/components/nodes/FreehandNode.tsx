@@ -52,12 +52,12 @@ export const FreehandNode: React.FC<FreehandNodeProps> = ({ id, data, selected, 
                 isVisible={selected}
                 minWidth={10}
                 minHeight={10}
-                color="#ffffff"
+                color="#4C4CEF"
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
+                    backgroundColor: '#242425',
+                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

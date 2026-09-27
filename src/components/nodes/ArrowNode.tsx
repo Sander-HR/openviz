@@ -7,6 +7,7 @@ import {
     buildArrowPath,
     clampPointToBox,
 } from '@/services/workbench/arrowGeometry';
+import { cn } from './nodeUi';
 
 interface ArrowNodeData extends ArrowWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -90,7 +91,13 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
     };
 
     return (
-        <div ref={containerRef} className="relative h-full w-full rounded-lg border border-transparent bg-transparent">
+        <div
+            ref={containerRef}
+            className={cn(
+                'relative h-full w-full rounded-xl2 border border-transparent bg-transparent',
+                selected && 'ring-2 ring-viz-accent'
+            )}
+        >
             <svg className="h-full w-full overflow-visible" viewBox={`0 0 ${nodeWidth} ${nodeHeight}`} role="img" aria-label="Arrow node">
                 <path
                     d={buildArrowPath(geometry.start, geometry.control, geometry.end)}
@@ -112,17 +119,17 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
             {selected && (
                 <>
                     <div
-                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border border-white bg-blue-500 shadow"
+                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-viz-bg bg-viz-accent shadow"
                         style={{ left: geometry.start.x, top: geometry.start.y }}
                         onPointerDown={(event) => updatePointDrag('start', event)}
                     />
                     <div
-                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border border-white bg-blue-500 shadow"
+                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-viz-bg bg-viz-accent shadow"
                         style={{ left: geometry.end.x, top: geometry.end.y }}
                         onPointerDown={(event) => updatePointDrag('end', event)}
                     />
                     <div
-                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border border-white bg-amber-400 shadow"
+                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-viz-bg bg-viz-muted shadow"
                         style={{ left: geometry.control.x, top: geometry.control.y }}
                         onPointerDown={(event) => updatePointDrag('control', event)}
                     />
@@ -133,12 +140,12 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
                 isVisible={selected}
                 minWidth={80}
                 minHeight={60}
-                color="#ffffff"
+                color="#4C4CEF"
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
+                    backgroundColor: '#242425',
+                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

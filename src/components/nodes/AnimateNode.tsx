@@ -3,7 +3,7 @@ import { Handle, Position } from '@xyflow/react';
 import { ChevronDown, Image as ImageIcon, Play, Plus, Settings2, Video, X } from 'lucide-react';
 import { AnimateNode as AnimateNodeType, ImageNode, VideoNode, WorkbenchNode } from '../../types';
 import { useAnimateNodeActions } from './hooks/useAnimateNodeActions';
-import { cn, elevatedFullNodeTargetHandleStyle, getNodeContainerClass, imageLikeHandleStyle } from './nodeUi';
+import { cn, elevatedFullNodeTargetHandleStyle, imageLikeHandleStyle, nodeCardClass, NodeCardHeader, nodeCardBodyClass } from './nodeUi';
 
 interface AnimateNodeProps {
     id: string;
@@ -43,7 +43,7 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
             onClick={handleNodeClick}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={getNodeContainerClass(selected, isHoverConnectable)}
+            className={cn(nodeCardClass(selected), isHoverConnectable && 'border-viz-accent')}
         >
             <Handle
                 type="target"
@@ -62,16 +62,9 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
             </Handle>
             <Handle type="target" position={Position.Left} style={elevatedFullNodeTargetHandleStyle} />
 
-            <div className="border-[#333] bg-[#222] p-4 border-b">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Video size={16} className="text-[#6366f1]" />
-                        <h3 className="text-white font-medium text-lg">Animate</h3>
-                    </div>
-                </div>
-            </div>
+            <NodeCardHeader icon={Video} label="Animate" />
 
-            <div className="space-y-4 p-4">
+            <div className={nodeCardBodyClass()}>
                 <div className="space-y-2 pointer-events-auto">
                     <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Frames</div>
                     <div className="flex items-center gap-2">

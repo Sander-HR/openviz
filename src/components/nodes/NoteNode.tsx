@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NodeResizer } from '@xyflow/react';
+import { StickyNote } from 'lucide-react';
 
 import { NoteWorkbenchNode } from '@/types';
+import { cn } from './nodeUi';
 
 interface NoteNodeData extends NoteWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -37,19 +39,27 @@ export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, h
 
     return (
         <div style={{ width: nodeSize.width, height: nodeSize.height }}
-            className={`relative rounded-md border bg-amber-100 shadow-lg ${selected ? 'border-blue-400' : 'border-amber-200'}`}
+            className={cn(
+                'relative flex flex-col overflow-hidden rounded-xl2 border bg-amber-100 shadow-viz',
+                selected ? 'border-amber-200 ring-2 ring-viz-accent' : 'border-amber-200'
+            )}
             onDoubleClick={() => setIsEditing(true)}
         >
+            <div className="flex h-9 shrink-0 items-center gap-2 border-b border-amber-200 px-3">
+                <StickyNote size={14} className="shrink-0 text-amber-700" />
+                <h3 className="truncate text-xs font-medium text-amber-900">Sticky Note</h3>
+            </div>
+
             {isEditing ? (
                 <textarea
                     ref={textareaRef}
                     value={textValue}
                     onChange={(event) => data.onDataChange?.(id, { text: event.target.value })}
                     onBlur={() => setIsEditing(false)}
-                    className="nodrag nowheel h-full w-full resize-none bg-transparent p-3 text-sm leading-relaxed text-amber-900 outline-none"
+                    className="nodrag nowheel min-h-0 w-full flex-1 resize-none bg-transparent p-3 text-sm leading-relaxed text-amber-900 outline-none"
                 />
             ) : (
-                <div className="h-full w-full whitespace-pre-wrap p-3 text-sm leading-relaxed text-amber-900">
+                <div className="min-h-0 w-full flex-1 whitespace-pre-wrap overflow-hidden p-3 text-sm leading-relaxed text-amber-900">
                     {textValue || 'Note'}
                 </div>
             )}
@@ -58,12 +68,12 @@ export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, h
                 isVisible={selected}
                 minWidth={120}
                 minHeight={100}
-                color="#ffffff"
+                color="#4C4CEF"
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
+                    backgroundColor: '#242425',
+                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

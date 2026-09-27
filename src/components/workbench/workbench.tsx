@@ -1,15 +1,14 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
     ReactFlow,
-    Background,
     NodeTypes,
     EdgeTypes,
-    BackgroundVariant,
     ReactFlowProvider,
     useReactFlow,
     useViewport,
     SelectionMode,
     OnNodeDrag,
+    type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -45,9 +44,17 @@ import { CursorOverlay } from './CursorOverlay';
 import { NodeLockBadges } from './NodeLockBadges';
 import { useShallow } from 'zustand/react/shallow';
 import { WorkbenchConnectionLine } from '../nodes/WorkbenchConnectionLine';
+import { WorkbenchCanvasBackground } from './WorkbenchCanvasBackground';
+import { useWorkbenchThemeStore } from '../../store/slices/workbenchThemeSlice';
 import { DrawingOverlay } from '@/drawing/DrawingOverlay';
+import { cn } from '@/lib/utils';
 import { requestImmediateSceneSave } from '@/services/workbench/sceneSyncBus';
 import { WORKBENCH_PAN_MOUSE_BUTTON } from './hooks/workbenchViewportGestures';
+import {
+    getCenteredWorkbenchViewport,
+    getWorkbenchViewport,
+    saveWorkbenchViewport,
+} from './hooks/workbenchViewportPersistence';
 
 const nodeTypes: NodeTypes = {
     imageNode: ImageNode,
@@ -68,14 +75,17 @@ const edgeTypes: EdgeTypes = {
 
 const WorkbenchContent: React.FC = () => {
     const flowWrapperRef = useRef<HTMLDivElement>(null);
+    const viewportInitializedForProjectRef = useRef<string | null>(null);
     const { setCenter, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
     const viewport = useViewport();
+    const latestViewportRef = useRef<Viewport>(viewport);
     const { viewMode, currentProjectId } = useStore(
         useShallow((state) => ({
             viewMode: state.viewMode,
             currentProjectId: state.currentProjectId,
         }))
     );
+    const sceneHydrated = useStore((state) => state.sceneHydrated);
     
     useAutoSaveScene(currentProjectId);
     useSceneStream(currentProjectId);
@@ -170,7 +180,7 @@ const WorkbenchContent: React.FC = () => {
     const handleRedo = collabSession.active ? collabSession.redo : redoWorkbench;
     const handleCanUndo = collabSession.active ? collabSession.canUndo : canUndoWorkbench;
     const handleCanRedo = collabSession.active ? collabSession.canRedo : canRedoWorkbench;
-    useWorkbenchCenterOnReturn({ viewMode, activeNodeId, workbenchNodes, setCenter });
+    useWorkbenchCenterOnReturn({ viewMode, activeNodeId, workbenchNodes, projectId: currentProjectId, setCenter });
     const { nodes, edges } = useWorkbenchGraph({
         workbenchNodes,
         connections,
@@ -184,6 +194,62 @@ const WorkbenchContent: React.FC = () => {
         handleGestureEnd,
         handleDataChange,
     });
+
+    useEffect(() => {
+        if (viewportInitializedForProjectRef.current !== currentProjectId) {
+            viewportInitializedForProjectRef.current = null;
+        }
+    }, [currentProjectId]);
+
+    useEffect(() => {
+        if (!currentProjectId || !sceneHydrated || viewportInitializedForProjectRef.current === currentProjectId) {
+            return;
+        }
+
+        const container = flowWrapperRef.current;
+        if (!container) return;
+
+        const savedViewport = getWorkbenchViewport(currentProjectId);
+        const initialViewport = savedViewport ?? getCenteredWorkbenchViewport(
+            nodes.map((node) => ({
+                position: node.position,
+                width: node.measured?.width ?? node.width,
+                height: node.measured?.height ?? node.height,
+            })),
+            container.clientWidth,
+            container.clientHeight,
+        );
+
+        latestViewportRef.current = initialViewport;
+        setViewport(initialViewport, { duration: 0 });
+        viewportInitializedForProjectRef.current = currentProjectId;
+    }, [currentProjectId, nodes, sceneHydrated, setViewport]);
+
+    useEffect(() => {
+        latestViewportRef.current = viewport;
+    }, [viewport]);
+
+    useEffect(() => {
+        const persistViewport = () => {
+            saveWorkbenchViewport(currentProjectId, latestViewportRef.current);
+        };
+
+        window.addEventListener('pagehide', persistViewport);
+        return () => {
+            persistViewport();
+            window.removeEventListener('pagehide', persistViewport);
+        };
+    }, [currentProjectId]);
+
+    const handleViewportMoveEnd = useCallback(
+        (_event: MouseEvent | TouchEvent | null, nextViewport: Viewport) => {
+            latestViewportRef.current = nextViewport;
+            if (viewportInitializedForProjectRef.current === currentProjectId) {
+                saveWorkbenchViewport(currentProjectId, nextViewport);
+            }
+        },
+        [currentProjectId]
+    );
 
     const contextMenuActions = useWorkbenchContextMenuActions({
         contextMenu,
@@ -246,6 +312,9 @@ const WorkbenchContent: React.FC = () => {
         [commitWorkbenchGesture]
     );
 
+    // FR-015: canvas theme (light default / dark optional), restyled in place.
+    const canvasTheme = useWorkbenchThemeStore((state) => state.canvasTheme);
+
     const isDrawModeActive = activeWorkbenchTool === 'draw';
     const isEraserModeActive = activeWorkbenchTool === 'eraser';
     // C-3.1/C-3.2: mode-derived React Flow props from the pure contract fn (T018).
@@ -254,7 +323,7 @@ const WorkbenchContent: React.FC = () => {
     return (
         <div
             ref={flowWrapperRef}
-            className="relative w-full h-screen bg-white"
+            className={cn('relative w-full h-screen', canvasTheme === 'dark' ? 'bg-viz-bg' : 'bg-white')}
             onMouseDown={handleCanvasMouseDownForArrow}
             onMouseUp={handleCanvasMouseUpForArrow}
         >
@@ -286,14 +355,13 @@ const WorkbenchContent: React.FC = () => {
                 nodesConnectable={flowModeProps.nodesConnectable}
                 snapToGrid={true}
                 snapGrid={[5, 5]}
-                fitView
                 minZoom={0.1}
                 maxZoom={2}
+                onMoveEnd={handleViewportMoveEnd}
                 connectionRadius={60}
                 connectionLineComponent={WorkbenchConnectionLine}
             >
-                <Background id='smalldots' variant={BackgroundVariant.Dots} gap={12} size={1} color="#c6cfdb" />
-                <Background id="fatdots" color="#a0afc3" variant={BackgroundVariant.Dots} gap={56} size={1.1} />
+                <WorkbenchCanvasBackground />
             </ReactFlow>
             {/* Awareness overlays (US2): remote cursors + soft-lock badges. */}
             <CursorOverlay remoteCursors={remoteCursors} viewport={viewport} />
@@ -338,7 +406,14 @@ const WorkbenchContent: React.FC = () => {
                 zoomLevel={viewport.zoom}
                 onZoomIn={() => zoomIn({ duration: 300 })}
                 onZoomOut={() => zoomOut({ duration: 300 })}
-                onResetZoom={() => setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 300 })}
+                // §3.5 zoom presets: zoom about the screen center.
+                onSetZoom={(targetZoom: number) => {
+                    const cx = window.innerWidth / 2;
+                    const cy = window.innerHeight / 2;
+                    const flowX = (cx - viewport.x) / viewport.zoom;
+                    const flowY = (cy - viewport.y) / viewport.zoom;
+                    setViewport({ x: cx - flowX * targetZoom, y: cy - flowY * targetZoom, zoom: targetZoom }, { duration: 300 });
+                }}
                 onFitToScreen={() => fitView({ duration: 300 })}
                 contextMenu={contextMenu}
                 onCloseContextMenu={() => setContextMenu(null)}

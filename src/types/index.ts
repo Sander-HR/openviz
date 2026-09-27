@@ -62,7 +62,7 @@ export interface Project {
     thumbnail?: string;
 }
 
-export type NodeType = 'image' | 'modify' | 'animate' | 'render' | 'video' | 'freehand' | 'arrow' | 'text' | 'note' | 'media';
+export type NodeType = 'image' | 'modify' | 'animate' | 'render' | 'video' | 'freehand' | 'arrow' | 'text' | 'note' | 'media' | 'variate' | 'new-view' | 'extract';
 
 export interface BaseNode {
     id: string;
@@ -328,3 +328,15 @@ export type {
     GenerationJobStatus,
     ModelTierDecision,
 } from './generationJob.types';
+export type {
+    CanvasTheme,
+    AbsorbedAttributeType,
+    AbsorbedAttribute,
+    ExportFormat,
+    ExportScaling,
+    ExportOptions,
+    ViewName,
+    VaryMode,
+    BackgroundHandling,
+} from './workbenchParity.types';
+export { VIEW_NAMES } from './workbenchParity.types';

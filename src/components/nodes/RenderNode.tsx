@@ -3,7 +3,7 @@ import { Handle, Position } from '@xyflow/react';
 import { ChevronDown, Layers, Plus, Wand2 } from 'lucide-react';
 import { RenderNode as RenderNodeType } from '../../types';
 import { useRenderNodeGeneration } from './hooks/useRenderNodeGeneration';
-import { cn, elevatedFullNodeTargetHandleStyle, getNodeContainerClass, imageLikeHandleStyle } from './nodeUi';
+import { cn, elevatedFullNodeTargetHandleStyle, imageLikeHandleStyle, nodeCardClass, NodeCardHeader, nodeCardBodyClass } from './nodeUi';
 
 interface RenderNodeProps {
     id: string;
@@ -30,7 +30,7 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
         <div
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={getNodeContainerClass(selected, isHoverConnectable)}
+            className={cn(nodeCardClass(selected), isHoverConnectable && 'border-viz-accent')}
         >
             <Handle
                 type="target"
@@ -49,16 +49,9 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
             </Handle>
             <Handle type="target" position={Position.Left} style={elevatedFullNodeTargetHandleStyle} />
 
-            <div className="border-[#333] bg-[#222] p-4 border-b">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Wand2 size={16} className="text-[#6366f1]" />
-                        <h3 className="text-white font-medium text-lg">Render</h3>
-                    </div>
-                </div>
-            </div>
+            <NodeCardHeader icon={Wand2} label="Render" />
 
-            <div className="space-y-4 p-4">
+            <div className={nodeCardBodyClass()}>
                 <div className="space-y-2">
                     <div className="flex justify-between items-center">
                         <label className="text-gray-400 text-xs font-bold uppercase tracking-wider">Prompt</label>

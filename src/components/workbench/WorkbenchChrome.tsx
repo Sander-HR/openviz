@@ -38,7 +38,8 @@ interface WorkbenchChromeProps {
     zoomLevel: number;
     onZoomIn: () => void;
     onZoomOut: () => void;
-    onResetZoom: () => void;
+    /** Absolute zoom presets (25/50/75/100%) from the percentage popover. */
+    onSetZoom?: (zoom: number) => void;
     onFitToScreen: () => void;
     contextMenu: ContextMenuState;
     onCloseContextMenu: () => void;
@@ -77,7 +78,7 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
     zoomLevel,
     onZoomIn,
     onZoomOut,
-    onResetZoom,
+    onSetZoom,
     onFitToScreen,
     contextMenu,
     onCloseContextMenu,
@@ -130,7 +131,7 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
                 zoomLevel={zoomLevel}
                 onZoomIn={onZoomIn}
                 onZoomOut={onZoomOut}
-                onResetZoom={onResetZoom}
+                onSetZoom={onSetZoom}
                 onFitToScreen={onFitToScreen}
             />
         </div>

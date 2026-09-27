@@ -41,5 +41,15 @@
 - The reference product's bottom-left utility dock could not be fully identified during
   analysis (state-dependent, unmounted during inspection); it is explicitly deferred as
   gap G8 with rationale recorded in Assumptions.
-- Three open questions for `/speckit-clarify` are listed in ui-translation.md §8 (dot-grid
-  color, prompt-panel fallback behavior, smart-dropper scope).
+- All three previously open questions in ui-translation.md §8 (dark-theme dot-grid
+  color, prompt-panel fallback behavior, and smart-dropper scope) were resolved by the
+  2026-09-26 clarification session. The canvas theme control placement is resolved: it
+  belongs in the top-left application menu and persists as a per-user preference.
+- FR-016 was refined on 2026-09-26 (user input): the smart dropper captures exactly one
+  attribute type per capture, selected from its dropdown (Style, Color, Environment);
+  dropping any captured attribute onto another image node renders a new image with that
+  attribute applied — style, palette, or environment — and the original images are never
+  modified in place. Re-validated: all items above still pass.
+- The reference canvas is light by default (with a dot grid); the top-left application menu
+  switches it to dark (FR-015). Node cards stay dark in both themes; the unified dark
+  language requirement (FR-001) applies to chrome surfaces only.

@@ -57,6 +57,8 @@ export default {
                 'viz-muted': '#808085',
                 'viz-accent': '#4C4CEF',
                 'viz-selected': '#343476',
+                // Dark-canvas dot grid (100% opacity, ui-translation §3.8)
+                'viz-canvas-dot': '#2a2a2c',
 
                 // Legacy tokens kept for existing components
                 'primary-dark': '#136AE0',

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NodeResizer } from '@xyflow/react';
+import { Type } from 'lucide-react';
 
 import { TextWorkbenchNode } from '@/types';
+import { nodeCardClass, NodeCardHeader } from './nodeUi';
 
 interface TextNodeData extends TextWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -38,10 +40,9 @@ export const TextNode: React.FC<TextNodeProps> = ({ id, data, selected, width, h
     }, [isEditing]);
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }}
-            className={`relative rounded-md border border-dashed bg-transparent ${selected ? 'border-blue-400' : 'border-transparent'}`}
-            onDoubleClick={() => setIsEditing(true)}
-        >
+        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={nodeCardClass(selected)} onDoubleClick={() => setIsEditing(true)}>
+            <NodeCardHeader icon={Type} label="Text" />
+
             {isEditing ? (
                 <textarea
                     ref={textareaRef}
@@ -49,15 +50,15 @@ export const TextNode: React.FC<TextNodeProps> = ({ id, data, selected, width, h
                     onChange={(event) => data.onDataChange?.(id, { text: event.target.value })}
                     onBlur={() => setIsEditing(false)}
                     rows={1}
-                    className="nodrag nowheel h-full w-full resize-none bg-transparent p-2 outline-none"
+                    className="nodrag nowheel min-h-0 w-full flex-1 resize-none bg-transparent p-2 outline-none"
                     style={{ color: textColor, fontSize }}
                 />
             ) : (
                 <div
-                    className="h-full w-full whitespace-pre-wrap p-2"
+                    className="min-h-0 w-full flex-1 whitespace-pre-wrap overflow-hidden p-2"
                     style={{ color: textColor, fontSize }}
                 >
-                    {textValue || 'Text'}
+                    {textValue || <span className="text-viz-muted">Double-click to edit</span>}
                 </div>
             )}
 
@@ -65,12 +66,12 @@ export const TextNode: React.FC<TextNodeProps> = ({ id, data, selected, width, h
                 isVisible={selected}
                 minWidth={120}
                 minHeight={44}
-                color="#ffffff"
+                color="#4C4CEF"
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
+                    backgroundColor: '#242425',
+                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

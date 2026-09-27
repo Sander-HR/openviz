@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Handle, NodeResizer, Position, useConnection } from '@xyflow/react';
-import { Plus } from 'lucide-react';
+import { Image as ImageIcon, Plus } from 'lucide-react';
 import { ImageNode as ImageNodeType } from '../../types';
-import { imageLikeHandleStyle } from './nodeUi';
+import { cn, imageLikeHandleStyle, nodeCardClass, NodeCardHeader } from './nodeUi';
 
 interface ImageNodeData extends ImageNodeType {
     onSourceClick?: (nodeId: string) => void;
@@ -39,17 +39,15 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
         (connection.fromNode?.type === 'animateNode' || connection.fromNode?.type === 'renderNode');
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }}>
-            {selected && (
-                <div className="absolute -top-4 left-0 right-0 text-blue-500 text-xs truncate text-left px-1">
-                    {data.name}
-                </div>
-            )}
+        <div
+            className={cn(nodeCardClass(selected), 'flex flex-col', isHoverConnectable && 'border-viz-accent')}
+            style={{ width: nodeSize.width, height: nodeSize.height }}
+        >
+            <NodeCardHeader icon={ImageIcon} label={data.name} />
             <div
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className={`relative bg-white rounded-lg shadow-lg transition-all duration-200 border-2 overflow-hidden ${selected ? 'border-[#6366f1]' : 'border-transparent hover:border-[#6366f1]'} ${isHoverConnectable ? 'border-[#6366f1]' : ''}`}
-                style={{ width: '100%', height: '100%' }}
+                className="relative min-h-0 flex-1 bg-white"
             >
                 {data.status === 'rendering' ? (
                     <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center animate-pulse">
@@ -97,8 +95,8 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
+                    backgroundColor: '#242425',
+                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

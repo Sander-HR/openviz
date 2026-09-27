@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Handle, Position, useConnection } from '@xyflow/react';
 import { ChevronDown, ImageIcon, Layers, Plus, Wand2 } from 'lucide-react';
 import type { ModifyNode as ModifyNodeType } from '@/types';
-import { cn, elevatedFullNodeTargetHandleStyle, getNodeContainerClass, imageLikeHandleStyle } from './nodeUi';
+import { cn, elevatedFullNodeTargetHandleStyle, imageLikeHandleStyle, nodeCardClass, NodeCardHeader, nodeCardBodyClass } from './nodeUi';
 import { ReferenceChips } from './modify/ReferenceChips';
 
 interface ModifyNodeData extends ModifyNodeType {
@@ -37,7 +37,7 @@ export const ModifyNode: React.FC<ModifyNodeProps> = ({ id, data, selected }) =>
     };
 
     return (
-        <div className={cn(getNodeContainerClass(selected, isConnectable), 'w-[320px]')}>
+        <div className={cn(nodeCardClass(selected), isConnectable && 'border-viz-accent')}>
             <Handle
                 type="target"
                 position={Position.Left}
@@ -55,17 +55,9 @@ export const ModifyNode: React.FC<ModifyNodeProps> = ({ id, data, selected }) =>
             </Handle>
             <Handle type="target" position={Position.Left} style={elevatedFullNodeTargetHandleStyle} />
 
-            <div className="border-b border-[#333] bg-[#222] p-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Wand2 size={16} className="text-[#a78bfa]" />
-                        <h3 className="text-lg font-medium text-white">Modify</h3>
-                    </div>
-                    <span className="rounded-full bg-[#333] px-2 py-1 text-[10px] font-medium text-gray-400">AI EDIT</span>
-                </div>
-            </div>
+            <NodeCardHeader icon={Wand2} label="Modify" badge={<span className="rounded-full bg-viz-surface px-2 py-1 text-[10px] font-medium text-viz-muted">AI EDIT</span>} />
 
-            <div className="space-y-4 p-4">
+            <div className={nodeCardBodyClass()}>
                 <div className="space-y-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Source</span>
                     <div className="flex items-center gap-2 rounded-xl border border-[#333] bg-[#2a2a2a] p-2">

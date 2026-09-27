@@ -15,7 +15,8 @@ required**; only radius/shadow/typography additions.
 
 | Token | Reference value | Our token | Tailwind usage |
 |-------|----------------|-----------|----------------|
-| Canvas background | `rgb(22,22,22)` = `#161616` | `viz-bg` | `bg-viz-bg` |
+| Canvas background (default light) | white + dot grid — current `bg-white`, dots `#c6cfdb`/`#a0afc3` | — | keep current classes |
+| Canvas background (dark setting) | `rgb(22,22,22)` = `#161616` | `viz-bg` | `bg-viz-bg` when theme = dark |
 | Node card / floating panel bg | `rgb(36,36,37)` = `#242425` | `viz-panel` | `bg-viz-panel` |
 | Menu surface bg | `rgb(47,47,49)` = `#2F2F31` | `viz-surface` | `bg-viz-surface` |
 | Border (menus) | `1px solid rgb(60,60,62)` = `#3C3C3E` | `viz-border` | `border-viz-border` |
@@ -30,8 +31,9 @@ required**; only radius/shadow/typography additions.
 
 - `borderRadius: { xl2: '12px' }` (already present per repo memory — verify).
 - `boxShadow: { viz: '0 2px 4px rgba(0,0,0,0.25)' }` (already present — verify).
-- Optional: `colors.viz-canvas-dot: '#2a2a2c'` for the dark dot-grid color (reference uses
-  a subtle light-on-dark dot; pick via design review — see Open Questions).
+- Optional: `colors.viz-canvas-dot: '#2a2a2c'` for the dark-theme dot-grid color
+  (reference uses a subtle light-on-dark dot; pick via design review — see Open
+  Questions). The light default keeps its existing two-layer dot pattern unchanged.
 
 ## 2. shadcn/ui Primitives to Add
 
@@ -162,11 +164,28 @@ shadcn is set up manually (no CLI) in this repo: `components.json`, `src/lib/uti
 
 ### 3.7 Top-Right Cluster
 
-- Add Export and Share buttons (shadcn `Button` ghost, `h-8 rounded-lg bg-viz-panel border
+- Add an Export button (shadcn `Button` ghost, `h-8 rounded-lg bg-viz-panel border
   border-viz-border text-xs`) left of the existing compute/collab chips; keep compute +
-  collab chip as-is but restyle to tokens.
+  collab chip as-is but restyle to tokens. Share is out of scope for v1 (spec FR-010).
+- Export opens a centered shadcn `Dialog`: left column lists selected assets; right
+  column shows Export format (JPEG/PNG), Quality (0–100%), Scaling (Original/2K/4K
+  upscaling) and a source preview; full-width Export button at the bottom.
 
-### 3.8 Edge Remove Affordance (restyle existing)
+### 3.8 Canvas Theme Setting (light/dark)
+
+- **Control**: shadcn `Select` (or segmented toggle) with two options — Light (default),
+  Dark.
+- **Effect**: switches only the canvas layer — background color + dot-grid colors
+  (light: current `bg-white` + `#c6cfdb`/`#a0afc3` dots; dark: `bg-viz-bg` +
+  `viz-canvas-dot` = `#2a2a2c` at 100% opacity). Node cards, toolbars, menus and panels
+  are unaffected (already on the shared token set).
+- **State**: persisted user preference in the workbench zustand store slice; applied
+  immediately on change (FR-015).
+- **Placement**: top-left application menu, matching the verified reference behavior.
+  The control should be available from that menu rather than being added to the
+  top-right compute/collaboration cluster.
+
+### 3.9 Edge Remove Affordance (restyle existing)
 
 - Current `CustomEdge` delete button: replace hardcoded `#6366f6`/white with
   `bg-viz-accent border-2 border-viz-bg rounded-full`; show on edge hover or when either
@@ -274,10 +293,17 @@ Floating toolbars (§3.2) and prompt panels (§3.4) must track their node throug
 
 ## 8. Open Questions (for /speckit-clarify)
 
-1. **Dot grid on dark canvas**: reference uses a subtle light dot on `#161616`. Confirm
-   dot color/opacity (suggested `#2a2a2c` at 100% vs current two-layer dot pattern).
-2. **Prompt panel vs inline form**: should Render/Modify nodes keep their inline forms as
-   a fallback when unselected, or always use the attached panel? (Spec assumes attached
-   panel on selection; collapsed summary otherwise.)
-3. **Smart Dropper scope**: v1 = capture canvas color into freehand tool only, or also
-   eyedropper from node images?
+1. **Dot grid on the dark canvas option**: RESOLVED 2026-09-26 — dark theme dots are
+   `#2a2a2c` at 100% opacity; the light default keeps its current two-layer dot pattern.
+2. **Prompt panel vs inline form**: RESOLVED 2026-09-26 — inline forms are removed; the
+   attached panel is the only prompt-entry surface on selection, with a collapsed
+   prompt/settings summary when unselected (spec FR-006).
+3. **Smart Dropper scope**: RESOLVED 2026-09-26 — canvas pixel-color sampling plus
+   absorption of style/color/environment from within a selected image node (spec FR-016).
+   Refined same day: the capture type is chosen via the dropper's dropdown (Style/Color/
+   Environment); dropping any captured attribute onto another image node renders a NEW
+   image with that attribute applied (style, palette, or environment) — originals are
+   never re-rendered in place.
+4. **Canvas theme setting placement & scope**: resolved by reference inspection — place
+  the Light/Dark control in the top-left application menu. The preference is per-user
+  and persists across sessions; it is not part of project scene data.

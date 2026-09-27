@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import { WorkbenchNode } from "@/types";
+import { getWorkbenchViewport } from "./workbenchViewportPersistence";
 
 type CenterOnReturnOptions = {
     viewMode: "STUDIO" | "WORKBENCH";
     activeNodeId: string | null;
     workbenchNodes: WorkbenchNode[];
+    projectId: string | null;
     setCenter: (x: number, y: number, options?: { zoom?: number; duration?: number }) => void;
 };
 
@@ -30,12 +32,17 @@ export function useWorkbenchCenterOnReturn({
     viewMode,
     activeNodeId,
     workbenchNodes,
+    projectId,
     setCenter,
 }: CenterOnReturnOptions) {
     const prevViewModeRef = useRef(viewMode);
 
     useEffect(() => {
         if (viewMode === "WORKBENCH" && prevViewModeRef.current === "STUDIO" && activeNodeId) {
+            if (getWorkbenchViewport(projectId)) {
+                prevViewModeRef.current = viewMode;
+                return;
+            }
             const node = workbenchNodes.find((candidate) => candidate.id === activeNodeId);
             if (node) {
                 const { width, height } = getNodeSize(node);
@@ -46,5 +53,5 @@ export function useWorkbenchCenterOnReturn({
         }
 
         prevViewModeRef.current = viewMode;
-    }, [viewMode, activeNodeId, workbenchNodes, setCenter]);
+    }, [viewMode, activeNodeId, workbenchNodes, projectId, setCenter]);
 }

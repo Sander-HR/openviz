@@ -18,10 +18,12 @@ specifications) is maintained in the companion document
 
 **Reference product observations (verified via DOM inspection):**
 
-1. **Unified dark visual language.** Canvas background `#161616`, node cards and floating
-   panels `#242425`, menu surfaces `#2F2F31` with a `1px #3C3C3E` border, muted text
-   `#808085`, accent `#4C4CEF`. Radii: 8px (menus/nodes), 12px (floating panels). Shadow
-   `0 2px 4px rgba(0,0,0,0.25)`. Inter typeface, 12px chrome base size.
+1. **Theme-aware visual language.** The reference workbench opens with a light canvas and
+   dot grid. A theme control in the top-left application menu switches the canvas to a
+   dark background. The dark canvas uses `#161616`; node cards and floating panels use
+   `#242425`, menu surfaces use `#2F2F31` with a `1px #3C3C3E` border, muted text uses
+   `#808085`, and the accent is `#4C4CEF`. Radii: 8px (menus/nodes), 12px (floating
+   panels). Shadow: `0 2px 4px rgba(0,0,0,0.25)`. Inter typeface, 12px chrome base size.
 2. **Node selection toolbar.** Selecting an image node shows a floating toolbar above it:
    Edit action, aspect-ratio chip (e.g. `1:1`, `2:3`), quick-action icon buttons, and a
    "more" (⋯) trigger.
@@ -51,8 +53,10 @@ specifications) is maintained in the companion document
 
 **Our current workbench observations:**
 
-- Light canvas (white with dot grid) hosting dark node cards — visually inconsistent with
-  the dark studio, which already uses the `viz-*` token set.
+- Light canvas (white with dot grid) hosting dark node cards. This is the reference
+   default. The top-left application menu provides the control to switch the canvas to a
+   dark theme; the gaps are that chrome surfaces do not share one token language yet and
+   our workbench does not currently expose the same theme control.
 - Top toolbar: Select/Draw/Eraser/Arrow/Text/Note/Media + Undo/Redo; Media opens a small
   dropdown (Upload, Upload from phone, Create new → sketch formats). No add-node grid, no
   Library/Section/Smart Dropper tools, no shortcut hints in menus.
@@ -69,7 +73,7 @@ specifications) is maintained in the companion document
 
 | # | Gap | Priority |
 |---|-----|----------|
-| G1 | No unified dark visual language on the workbench route | P1 |
+| G1 | No shared token language for workbench chrome; no top-left canvas theme control matching the light default and dark-mode option | P1 |
 | G2 | No floating node-selection toolbar or "more" menu on selected nodes | P1 |
 | G3 | No rich add-node menu (grid of node types, shortcut hints, legacy badges) | P1 |
 | G4 | Prompt editing is inline per node; no attached prompt panel with `@` references, reference chips, aspect/mode/resolution settings | P2 |
@@ -78,26 +82,41 @@ specifications) is maintained in the companion document
 | G7 | Edge remove affordance and zoom cluster not restyled to the shared language | P3 |
 | G8 | Bottom-left utility dock (contents unverified) — deferred | Deferred |
 
+## Clarifications
+
+### Session 2026-09-26
+
+- Q: For v1, should the Smart Dropper capture color only from the canvas background, or also eyedropper colors from pixels inside node images? → A: The eyedropper absorbs style, color, and environment from within a selected image node (canvas-only sampling is insufficient; behavior detailed in FR-016).
+- Q: For Render/Modify nodes that are not currently selected, should their existing inline settings forms be kept as a fallback, or should the attached prompt panel be the only prompt-entry surface? → A: Remove inline forms; attached prompt panel on selection only, with a collapsed prompt/settings summary shown when unselected.
+- Q: In v1, what exactly should the top-right Export and Share buttons do? → A: Discard the Share button. Export opens a centered export modal listing selected assets on the left with options on the right — Export format (JPEG, PNG), Quality (0–100%), Scaling (Original, 2K, 4K upscaling) and a source preview — plus an Export button at the bottom of the modal.
+- Q: What dot-grid color and opacity should the dark canvas use? → A: `#2a2a2c` at 100% opacity — subtle low-contrast dots on the near-black canvas; the light default keeps its current two-layer dot pattern.
+- Q: In the v1 add-node menu, should the existing render node be labeled "Instant Render" to match the reference product, or keep the label "Render"? → A: Label it "Instant Render" in the add-node menu (node type unchanged).
+- Q: How does the user choose which attribute the smart dropper captures, and how are captured attributes applied? → A: The Smart Dropper has a dropdown list to select Style, Color, or Environment. Style copies the visual style of the source image; dropping it onto another image node renders a new image with that style applied. Color captures the image's color palette; dropping it onto another image renders a new image with that palette applied. Environment works the same way: captured from the source image and dropped onto another image to render a new image in that environment.
+- Q: When dropping a captured Style attribute, should the target image be re-rendered in place? → A: No — dropping any captured attribute (including Style) renders a new image on the canvas; the original images are never modified.
+
 ## User Scenarios & Testing
 
-### User Story 1 - One consistent dark workbench surface (Priority: P1)
+### User Story 1 - One consistent workbench surface with a configurable canvas theme (Priority: P1)
 
-A designer opens a project's workbench and sees a single, cohesive dark canvas: the
-background, grid, node cards, toolbars, panels and menus all share the same visual
-language as the studio. Nothing looks like a different product or theme.
+A designer opens a project's workbench and sees one cohesive surface: dark node cards on
+a light canvas with a dot grid (the reference default), with every toolbar, panel and menu
+sharing the same visual language as the studio. From the top-left application menu, the
+designer can switch only the canvas background and dot grid to dark; node cards stay dark
+in both themes. Nothing looks like a different product or theme.
 
 **Why this priority**: Visual consistency is the foundation every other parity item sits
 on; without it, added features read as patches rather than one product.
 
 **Independent Test**: Open any project workbench and visually audit every surface
-(canvas, nodes, toolbar, menus, zoom cluster) against the shared design tokens; no
-off-palette surface remains.
+(canvas, nodes, toolbar, menus, zoom cluster) against the shared design tokens; toggle
+the canvas theme setting and re-audit; no off-palette or mixed-language surface remains.
 
 **Acceptance Scenarios**:
 
-1. **Given** a project with existing nodes, **When** I open its workbench, **Then** the canvas background, dot grid, all node cards and all chrome surfaces use the shared dark token set with no light-theme remnants.
-2. **Given** the workbench is open, **When** I open any menu or panel (add-node, more-menu, prompt panel, zoom cluster), **Then** it uses the same surface color, border, radius and shadow language as every other popup.
-3. **Given** a node card of any type, **When** I view it, **Then** it shows a consistent header (type icon + label) and body spacing defined by the token set.
+1. **Given** a project with existing nodes, **When** I open its workbench, **Then** the canvas is light by default (white background with dot grid), node cards are dark, and all chrome surfaces use the shared token set.
+2. **Given** the workbench is open, **When** I choose dark mode from the top-left application menu, **Then** the canvas background and dot grid change to the dark palette while node cards, toolbars, menus and panels remain on the shared token language; choosing light mode restores the light canvas.
+3. **Given** the workbench is open, **When** I open any menu or panel (add-node, more-menu, prompt panel, zoom cluster), **Then** it uses the same surface color, border, radius and shadow language as every other popup, in both canvas themes.
+4. **Given** a node card of any type, **When** I view it, **Then** it shows a consistent header (type icon + label) and body spacing defined by the token set.
 
 ---
 
@@ -167,6 +186,7 @@ confirm it appears as a numbered chip.
 3. **Given** references are attached, **When** I view the panel, **Then** each reference shows as a numbered chip that can be removed.
 4. **Given** the prompt is empty and required inputs are missing, **When** I view Generate, **Then** it is disabled with a clear reason.
 5. **Given** the node sits near the bottom viewport edge, **When** the panel attaches, **Then** it flips or repositions so it stays fully visible.
+6. **Given** a generation-capable node is unselected, **When** I view its card, **Then** no inline settings form is shown; instead a collapsed summary of its last prompt and settings is displayed.
 
 ---
 
@@ -193,11 +213,11 @@ action, and verify output appears on the canvas.
 
 ---
 
-### User Story 6 - Toolbar, export/share and shortcut affordances (Priority: P3)
+### User Story 6 - Toolbar, export and shortcut affordances (Priority: P3)
 
 A designer sees a complete top toolbar (add node, library, select, text, sticky note,
 section, smart dropper, draw, eraser, arrow, undo, redo) where every button's tooltip
-shows its keyboard shortcut; Export and Share live in the top-right; edges show a remove
+shows its keyboard shortcut; Export lives in the top-right (Share is out of scope for v1); edges show a remove
 affordance on hover; the zoom cluster matches the shared visual language.
 
 **Why this priority**: These are polish and power-user affordances that complete parity
@@ -210,9 +230,13 @@ the shared tokens.
 **Acceptance Scenarios**:
 
 1. **Given** the workbench is open, **When** I hover any top-toolbar button, **Then** a tooltip shows its name and keyboard shortcut where one exists.
-2. **Given** the workbench is open, **When** I click Export or Share in the top-right, **Then** the corresponding flow starts.
-3. **Given** an edge between two nodes, **When** I hover it or select it, **Then** a remove-connector affordance appears and removes the edge on activation.
-4. **Given** I use the smart dropper tool, **When** I click a point on the canvas, **Then** the color at that point is captured for use by drawing tools.
+2. **Given** the workbench is open, **When** I click Export in the top-right, **Then** a centered export modal opens listing selected assets on the left with options on the right — Export format (JPEG, PNG), Quality (0–100%), Scaling (Original, 2K, 4K upscaling) and a source preview — plus an Export button at the bottom.
+3. **Given** the export modal is open, **When** I press its Export button, **Then** the selected assets are exported with the chosen format, quality and scaling.
+4. **Given** an edge between two nodes, **When** I hover it or select it, **Then** a remove-connector affordance appears and removes the edge on activation.
+5. **Given** I use the smart dropper tool, **When** I click a point on empty canvas, **Then** the pixel color at that point is captured and set as the active drawing tool's color.
+6. **Given** an image node is selected and I use the smart dropper with a capture type chosen from its dropdown (Style, Color, or Environment), **When** I click inside the source image, **Then** that attribute is captured and shown as a removable chip.
+7. **Given** I have captured any attribute (Style, Color, or Environment), **When** I drop it onto another image node, **Then** a new image is rendered on the canvas with the captured attribute applied to the target image — style characteristics, color palette, or environment respectively — and the original images are unchanged.
+8. **Given** a non-image node or an unselected node, **When** I click inside it with the smart dropper, **Then** only the pixel color at that point is sampled; no style, color-palette, or environment attributes are captured.
 
 ---
 
@@ -224,25 +248,36 @@ the shared tokens.
 - How does the system behave when generation fails or times out while a prompt panel is attached? (Inline error state in the panel; inputs preserved.)
 - What happens when references are removed after being `@`-mentioned in a prompt? (Mentions degrade gracefully; Generate re-validates required inputs.)
 - How do floating toolbars behave at extreme zoom levels? (They stay anchored to their node and remain legible without drifting.)
+- What happens when the canvas theme is switched while floating toolbars or prompt panels are open? (They restyle in place; no re-anchoring or dismissal required.)
+- What happens when the smart dropper absorbs from an image that fails to load? (Inline error feedback is shown; nothing is absorbed and no chip is created.)
+- What happens when an absorbed style/color/environment chip is removed from a prompt panel? (**Deferred** — prompt-panel conditioning is out of v1 scope by user decision; capture + drop-to-image only. When implemented, removing a chip MUST stop conditioning that node's generation and re-validate Generate, matching reference-chip behavior.)
+- What happens when a captured attribute is dropped onto a non-image node or empty canvas? (Nothing is applied; clear feedback indicates the drop target is invalid.)
+- What happens when an attribute of the same type is dropped onto a target that already has one? (The newly dropped attribute replaces the previous one on that target.)
+- What happens if generation fails while applying a captured attribute to a target image? (Inline error state on the newly created image node's card/job status — the drop target is an `image` node, which has no prompt panel; inputs and the captured attribute are preserved, matching the existing generation-failure behavior.)
+- What happens when the active generation backend does not support an operation (e.g. variate or style transfer on a backend without that capability)? (The affected node's Generate is disabled with a clear reason naming the unsupported operation; the node remains editable and re-validates when the backend changes.)
+- What happens when Export requests 2K/4K but the active backend does not support upscaling? (Export proceeds using high-quality client-side resize; the export never fails because of missing upscale capability.)
+- What happens when Export is opened while no assets are selected? (The modal lists no assets and its Export button is disabled with a clear reason.)
 
 ## Requirements
 
 ### Functional Requirements
 
-- **FR-001**: System MUST render the entire workbench surface — canvas background, grid, node cards, toolbars, panels and menus — in one unified dark visual language using the project's shared design tokens, with no light-theme surfaces remaining on the workbench route.
+- **FR-001**: System MUST render all workbench chrome surfaces — toolbars, panels, menus and the zoom cluster — in one unified visual language using the project's shared design tokens; node cards MUST be dark in both canvas themes.
 - **FR-002**: When a user selects an image node, system MUST display a floating toolbar above the node containing an Edit action, an aspect-ratio selector, quick-action buttons and a "more" menu trigger.
 - **FR-003**: The "more" menu MUST present grouped actions — image actions (Remove Background, Download, Export, Copy raw image), library & references (Add to library, Add to reference images, Set as thumbnail, Restore default thumbnail), organization (Wrap in section, Bring to front, Send to back), clipboard (Copy link to selection, Copy, Duplicate) and Delete — each showing a right-aligned keyboard-shortcut hint where a shortcut is assigned.
-- **FR-004**: System MUST provide an add-node menu listing all creatable node types in a two-column icon grid plus upload options with keyboard-shortcut hints; deprecated node types MUST be visibly badged as legacy and excluded from the default creation flow.
+- **FR-004**: System MUST provide an add-node menu listing all creatable node types in a two-column icon grid plus upload options with keyboard-shortcut hints; deprecated node types are excluded from the v1 menu (out of scope per Assumptions) and, when reintroduced, MUST carry a visible LEGACY badge and remain excluded from the default creation flow. The existing render node MUST appear in the menu under its reference product name "Instant Render".
 - **FR-005**: The workbench node catalog MUST include, at minimum: Image (upload), Sketch, Render, Modify, Animate, Variate, New View, Extract, Text, Sticky Note, Arrow, Freehand drawing and Media/Video.
-- **FR-006**: When a user selects a generation-capable node (Render, Modify, Variate, New View, Extract), system MUST attach a prompt panel below the node containing a prompt editor supporting `@` references to images/assets, numbered reference-image chips, settings for aspect ratio, mode and resolution, and a primary Generate action.
+- **FR-006**: When a user selects a generation-capable node (Render, Modify, Variate, New View, Extract), system MUST attach a prompt panel below the node containing a prompt editor supporting `@` references to images/assets, numbered reference-image chips, settings for aspect ratio, mode and resolution, and a primary Generate action. The existing inline settings forms on Render/Modify nodes MUST be removed; when unselected, a generation-capable node card MUST show only a collapsed summary of its last prompt and settings.
 - **FR-007**: The New View node MUST let the user choose from named views (e.g. Rear, Rear Right 3/4) or a "Select a view" placeholder, display the count of attached reference images, and generate the selected view; generation MUST be disabled until a view is chosen.
 - **FR-008**: System MUST display keyboard-shortcut hints in all top-toolbar tooltips and in every menu item that has an assigned shortcut.
 - **FR-009**: The top toolbar MUST expose: Add node, Library, Select, Text, Sticky Note, Section (group), Smart Dropper, Draw, Eraser, Arrow, Undo and Redo, with tooltips and shortcut hints.
-- **FR-010**: System MUST provide Export and Share actions in the top-right of the workbench.
+- **FR-010**: System MUST provide an Export action in the top-right of the workbench that opens a centered export modal listing selected assets on the left and options on the right — Export format (JPEG, PNG), Quality (0–100%), Scaling (Original, 2K, 4K upscaling) and a source preview — with an Export button at the bottom. A Share action is explicitly out of scope for v1.
 - **FR-011**: Edges MUST show a remove-connector affordance on hover or selection, styled to the shared visual language.
 - **FR-012**: The zoom control cluster MUST display the current zoom percentage with zoom-in, zoom-out and fit-to-screen actions, styled to the shared visual language.
 - **FR-013**: All new menus, popups and panels MUST be accessible: keyboard-navigable, focus-managed, dismissible via Escape, and built on the project's accessible UI primitive conventions.
 - **FR-014**: Every node card MUST display a header with its type icon and label and use consistent padding, radius and border from the shared token set.
+- **FR-015**: System MUST provide a Light/Dark canvas theme control in the top-left application menu. Light MUST be the default; selecting Dark MUST change only the workbench canvas background and dot grid, apply immediately without reloading the project, and persist as the user's preference across sessions. The dark-theme dot grid MUST use a subtle, low-contrast dot color from the shared token set (value defined in ui-translation.md §3.8).
+- **FR-016**: The Smart Dropper (`Y`) MUST support two sampling behaviors: (a) clicking a point on empty canvas samples the pixel color there and sets it as the active drawing tool's color; (b) capturing from a selected image node via its attribute dropdown, which offers exactly three capture types — Style (visual style characteristics such as lighting, texture, mood), Color (the image's dominant color palette), and Environment (background/environmental context). A captured attribute MUST be shown as a removable chip. Applying a captured attribute to another image node by dropping it on the target MUST always render a new image on the canvas — for Style, a new image with the copied style applied to the target image; for Color, a new image with the captured color palette applied; for Environment, a new image in the captured environment using the target image. The source and target images MUST NOT be modified in place. Captured attributes MAY also appear as removable chips in the attached prompt panels of generation nodes, conditioning their Generate action. Clicking inside an unselected node or a non-image node MUST sample only the pixel color.
 
 ### Key Entities
 
@@ -250,23 +285,26 @@ the shared tokens.
 - **Reference Image**: An image attached to a prompt for conditioning. Shown as a numbered chip; can be added from any node's "more" menu or via `@` mention in the prompt editor.
 - **Section**: A grouping container that wraps one or more nodes (created via "Wrap in section").
 - **View**: A named camera angle of a subject (e.g. Rear, Rear Right 3/4) selectable on a New View node.
+- **Absorbed Attribute**: A Style, Color palette, or Environment characteristic captured from an image node via the Smart Dropper's attribute dropdown. Shown as a removable chip; dropping it onto another image node always renders a new image with that attribute applied (style, palette, or environment), leaving the original images unchanged; may also condition generation in prompt panels.
 - **Design Token Set**: The shared visual constants (colors, radii, shadows, typography) applied uniformly across all workbench surfaces.
 
 ## Success Criteria
 
 ### Measurable Outcomes
 
-- **SC-001**: A visual audit of the workbench route finds 100% of surfaces (canvas, nodes, toolbars, menus, panels, zoom cluster) using the shared dark token set, with zero off-palette colors.
+- **SC-001**: A visual audit of the workbench route finds 100% of chrome surfaces (toolbars, menus, panels, zoom cluster) and node cards on the shared token set in both canvas themes, with zero off-palette colors; the canvas renders light by default and switches to dark via the setting.
 - **SC-002**: A user can create any non-legacy node type from an empty canvas in two clicks or fewer.
 - **SC-003**: 100% of top-toolbar buttons show a tooltip containing the action name and its keyboard shortcut where one is assigned; 100% of menu items with an assigned shortcut display it.
 - **SC-004**: From a selected image node, every action in the "more" menu is reachable in one click or fewer from the selection state.
 - **SC-005**: At least 90% of the identified reference-product workbench UI features (see Gap Analysis Summary) are implemented or explicitly deferred with documented rationale.
 - **SC-006**: A first-time user can complete the core loop — upload an image, attach a prompt, generate — without leaving the canvas in under two minutes.
+- **SC-007**: A user can capture each of the three smart-dropper attribute types (Style, Color, Environment) from one image node and apply it to another image node in three interactions or fewer, with the resulting new image appearing on the canvas and the originals unchanged.
 
 ## Assumptions
 
-- The workbench adopts the same dark visual language as the studio (the existing `viz-*` token set); the current light canvas is retired on this route.
+- The reference workbench keeps its light canvas as the default and exposes the Light/Dark canvas control from the top-left application menu. OpenViz will match that placement and behavior; node cards stay dark in both themes, and all chrome surfaces adopt the studio's shared `viz-*` token set.
 - Node types badged LEGACY in the reference product (Style, Mix, legacy Render, Try on) are out of scope for v1 parity and remain deferred.
+- The reference product's top-right Share action is discarded for v1 by user decision; only Export is implemented (FR-010).
 - The reference product's bottom-left utility dock could not be fully identified during analysis; it is deferred until its contents are confirmed (gap G8).
 - Collaboration features (presence cursors, soft-lock badges, status chip) are unchanged by this feature; the scope is UI and interaction parity only.
 - The canvas rendering architecture remains DOM-based node rendering; the reference product's single-canvas rendering approach is not adopted.

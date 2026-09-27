@@ -7,6 +7,7 @@ export function AgentationWrapper() {
 
     return (
         <Agentation
+            className="agentation-bottom-left"
             endpoint="http://localhost:4747"
             onSessionCreated={(sessionId) => {
                 console.log("Session started:", sessionId);

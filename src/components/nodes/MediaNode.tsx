@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ImageOff } from 'lucide-react';
+import { Image as ImageIcon, ImageOff } from 'lucide-react';
 import { NodeResizer } from '@xyflow/react';
 
 import { MediaWorkbenchNode } from '@/types';
+import { nodeCardClass, NodeCardHeader } from './nodeUi';
 
 interface MediaNodeData extends MediaWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -30,8 +31,10 @@ export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width,
     }, [width, height]);
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`relative rounded-lg border bg-white shadow-md ${selected ? 'border-blue-400' : 'border-slate-200'}`}>
-            <div className="h-full w-full overflow-hidden rounded-lg">
+        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`${nodeCardClass(selected)} flex flex-col`}>
+            <NodeCardHeader icon={ImageIcon} label="Media" />
+
+            <div className="relative min-h-0 flex-1 bg-white">
             {src && !loadError ? (
                 <img
                     src={src}
@@ -54,12 +57,12 @@ export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width,
                 isVisible={selected}
                 minWidth={120}
                 minHeight={80}
-                color="#ffffff"
+                color="#4C4CEF"
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
+                    backgroundColor: '#242425',
+                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}

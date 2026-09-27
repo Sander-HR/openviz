@@ -102,3 +102,16 @@ select {
     background-color: #ffffff;
   }
 }
+
+/* Agentation toolbar defaults to bottom-right via a shadow-DOM :host rule.
+   The consumer className lands on the <agentation-toolbar> host element, so
+   this external class (higher specificity than :host) overrides it — see the
+   agentation docs for the className prop. No !important: when the user drags
+   the toolbar, agentation sets inline left/top styles that must keep winning. */
+.agentation-bottom-left {
+  position: fixed;
+  top: auto;
+  left: 1.25rem;
+  right: auto;
+  bottom: 1.25rem;
+}

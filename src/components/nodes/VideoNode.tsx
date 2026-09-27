@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NodeResizer } from '@xyflow/react';
-import { Play, Pause, Maximize2, X } from 'lucide-react';
+import { Play, Pause, Maximize2, X, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VideoNode as VideoNodeType } from '../../types';
+import { nodeCardClass, NodeCardHeader } from './nodeUi';
 
 interface VideoNodeData extends VideoNodeType {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -47,10 +48,11 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width,
     };
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }}>
+        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`${nodeCardClass(selected)} flex flex-col`}>
+            <NodeCardHeader icon={Video} label="Video" />
+
             <div
-                className={`relative bg-black rounded-lg shadow-lg transition-all duration-200 border-2 overflow-hidden ${selected ? 'border-[#6366f1]' : 'border-transparent hover:border-[#6366f1]'}`}
-                style={{ width: '100%', height: '100%' }}
+                className="relative min-h-0 flex-1 bg-black overflow-hidden"
             >
                 {data.status === 'rendering' ? (
                     <div className="w-full h-full bg-gray-900 flex flex-col items-center justify-center animate-pulse">
@@ -113,12 +115,12 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width,
                 minWidth={100}
                 minHeight={100}
                 keepAspectRatio={true}
-                color="#6366f1"
+                color="#4C4CEF"
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
+                    backgroundColor: '#242425',
+                    borderColor: '#4C4CEF',
                     borderWidth: '2px',
                     borderRadius: 3,
                     transform: `scale(1)`,
