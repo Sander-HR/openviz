@@ -44,7 +44,7 @@ export const ModifyNode: React.FC<ModifyNodeProps> = ({ id, data, selected }) =>
                 id="modify-target-visible"
                 style={{
                     ...imageLikeHandleStyle,
-                    left: '13px',
+                    left: 0,
                     top: '50%',
                     zIndex: 11000,
                     opacity: selected ? 1 : 0,

@@ -38,7 +38,7 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
                 id="render-target-visible"
                 style={{
                     ...imageLikeHandleStyle,
-                    left: '13px',
+                    left: 0,
                     top: '50%',
                     zIndex: 11000,
                     opacity: selected ? 1 : 0,
