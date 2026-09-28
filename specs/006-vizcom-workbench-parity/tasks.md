@@ -316,3 +316,12 @@ With multiple developers after Foundational:
 - Per research R11: More-menu actions without a backend render disabled with a tooltip reason — do NOT stub fake backends
 - Per research R12: Smart Dropper prompt-panel conditioning is OUT of scope — v1 is capture + drop-to-image only
 - Commit after each task or logical group; stop at any checkpoint to validate the story independently
+
+---
+
+## Phase 10: Convergence
+
+**Purpose**: Remediate constitution violations surfaced by the convergence assessment. These are CRITICAL (Constitution I, NON-NEGOTIABLE) and MUST be resolved before `/speckit-implement` proceeds with new work.
+
+- [ ] T070 Remove all five `as any` usages from `src/components/nodes/AnimateNode.test.tsx` (lines 35, 36, 76, 80, 85) by typing the store/service mocks — use `vi.mocked()` for `renderService.animate` and a properly typed partial-store cast instead of raw `as any` per Constitution I (contradicts)
+- [ ] T071 Replace the two `(window as any).fitToScreen` accesses in `src/components/studio/CanvasControls.tsx` (lines 102–103) with a typed global declaration (e.g. an ambient `Window` interface extension in `src/types/`) or route the fit-to-screen call through a typed prop/callback so no untyped access remains per Constitution I (contradicts)
