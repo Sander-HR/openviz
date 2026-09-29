@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // vitest runs without `globals:true`, so RTL's auto-cleanup is not registered;
 // unmount explicitly between tests to avoid DOM accumulation.
@@ -9,6 +9,16 @@ afterEach(cleanup);
 // node types (data-model.md "WorkbenchNode (extended)"). Header icon + label
 // only, body placeholder — full bodies land in US5. Creation defaults:
 // variate count 2|4|8, new-view view null, extract backgroundHandling.
+
+vi.mock('@xyflow/react', () => ({
+    Handle: () => <div data-testid="rf__handle" />,
+    Position: { Left: 'left' },
+    useConnection: () => ({ inProgress: false }),
+}));
+
+vi.mock('../../store/useStore', () => ({
+    useStore: () => ({ connections: [], workbenchNodes: [] }),
+}));
 
 import { VariateNode } from './VariateNode';
 import { NewViewNode } from './NewViewNode';

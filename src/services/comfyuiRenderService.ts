@@ -1,6 +1,6 @@
-import { RenderService, GenerateRequest, GenerateResponse, AnimateRequest } from './types';
+import { RenderOperation, RenderService, GenerateRequest, GenerateResponse, AnimateRequest, NewViewRequest } from './types';
 import { getWorkflow, mapStyleToId, WorkflowDefinition } from './ai/workflowRegistry';
-import { composeStylePrompt } from './ai/stylePromptRegistry';
+import { composeNewViewPrompt, composeStylePrompt } from './ai/stylePromptRegistry';
 import { client_id, fetchWithTimeout, getComfyUrl, setComfyProxy, uploadImage, waitForCompletion } from './comfyuiClient';
 
 /**
@@ -216,6 +216,44 @@ export const comfyRenderService: RenderService = {
                 error: errorMessage(error),
             };
         }
+    },
+
+    newView: async (request: NewViewRequest): Promise<GenerateResponse> => {
+        try {
+            const referenceImage = request.referenceImages[0];
+            if (!referenceImage) {
+                throw new Error('New view requires at least one reference image.');
+            }
+
+            console.log('🧊 Starting New View Process...', request);
+
+            // 1. Upload the primary reference (ComfyUI workflows take a single init image).
+            const uploadedFileName = await uploadImage(referenceImage, 'new_view_ref');
+
+            // 2. Execute a product render workflow conditioned on the view prompt.
+            const workflow = getWorkflow('product');
+            if (!workflow) {
+                throw new Error('Product workflow not found for new-view generation.');
+            }
+
+            const imageUrls = await executeWorkflow(workflow, {
+                prompt: composeNewViewPrompt(request.view),
+                initImage: uploadedFileName,
+                width: request.width,
+                height: request.height,
+                numImages: 1,
+            });
+
+            console.log('✨ New View Success:', imageUrls);
+            return { success: true, images: imageUrls };
+        } catch (error) {
+            console.error('❌ New View Error:', error);
+            return { success: false, images: [], error: errorMessage(error) };
+        }
+    },
+
+    capabilities(): RenderOperation[] {
+        return ['generate', 'animate', 'new-view'];
     },
 
     checkConnection: async (): Promise<boolean> => {

@@ -50,7 +50,7 @@ const project = {
 function renderLayer() {
     return render(
         <div className="relative h-screen w-screen">
-            <WorkbenchOverlayLayer contextMenu={null} onCloseContextMenu={noop} contextNodes={[]} onPaste={noop} />
+            <WorkbenchOverlayLayer contextMenu={null} onCloseContextMenu={noop} contextNodes={[]} onPaste={noop} onPasteImage={noop} />
         </div>,
     );
 }

@@ -64,7 +64,7 @@ describe('openAIImageTarget', () => {
         await expect(target.submit({
             ...request,
             workflowId: 'product_edit',
-            initImage: 'data:image/png;base64,input',
+            initImage: 'data:image/png;base64,aW5wdXQ=',
             parameters: { strength: 0.7 },
         })).resolves.toMatchObject({ targetId: 'unsloth' });
 
@@ -75,7 +75,7 @@ describe('openAIImageTarget', () => {
             width: 1024,
             height: 704,
             batch_size: 1,
-            init_image: 'data:image/png;base64,input',
+            init_image: 'data:image/png;base64,aW5wdXQ=',
             workflow: 'edit',
         });
         expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).not.toHaveProperty('strength');
@@ -114,6 +114,31 @@ describe('openAIImageTarget', () => {
         expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toHaveProperty('init_image', 'data:image/png;base64,source');
     });
 
+    it('downloads URL inputs and sends them as base64 image data', async () => {
+        const fetcher = vi.fn<typeof fetch>()
+            .mockResolvedValueOnce(new Response('image-bytes', { status: 200, headers: { 'Content-Type': 'image/jpeg' } }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({ images: [{ url: '/api/inference/images/gallery/result' }] }), { status: 200 }))
+            .mockResolvedValueOnce(new Response('result-bytes', { status: 200, headers: { 'Content-Type': 'image/png' } }));
+        const target = createOpenAIImageTarget({
+            id: 'unsloth',
+            endpoint: 'http://localhost:8001/v1',
+            model: 'unsloth/Qwen-Image-2.1-GGUF',
+            apiKey: 'secret',
+            fetcher,
+        });
+
+        await target.submit({
+            ...request,
+            initImage: 'https://picsum.photos/seed/732/1024/682',
+            imageWorkflow: 'edit',
+        });
+
+        const payload = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body)) as { init_image?: string };
+        expect(payload.init_image).toMatch(/^data:image\/jpeg;base64,/);
+        expect(payload.init_image).not.toContain('picsum.photos');
+        expect(fetcher.mock.calls[0]?.[1]?.headers).toBeUndefined();
+    });
+
     it('adds the native gallery file suffix when the backend returns only the gallery id path', async () => {
         const fetcher = vi.fn<typeof fetch>()
             .mockResolvedValueOnce(new Response(JSON.stringify({
@@ -128,10 +153,10 @@ describe('openAIImageTarget', () => {
             fetcher,
         });
 
-        await target.submit({ ...request, initImage: 'data:image/png;base64,input' });
+        await target.submit({ ...request, initImage: 'data:image/png;base64,aW5wdXQ=' });
         const outputs = await target.getOutputs('native-edit');
         expect(outputs).toHaveLength(1);
-        expect(outputs[0]?.url.startsWith('blob:') || outputs[0]?.url.startsWith('http://100.85.5.85:8888/')).toBe(true);
+        expect(outputs[0]?.url.startsWith('data:image/png;base64,')).toBe(true);
     });
 
     it('requires a key unless keyless mode is explicitly enabled', async () => {

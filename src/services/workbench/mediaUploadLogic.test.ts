@@ -24,14 +24,14 @@ describe('buildImageNode (uploaded image node)', () => {
     it('produces an editable image node centered on the viewport point', async () => {
         const { buildImageNode } = await import('./mediaUploadLogic');
         const node = buildImageNode({
-            src: 'blob:http://localhost/abc',
+            src: 'data:image/png;base64,abc',
             fileName: 'pic.png',
             mimeType: 'image/png',
             centerPoint: { x: 500, y: 300 },
         });
 
         expect(node.type).toBe('image');
-        expect(node.project.layers[0].image).toBe('blob:http://localhost/abc');
+        expect(node.project.layers[0].image).toBe('data:image/png;base64,abc');
         expect(node.name).toBe('pic.png');
         expect(node.width).toBe(260);
         expect(node.height).toBe(195);
@@ -42,7 +42,7 @@ describe('buildImageNode (uploaded image node)', () => {
     it('falls back to a generic alt when the file has no name', async () => {
         const { buildImageNode } = await import('./mediaUploadLogic');
         const node = buildImageNode({
-            src: 'blob:http://localhost/xyz',
+            src: 'data:image/jpeg;base64,xyz',
             fileName: '',
             mimeType: 'image/jpeg',
             centerPoint: { x: 10, y: 20 },

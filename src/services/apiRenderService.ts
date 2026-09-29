@@ -1,4 +1,4 @@
-import { RenderService, GenerateRequest, GenerateResponse, AnimateRequest } from './types';
+import { RenderService, GenerateRequest, GenerateResponse, AnimateRequest, NewViewRequest, RenderOperation } from './types';
 
 /**
  * Refactored Render Service that delegates AI jobs to the Backend.
@@ -49,6 +49,13 @@ export const apiRenderService: RenderService = {
         // Similar pattern for animate...
         return { success: false, images: [] };
     },
+
+    newView: async (_request: NewViewRequest): Promise<GenerateResponse> => {
+        // Not supported by the legacy API backend yet.
+        return { success: false, images: [], error: 'new-view is not supported by this backend' };
+    },
+
+    capabilities: (): RenderOperation[] => ['generate'],
 
     checkConnection: async (): Promise<boolean> => {
         const res = await fetch("/api/health");

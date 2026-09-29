@@ -34,15 +34,37 @@ export interface ExportOptions {
 }
 
 // US5 — new node-type settings (data-model.md "WorkbenchNode (extended)")
-export type ViewName = 'Rear' | 'Front' | 'Left' | 'Right' | 'Top' | 'Rear Right 3/4' | 'Rear Left 3/4';
+export type ViewName =
+    | 'Front'
+    | 'Front Right 3/4 view'
+    | 'Front Left 3/4 view'
+    | 'Bottom Front Left 3/4 view'
+    | 'Bottom Front Right 3/4 view'
+    | 'Left'
+    | 'Bottom Rear Left 3/4 view'
+    | 'Rear Left 3/4 view'
+    | 'Rear Right 3/4 view'
+    | 'Top'
+    | 'Rear'
+    | 'Right'
+    | 'Bottom'
+    | 'Bottom Rear Right 3/4 view';
+
 export const VIEW_NAMES: readonly ViewName[] = [
-    'Rear',
     'Front',
+    'Front Right 3/4 view',
+    'Front Left 3/4 view',
+    'Bottom Front Left 3/4 view',
+    'Bottom Front Right 3/4 view',
     'Left',
-    'Right',
+    'Bottom Rear Left 3/4 view',
+    'Rear Left 3/4 view',
+    'Rear Right 3/4 view',
     'Top',
-    'Rear Right 3/4',
-    'Rear Left 3/4',
+    'Rear',
+    'Right',
+    'Bottom',
+    'Bottom Rear Right 3/4 view',
 ] as const;
 
 export type VaryMode = 'form' | 'color' | 'both';

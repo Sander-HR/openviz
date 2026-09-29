@@ -142,6 +142,7 @@ export function useWorkbenchOneShotCreation({
                     control,
                     strokeColor: '#111827',
                     strokeWidth: 2,
+                    temporary: true,
                 },
             };
 

@@ -1,4 +1,4 @@
-import { RenderService, GenerateRequest, GenerateResponse, AnimateRequest } from './types';
+import { RenderService, GenerateRequest, GenerateResponse, AnimateRequest, NewViewRequest, RenderOperation } from './types';
 
 const MOCK_VIDEOS = [
     'https://download.samplelib.com/mp4/sample-5s.mp4',
@@ -52,6 +52,24 @@ export const mockRenderService: RenderService = {
             images: [videoUrl]
         };
     },
+
+    newView: async (request: NewViewRequest): Promise<GenerateResponse> => {
+        console.log('🧪 [Mock] Starting mock new-view process...', request);
+
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+        await delay(1000); // Simulate view rendering
+
+        const seed = Math.floor(Math.random() * 1000);
+        const width = request.width || 1024;
+        const height = request.height || 1024;
+
+        return {
+            success: true,
+            images: [`https://picsum.photos/seed/${seed}/${width}/${height}`],
+        };
+    },
+
+    capabilities: (): RenderOperation[] => ['generate', 'animate', 'new-view'],
 
     checkConnection: async (): Promise<boolean> => {
         console.log('🔍 [Mock] Checking mock connection...');

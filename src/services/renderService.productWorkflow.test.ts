@@ -46,6 +46,12 @@ function installFetchMock(): FetchMock {
         if (url.includes('/images/generations')) {
             return jsonResponse(openAIGenerationsBody);
         }
+        if (url.includes('/api/inference/images/generate')) {
+            return jsonResponse({ images: [{ url: '/api/inference/images/gallery/new-view/file' }] });
+        }
+        if (url.includes('/api/inference/images/gallery/')) {
+            return new Response('image-bytes', { status: 200, headers: { 'Content-Type': 'image/png' } });
+        }
         return new Response('not found', { status: 404 });
     });
     global.fetch = fetchMock;
@@ -122,6 +128,77 @@ describe('renderService execution-target boundary', () => {
         expect(payload.model).toBe('Qwen-Image-2.1');
         expect(payload.size).toBe('1024x704');
         expect(payload.prompt).toContain('Style direction:');
+    });
+
+    it('routes new-view through the ComfyUI target boundary with a view-conditioned prompt', async () => {
+        const fetchMock = installFetchMock();
+
+        const response = await renderService.newView({
+            referenceImages: ['data:image/png;base64,ref1'],
+            init_image: 'data:image/png;base64,ref1',
+            view: 'Rear Right 3/4 view',
+            width: 1024,
+            height: 704,
+        });
+
+        expect(response.success).toBe(true);
+        const urls = calledUrls(fetchMock);
+        expect(urls.some((url) => url.includes('/prompt'))).toBe(true);
+        expect(urls.some((url) => url.includes('/images/generations'))).toBe(false);
+
+        const promptCall = fetchMock.mock.calls.find((call) => String(call[0]).includes('/prompt'));
+        const payload = JSON.parse(String(promptCall?.[1]?.body));
+        expect(payload.prompt['6'].inputs.text).toContain('Rear Right 3/4 view');
+    });
+
+    it('routes new-view through the OpenAI target boundary with reference images', async () => {
+        const fetchMock = installFetchMock();
+        useStore.setState((state) => ({
+            computeSettings: {
+                ...state.computeSettings,
+                protocol: 'openai-image',
+                imageApiEndpoint: 'http://localhost:8001/v1',
+                imageApiKey: 'secret',
+                imageApiModel: 'Qwen-Image-2.1',
+            },
+        }));
+
+        const response = await renderService.newView({
+            referenceImages: ['data:image/png;base64,ref1', 'data:image/png;base64,ref2'],
+            init_image: 'data:image/png;base64,ref1',
+            view: 'Rear',
+            width: 1024,
+            height: 704,
+        });
+
+        expect(response.success).toBe(true);
+        const urls = calledUrls(fetchMock);
+        expect(urls.some((url) => url.includes('/api/inference/images/generate'))).toBe(true);
+        expect(urls.some((url) => url.includes('/comfy-api'))).toBe(false);
+
+        const generateCall = fetchMock.mock.calls.find((call) => String(call[0]).includes('/api/inference/images/generate'));
+        const payload = JSON.parse(String(generateCall?.[1]?.body));
+        expect(payload.prompt).toContain('Rear');
+        expect(payload.reference_images).toEqual(['data:image/png;base64,ref1', 'data:image/png;base64,ref2']);
+        expect(payload.workflow).toBe('reference');
+    });
+
+    it('reports new-view capability per backend for Generate gating', async () => {
+        useStore.setState((state) => ({
+            computeSettings: { ...state.computeSettings, protocol: 'comfyui' },
+        }));
+        expect(renderService.capabilities()).toContain('new-view');
+
+        useStore.setState((state) => ({
+            computeSettings: {
+                ...state.computeSettings,
+                protocol: 'openai-image',
+                imageApiEndpoint: 'http://localhost:8001/v1',
+                imageApiKey: 'secret',
+                imageApiModel: 'Qwen-Image-2.1',
+            },
+        }));
+        expect(renderService.capabilities()).toContain('new-view');
     });
 
     it('routes connection health checks through the active protocol target', async () => {

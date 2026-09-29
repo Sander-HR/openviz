@@ -20,6 +20,12 @@ export const renderService: RenderService = useMock ? mockRenderService : {
     animate: (request) => useStore.getState().computeSettings.protocol === 'openai-image'
         ? openAIImageRenderService.animate(request)
         : comfyRenderService.animate(request),
+    newView: (request) => useStore.getState().computeSettings.protocol === 'openai-image'
+        ? openAIImageRenderService.newView(request)
+        : comfyRenderService.newView(request),
+    capabilities: () => useStore.getState().computeSettings.protocol === 'openai-image'
+        ? openAIImageRenderService.capabilities()
+        : comfyRenderService.capabilities(),
     checkConnection: () => useStore.getState().computeSettings.protocol === 'openai-image'
         ? openAIImageRenderService.checkConnection()
         : comfyRenderService.checkConnection(),

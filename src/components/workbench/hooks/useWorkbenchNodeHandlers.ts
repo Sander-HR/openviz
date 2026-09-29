@@ -14,7 +14,7 @@ import { buildFlowNodes } from './workbenchNodeSizing';
 import { BasicBlocksMenuState } from './useWorkbenchBlockCreation';
 import { useStore } from '@/store/useStore';
 
-type ContextMenuState = { x: number; y: number; nodeId: string } | null;
+type ContextMenuState = { x: number; y: number; nodeId: string | null } | null;
 
 type UseWorkbenchNodeHandlersOptions = {
     workbenchNodes: WorkbenchNode[];
@@ -74,9 +74,35 @@ export function useWorkbenchNodeHandlers({
                 if (resizingNodeIdsRef.current.has(change.id)) {
                     return;
                 }
+                const movedNode = workbenchNodes.find((node) => node.id === change.id);
+                const movedPosition = change.position;
+                if (!movedPosition) return;
+                const nextNodes = workbenchNodes.map((node) => {
+                    if (node.type !== 'arrow' || !node.data.temporary) return node;
+                    const updates: { start?: { x: number; y: number }; end?: { x: number; y: number } } = {};
+                    (['start', 'end'] as const).forEach((point) => {
+                        const attachment = node.data[point === 'start' ? 'startAttachment' : 'endAttachment'];
+                        if (!attachment || attachment.nodeId !== change.id || !movedNode) return;
+                        const width = movedNode.width ?? 0;
+                        const height = movedNode.height ?? 0;
+                        const local = attachment.side === 'left'
+                            ? { x: 0, y: attachment.offset * height }
+                            : attachment.side === 'right'
+                                ? { x: width, y: attachment.offset * height }
+                                : attachment.side === 'top'
+                                    ? { x: attachment.offset * width, y: 0 }
+                                    : { x: attachment.offset * width, y: height };
+                        updates[point] = { x: movedPosition.x - node.x + local.x, y: movedPosition.y - node.y + local.y };
+                    });
+                    return Object.keys(updates).length > 0 ? { ...node, data: { ...node.data, ...updates } } : node;
+                });
+                const attachedArrows = nextNodes.filter((node) => node.type === 'arrow' && node !== workbenchNodes.find((candidate) => candidate.id === node.id));
                 updateWorkbenchNodeTransient(change.id, {
-                    x: change.position.x,
-                    y: change.position.y,
+                    x: movedPosition.x,
+                    y: movedPosition.y,
+                });
+                attachedArrows.forEach((node) => {
+                    if (node.type === 'arrow') updateWorkbenchNodeTransient(node.id, { data: node.data });
                 });
             }
             // Dimension changes are handled by onResizeEnd in nodes - not here
@@ -122,6 +148,11 @@ export function useWorkbenchNodeHandlers({
     const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
         event.preventDefault();
         setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
+    }, []);
+
+    const handlePaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
+        event.preventDefault();
+        setContextMenu({ x: event.clientX, y: event.clientY, nodeId: null });
     }, []);
 
     const handlePaneClick = useCallback(() => {
@@ -258,6 +289,7 @@ export function useWorkbenchNodeHandlers({
         handleNodesChange,
         handleNodeDoubleClick,
         handleNodeContextMenu,
+        handlePaneContextMenu,
         handlePaneClick,
         handleSourceClick,
         handleResize,

@@ -19,12 +19,13 @@ import { useOverlayAnchoring } from './hooks/useOverlayAnchoring';
 
 export interface WorkbenchOverlayLayerProps {
     /** Right-click state from the node handlers. */
-    contextMenu: { x: number; y: number; nodeId: string } | null;
+    contextMenu: { x: number; y: number; nodeId: string | null } | null;
     onCloseContextMenu: () => void;
     /** Nodes the right-click menu should act on (selection-aware). */
     contextNodes: WorkbenchNode[];
     /** Paste handler for the right-click menu's extra row. */
     onPaste: () => void;
+    onPasteImage: () => void;
 }
 
 const RATIO_LABELS = ['1:1', '4:5', '5:4', '2:3', '3:2', '9:16', '16:9'];
@@ -62,6 +63,7 @@ export const WorkbenchOverlayLayer: React.FC<WorkbenchOverlayLayerProps> = ({
     onCloseContextMenu,
     contextNodes,
     onPaste,
+    onPasteImage,
 }) => {
     const anchor = useOverlayAnchoring();
     const [moreOpen, setMoreOpen] = useState(false);
@@ -165,6 +167,7 @@ export const WorkbenchOverlayLayer: React.FC<WorkbenchOverlayLayerProps> = ({
                                 }}
                                 extraActions={[
                                     { label: 'Paste', shortcut: '⌘V', onClick: () => { onPaste(); onCloseContextMenu(); } },
+                                    { label: 'Paste image', onClick: () => { onPasteImage(); onCloseContextMenu(); } },
                                 ]}
                             />
                         </DropdownMenuPrimitive.Content>

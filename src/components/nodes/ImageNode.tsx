@@ -3,6 +3,7 @@ import { Handle, NodeResizer, Position, useConnection } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { ImageNode as ImageNodeType } from '../../types';
 import { cn, imageLikeHandleStyle, mediaNodeFrameClass, mediaNodeTitleClass, resizeHandleClassName } from './nodeUi';
+import { getGenerationRetry } from '@/services/workbench/generationRetryRegistry';
 
 interface ImageNodeData extends ImageNodeType {
     onSourceClick?: (nodeId: string) => void;
@@ -57,6 +58,27 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
                     <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center animate-pulse">
                         <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2"></div>
                         <span className="text-gray-400 text-xs font-medium">Rendering...</span>
+                    </div>
+                ) : data.status === 'error' ? (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-red-50 p-4 text-center">
+                        <div role="alert" className="space-y-1">
+                            <p className="text-xs font-semibold text-red-700">Generation failed</p>
+                            <p className="line-clamp-3 text-[10px] text-red-600">
+                                {data.errorMessage ?? 'The image could not be generated.'}
+                            </p>
+                        </div>
+                        {getGenerationRetry(data.id) && (
+                            <button
+                                type="button"
+                                className="nodrag rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    getGenerationRetry(data.id)?.();
+                                }}
+                            >
+                                Retry
+                            </button>
+                        )}
                     </div>
                 ) : data.project.thumbnail ? (
                     <img

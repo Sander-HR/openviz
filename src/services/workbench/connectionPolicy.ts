@@ -10,7 +10,7 @@ const INBOUND_CAPS: Partial<Record<NodeType, number>> = {
 };
 
 function isAllowedDirection(sourceType: NodeType, targetType: NodeType): boolean {
-    return sourceType === 'image' && (targetType === 'animate' || targetType === 'render' || targetType === 'modify');
+    return sourceType === 'image' && (targetType === 'animate' || targetType === 'render' || targetType === 'modify' || targetType === 'new-view');
 }
 
 function isVideoEndpoint(sourceType: NodeType, targetType: NodeType): boolean {
