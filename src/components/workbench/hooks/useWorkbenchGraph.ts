@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Edge, Node } from "@xyflow/react";
 import { Connection, NodeLockState, WorkbenchNode } from "@/types";
 import { getGenerationRetry } from "@/services/workbench/generationRetryRegistry";
@@ -6,7 +6,8 @@ import { getGenerationRetry } from "@/services/workbench/generationRetryRegistry
 type WorkbenchGraphOptions = {
     workbenchNodes: WorkbenchNode[];
     connections: Connection[];
-    selectedNodeIds: string[];
+    /** React Flow's internal selection mirror; never read from Zustand. */
+    flowSelectedNodeIds: string[];
     /** Remote soft locks (nodeId → holder). Locked nodes are inert for this session. */
     nodeLocks: Record<string, NodeLockState>;
     handleSourceClick: (nodeId: string) => void;
@@ -91,7 +92,7 @@ function getNodeSize(node: WorkbenchNode) {
 export function useWorkbenchGraph({
     workbenchNodes,
     connections,
-    selectedNodeIds,
+    flowSelectedNodeIds,
     nodeLocks,
     handleSourceClick,
     handleResize,
@@ -101,13 +102,34 @@ export function useWorkbenchGraph({
     handleGestureEnd,
     handleDataChange,
 }: WorkbenchGraphOptions) {
+    const flowNodeCacheRef = useRef(new Map<string, {
+        sourceNode: WorkbenchNode;
+        remotelyLocked: boolean;
+        node: Node<Record<string, unknown>, WorkbenchFlowNodeType>;
+    }>());
+
     const nodes = useMemo<Array<Node<Record<string, unknown>, WorkbenchFlowNodeType>>>(() => {
-        return workbenchNodes
+        const nextCache = new Map(flowNodeCacheRef.current);
+        const nextNodes = workbenchNodes
             .filter((node) => !(node.type === 'arrow' && node.data.temporary))
             .map((node) => {
+            const remotelyLocked = Boolean(nodeLocks[node.id]);
+            const selected = flowSelectedNodeIds.includes(node.id);
+            const cached = nextCache.get(node.id);
+
+            if (cached?.sourceNode === node && cached.remotelyLocked === remotelyLocked) {
+                if (cached.node.selected === selected) {
+                    return cached.node;
+                }
+
+                const selectedNode = { ...cached.node, selected };
+                nextCache.set(node.id, { ...cached, node: selectedNode });
+                return selectedNode;
+            }
+
             const { width, height } = getNodeSize(node);
 
-            return {
+            const flowNode: Node<Record<string, unknown>, WorkbenchFlowNodeType> = {
                 id: node.id,
                 type: mapNodeType(node),
                 position: { x: node.x, y: node.y },
@@ -127,14 +149,24 @@ export function useWorkbenchGraph({
                     onDataChange: handleDataChange,
                     onRetry: getGenerationRetry(node.id),
                 } as Record<string, unknown>,
-                selected: selectedNodeIds.includes(node.id),
+                selected,
                 // Remote soft locks (spec FR-015): a node another collaborator
                 // holds cannot be selected or dragged from this session.
-                selectable: !nodeLocks[node.id],
-                draggable: !nodeLocks[node.id],
+                selectable: !remotelyLocked,
+                draggable: !remotelyLocked,
             };
-            });
-    }, [workbenchNodes, selectedNodeIds, nodeLocks, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
+
+            nextCache.set(node.id, { sourceNode: node, remotelyLocked, node: flowNode });
+            return flowNode;
+        });
+
+        const activeIds = new Set(nextNodes.map((node) => node.id));
+        for (const id of nextCache.keys()) {
+            if (!activeIds.has(id)) nextCache.delete(id);
+        }
+        flowNodeCacheRef.current = nextCache;
+        return nextNodes;
+    }, [workbenchNodes, flowSelectedNodeIds, nodeLocks, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
 
     const edges = useMemo<Array<Edge>>(() => {
         const nodeById = new Map(workbenchNodes.map((node) => [node.id, node]));

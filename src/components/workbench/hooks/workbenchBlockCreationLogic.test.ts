@@ -67,7 +67,7 @@ describe('workbench block creation logic', () => {
             x: 600,
             y: 200,
             width: 320,
-            height: 500,
+            height: 390,
             data: {
                 prompt: '',
                 stylePreset: 'Photorealistic',

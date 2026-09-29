@@ -14,7 +14,7 @@ function isFrameNode(node: WorkbenchNode | undefined): node is ImageNode | Video
     return Boolean(node && (node.type === 'image' || node.type === 'video'));
 }
 
-export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) => {
+export const AnimateNode = React.memo(({ id, data, selected }: AnimateNodeProps) => {
     const {
         videoStyles,
         settings,
@@ -214,4 +214,6 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
             </div>
         </div>
     );
-};
+});
+
+AnimateNode.displayName = 'AnimateNode';

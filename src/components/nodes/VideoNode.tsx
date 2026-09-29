@@ -19,7 +19,7 @@ interface VideoNodeProps {
     height?: number;
 }
 
-export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width, height }) => {
+export const VideoNode = React.memo(({ id, data, selected, width, height }: VideoNodeProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -197,4 +197,6 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width,
             )}
         </div>
     );
-};
+});
+
+VideoNode.displayName = 'VideoNode';

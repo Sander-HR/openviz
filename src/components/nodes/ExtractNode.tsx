@@ -20,7 +20,7 @@ interface ExtractNodeProps {
  * US3 shell (T036): header + collapsed summary only. The extract prompt and
  * background-handling controls land in US5 with the renderService ops.
  */
-export const ExtractNode: React.FC<ExtractNodeProps> = ({ data, selected }) => {
+export const ExtractNode = React.memo(({ data, selected }: ExtractNodeProps) => {
     const backgroundHandling = data.data?.backgroundHandling ?? 'transparent';
 
     return (
@@ -33,4 +33,6 @@ export const ExtractNode: React.FC<ExtractNodeProps> = ({ data, selected }) => {
             </div>
         </div>
     );
-};
+});
+
+ExtractNode.displayName = 'ExtractNode';

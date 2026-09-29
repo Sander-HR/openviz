@@ -8,6 +8,7 @@ interface UseWorkbenchOneShotCreationOptions {
     activeWorkbenchTool: WorkbenchToolType;
     screenToFlowPosition: (point: { x: number; y: number }) => { x: number; y: number };
     createOneShotNode: (node: TextWorkbenchNode | NoteWorkbenchNode | ArrowWorkbenchNode) => void;
+    setSelection: (ids: string[]) => void;
     handlePaneClick: () => void;
 }
 
@@ -21,6 +22,7 @@ export function useWorkbenchOneShotCreation({
     activeWorkbenchTool,
     screenToFlowPosition,
     createOneShotNode,
+    setSelection,
     handlePaneClick,
 }: UseWorkbenchOneShotCreationOptions) {
     const arrowDragStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -45,6 +47,7 @@ export function useWorkbenchOneShotCreation({
                 },
             };
             createOneShotNode(textNode);
+            setSelection([textNode.id]);
             return;
         }
 
@@ -62,8 +65,9 @@ export function useWorkbenchOneShotCreation({
                 },
             };
             createOneShotNode(noteNode);
+            setSelection([noteNode.id]);
         }
-    }, [screenToFlowPosition, createOneShotNode]);
+    }, [screenToFlowPosition, createOneShotNode, setSelection]);
 
     const handlePaneClickWithTool = useCallback(
         (event: React.MouseEvent) => {
@@ -147,9 +151,10 @@ export function useWorkbenchOneShotCreation({
             };
 
             createOneShotNode(arrowNode);
+            setSelection([arrowNode.id]);
             requestImmediateSceneSave();
         },
-        [activeWorkbenchTool, screenToFlowPosition, createOneShotNode]
+        [activeWorkbenchTool, screenToFlowPosition, createOneShotNode, setSelection]
     );
 
     return {

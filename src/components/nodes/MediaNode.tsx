@@ -18,7 +18,7 @@ interface MediaNodeProps {
     height?: number;
 }
 
-export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width, height }) => {
+export const MediaNode = React.memo(({ id, data, selected, width, height }: MediaNodeProps) => {
     const [nodeSize, setNodeSize] = useState({ width: width || 260, height: height || 180 });
     const [loadError, setLoadError] = useState(false);
     const src = data.data?.src;
@@ -90,4 +90,6 @@ export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width,
             />
         </div>
     );
-};
+});
+
+MediaNode.displayName = 'MediaNode';

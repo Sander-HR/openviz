@@ -99,8 +99,6 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         handleDataChange,
     } = useWorkbenchNodeHandlers({
         workbenchNodes,
-        selectedNodeIds,
-        setSelectedNodeIds,
         updateWorkbenchNode,
         updateWorkbenchNodeTransient,
         beginWorkbenchGesture,

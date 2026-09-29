@@ -26,7 +26,7 @@ interface NewViewNodeProps {
  * stays disabled until a view is selected AND at least one reference image is
  * connected (the connection itself is visible on the canvas).
  */
-export const NewViewNode: React.FC<NewViewNodeProps> = ({ id, data, selected }) => {
+export const NewViewNode = React.memo(({ id, data, selected }: NewViewNodeProps) => {
     const [showViews, setShowViews] = useState(false);
     const [hoveredView, setHoveredView] = useState<ViewName | null>(null);
     const { view, isGenerating, isHoverConnectable, setIsHovered, referenceCount, handleGenerate } = useNewViewNodeActions(id, data);
@@ -113,4 +113,6 @@ export const NewViewNode: React.FC<NewViewNodeProps> = ({ id, data, selected }) 
             </div>
         </div>
     );
-};
+});
+
+NewViewNode.displayName = 'NewViewNode';

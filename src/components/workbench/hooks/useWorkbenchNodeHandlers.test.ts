@@ -23,8 +23,6 @@ function renderHandlers(workbenchNode: NoteWorkbenchNode | MediaWorkbenchNode = 
     const openNodeInStudio = vi.fn();
     const options = {
         workbenchNodes: [workbenchNode],
-        selectedNodeIds: ['note-1'],
-        setSelectedNodeIds: vi.fn(),
         updateWorkbenchNode,
         updateWorkbenchNodeTransient,
         beginWorkbenchGesture: vi.fn(),
@@ -41,7 +39,6 @@ function renderHandlers(workbenchNode: NoteWorkbenchNode | MediaWorkbenchNode = 
         updateWorkbenchNode,
         updateWorkbenchNodeTransient,
         openNodeInStudio,
-        setSelectedNodeIds: options.setSelectedNodeIds,
     };
 }
 
@@ -64,14 +61,11 @@ describe('useWorkbenchNodeHandlers gesture updates', () => {
     });
 
     it('clears selection and active node when the canvas background is clicked', () => {
-        const setSelectedNodeIds = vi.fn();
         const setActiveNodeId = vi.fn();
         // The hook options are intentionally replaced through a dedicated render
         // fixture for this interaction contract.
         const { result: paneResult } = renderHook(() => useWorkbenchNodeHandlers({
             workbenchNodes: [note],
-            selectedNodeIds: ['note-1'],
-            setSelectedNodeIds,
             updateWorkbenchNode: vi.fn(),
             updateWorkbenchNodeTransient: vi.fn(),
             beginWorkbenchGesture: vi.fn(),
@@ -85,33 +79,15 @@ describe('useWorkbenchNodeHandlers gesture updates', () => {
 
         act(() => paneResult.current.handlePaneClick());
 
-        expect(setSelectedNodeIds).toHaveBeenCalledWith([]);
         expect(setActiveNodeId).toHaveBeenCalledWith(null);
     });
 
-    it('replaces the previous selection when a plain click selects another node', () => {
-        const { result, setSelectedNodeIds } = renderHandlers();
+    it('does not intercept React Flow selection changes', () => {
+        const { result } = renderHandlers();
 
-        act(() => {
-            result.current.handleNodesChange([
-                { id: 'note-1', type: 'select', selected: false },
-                { id: 'node-2', type: 'select', selected: true },
-            ]);
-        });
-
-        expect(setSelectedNodeIds).toHaveBeenCalledWith(['node-2']);
-    });
-
-    it('preserves the previous selection when Shift adds another node', () => {
-        const { result, setSelectedNodeIds } = renderHandlers();
-
-        act(() => {
-            result.current.handleNodesChange([
-                { id: 'node-2', type: 'select', selected: true },
-            ]);
-        });
-
-        expect(setSelectedNodeIds).toHaveBeenCalledWith(['note-1', 'node-2']);
+        expect(() => {
+            act(() => result.current.handleNodesChange([{ id: 'node-2', type: 'select', selected: true }]));
+        }).not.toThrow();
     });
 
     it('routes position changes to transient updates during drag', () => {
@@ -138,8 +114,6 @@ describe('useWorkbenchNodeHandlers remote soft-lock guards (spec FR-015)', () =>
 
         const options = {
             workbenchNodes: [note],
-            selectedNodeIds: ['note-1'],
-            setSelectedNodeIds: vi.fn(),
             updateWorkbenchNode: vi.fn(),
             updateWorkbenchNodeTransient,
             beginWorkbenchGesture,
@@ -173,8 +147,6 @@ describe('useWorkbenchNodeHandlers remote soft-lock guards (spec FR-015)', () =>
 
         const options = {
             workbenchNodes: [media],
-            selectedNodeIds: ['media-1'],
-            setSelectedNodeIds: vi.fn(),
             updateWorkbenchNode: vi.fn(),
             updateWorkbenchNodeTransient: vi.fn(),
             beginWorkbenchGesture: vi.fn(),
@@ -200,8 +172,6 @@ describe('useWorkbenchNodeHandlers remote soft-lock guards (spec FR-015)', () =>
 
         const options = {
             workbenchNodes: [note],
-            selectedNodeIds: ['note-1'],
-            setSelectedNodeIds: vi.fn(),
             updateWorkbenchNode,
             updateWorkbenchNodeTransient: vi.fn(),
             beginWorkbenchGesture: vi.fn(),

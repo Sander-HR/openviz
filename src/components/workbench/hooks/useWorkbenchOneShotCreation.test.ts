@@ -23,6 +23,7 @@ function mouseEvent(clientX: number, clientY: number, target: EventTarget): Reac
 
 function setup(tool: 'select' | 'text' | 'note' | 'arrow') {
     const createOneShotNode = vi.fn();
+    const setSelection = vi.fn();
     const handlePaneClick = vi.fn();
     // Identity mapping keeps expected coordinates trivial to assert.
     const screenToFlowPosition = (p: { x: number; y: number }) => p;
@@ -31,10 +32,11 @@ function setup(tool: 'select' | 'text' | 'note' | 'arrow') {
             activeWorkbenchTool: tool,
             screenToFlowPosition,
             createOneShotNode,
+            setSelection,
             handlePaneClick,
         })
     );
-    return { createOneShotNode, handlePaneClick, handlers: result.current };
+    return { createOneShotNode, setSelection, handlePaneClick, handlers: result.current };
 }
 
 describe('useWorkbenchOneShotCreation — text (C-4.2)', () => {

@@ -20,7 +20,7 @@ interface VariateNodeProps {
  * US3 shell (T036): header + collapsed summary only. The full variate body
  * (count/varyMode controls, Generate) lands in US5 with the renderService ops.
  */
-export const VariateNode: React.FC<VariateNodeProps> = ({ data, selected }) => {
+export const VariateNode = React.memo(({ data, selected }: VariateNodeProps) => {
     const count = data.data?.count ?? 4;
 
     return (
@@ -33,4 +33,6 @@ export const VariateNode: React.FC<VariateNodeProps> = ({ data, selected }) => {
             </div>
         </div>
     );
-};
+});
+
+VariateNode.displayName = 'VariateNode';

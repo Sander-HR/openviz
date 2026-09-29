@@ -23,7 +23,7 @@ const modes = [
     { id: 'product_background', label: 'Background' },
 ];
 
-export const ModifyNode: React.FC<ModifyNodeProps> = ({ id, data, selected }) => {
+export const ModifyNode = React.memo(({ id, data, selected }: ModifyNodeProps) => {
     const connection = useConnection();
     const [settings, setSettings] = useState(data.data);
     const [showModes, setShowModes] = useState(false);
@@ -184,4 +184,6 @@ export const ModifyNode: React.FC<ModifyNodeProps> = ({ id, data, selected }) =>
             </div>
         </div>
     );
-};
+});
+
+ModifyNode.displayName = 'ModifyNode';

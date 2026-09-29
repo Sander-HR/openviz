@@ -17,7 +17,7 @@ interface FreehandNodeProps {
     height?: number;
 }
 
-export const FreehandNode: React.FC<FreehandNodeProps> = ({ id, data, selected, width, height }) => {
+export const FreehandNode = React.memo(({ id, data, selected, width, height }: FreehandNodeProps) => {
     const [nodeSize, setNodeSize] = useState({ width: width || 1, height: height || 1 });
     const path = data.data?.path ?? '';
     const strokeColor = data.data?.color ?? '#2563eb';
@@ -86,4 +86,6 @@ export const FreehandNode: React.FC<FreehandNodeProps> = ({ id, data, selected, 
             />
         </div>
     );
-};
+});
+
+FreehandNode.displayName = 'FreehandNode';

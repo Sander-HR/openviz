@@ -1,16 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
-import {
-    Node,
-    NodeChange,
-    OnNodesChange,
-    applyNodeChanges,
-} from '@xyflow/react';
+import { Node, OnNodesChange } from '@xyflow/react';
 
 import { WorkbenchNode } from '@/types';
 
 import { normalizeArrowGeometry } from '@/services/workbench/arrowGeometry';
 import { requestImmediateSceneSave } from '@/services/workbench/sceneSyncBus';
-import { buildFlowNodes } from './workbenchNodeSizing';
 import { BasicBlocksMenuState } from './useWorkbenchBlockCreation';
 import { useStore } from '@/store/useStore';
 
@@ -18,8 +12,6 @@ type ContextMenuState = { x: number; y: number; nodeId: string | null } | null;
 
 type UseWorkbenchNodeHandlersOptions = {
     workbenchNodes: WorkbenchNode[];
-    selectedNodeIds: string[];
-    setSelectedNodeIds: (ids: string[]) => void;
     updateWorkbenchNode: (id: string, updates: Partial<WorkbenchNode>) => void;
     updateWorkbenchNodeTransient: (id: string, updates: Partial<WorkbenchNode>) => void;
     beginWorkbenchGesture: (kind: 'move' | 'resize' | 'arrow-handle', affectedNodeIds?: string[]) => void;
@@ -40,8 +32,6 @@ const isRemotelyLocked = (nodeId: string): boolean => Boolean(useStore.getState(
 
 export function useWorkbenchNodeHandlers({
     workbenchNodes,
-    selectedNodeIds,
-    setSelectedNodeIds,
     updateWorkbenchNode,
     updateWorkbenchNodeTransient,
     beginWorkbenchGesture,
@@ -54,14 +44,11 @@ export function useWorkbenchNodeHandlers({
 }: UseWorkbenchNodeHandlersOptions) {
     const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
     const resizingNodeIdsRef = useRef<Set<string>>(new Set());
+    const workbenchNodesRef = useRef(workbenchNodes);
+    workbenchNodesRef.current = workbenchNodes;
 
     const handleNodesChange: OnNodesChange = useCallback((changes) => {
-        const flowNodes = buildFlowNodes(workbenchNodes, selectedNodeIds);
-        applyNodeChanges(changes as NodeChange[], flowNodes);
-        const nextSelectedNodeIds = new Set(selectedNodeIds);
-        // US2 overlay anchoring (§5): the last node clicked in this batch is
-        // the "active" node — only it anchors the floating toolbar/panel.
-        let activeNodeId: string | null = null;
+        const currentNodes = workbenchNodesRef.current;
 
         changes.forEach((change) => {
             if (change.type === 'dimensions') {
@@ -74,10 +61,10 @@ export function useWorkbenchNodeHandlers({
                 if (resizingNodeIdsRef.current.has(change.id)) {
                     return;
                 }
-                const movedNode = workbenchNodes.find((node) => node.id === change.id);
+                const movedNode = currentNodes.find((node) => node.id === change.id);
                 const movedPosition = change.position;
                 if (!movedPosition) return;
-                const nextNodes = workbenchNodes.map((node) => {
+                const nextNodes = currentNodes.map((node) => {
                     if (node.type !== 'arrow' || !node.data.temporary) return node;
                     const updates: { start?: { x: number; y: number }; end?: { x: number; y: number } } = {};
                     (['start', 'end'] as const).forEach((point) => {
@@ -96,7 +83,10 @@ export function useWorkbenchNodeHandlers({
                     });
                     return Object.keys(updates).length > 0 ? { ...node, data: { ...node.data, ...updates } } : node;
                 });
-                const attachedArrows = nextNodes.filter((node) => node.type === 'arrow' && node !== workbenchNodes.find((candidate) => candidate.id === node.id));
+                const currentNodeById = new Map(currentNodes.map((node) => [node.id, node]));
+                const attachedArrows = nextNodes.filter((node) =>
+                    node.type === 'arrow' && node !== currentNodeById.get(node.id)
+                );
                 updateWorkbenchNodeTransient(change.id, {
                     x: movedPosition.x,
                     y: movedPosition.y,
@@ -109,41 +99,20 @@ export function useWorkbenchNodeHandlers({
             // This prevents flooding Zustand during drag operations
             else if (change.type === 'remove') {
                 removeWorkbenchNode(change.id);
-            } else if (change.type === 'select') {
-                // Defense in depth for FR-015: per-node `selectable=false`
-                // already blocks selection in React Flow; never re-add a
-                // remotely locked node through a programmatic change either.
-                if (change.selected && isRemotelyLocked(change.id)) {
-                    return;
-                }
-                if (change.selected) {
-                    nextSelectedNodeIds.add(change.id);
-                    activeNodeId = change.id;
-                } else {
-                    nextSelectedNodeIds.delete(change.id);
-                }
             }
         });
-
-        const nextSelection = [...nextSelectedNodeIds];
-        if (nextSelection.length !== selectedNodeIds.length || nextSelection.some((id) => !selectedNodeIds.includes(id))) {
-            setSelectedNodeIds(nextSelection);
-        }
-        if (activeNodeId && activeNodeId !== useStore.getState().activeNodeId) {
-            setActiveNodeId(activeNodeId);
-        }
-    }, [updateWorkbenchNodeTransient, removeWorkbenchNode, setSelectedNodeIds, setActiveNodeId, selectedNodeIds, workbenchNodes]);
+    }, [removeWorkbenchNode, updateWorkbenchNodeTransient]);
 
     const handleNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
         if (isRemotelyLocked(node.id)) return;
-        const workbenchNode = workbenchNodes.find((n) => n.id === node.id);
+        const workbenchNode = workbenchNodesRef.current.find((n) => n.id === node.id);
         // Uploaded images use the `media` node shape so their object URL can be
         // released when the node is deleted. They are still editable images,
         // so treat them like project image nodes when opening the editor.
         if (workbenchNode?.type === 'image' || workbenchNode?.type === 'media') {
             openNodeInStudio(node.id);
         }
-    }, [workbenchNodes, openNodeInStudio]);
+    }, [openNodeInStudio]);
 
     const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
         event.preventDefault();
@@ -157,12 +126,11 @@ export function useWorkbenchNodeHandlers({
 
     const handlePaneClick = useCallback(() => {
         setActiveNodeId(null);
-        setSelectedNodeIds([]);
         setBasicBlocksMenu(null);
-    }, [setActiveNodeId, setBasicBlocksMenu, setSelectedNodeIds]);
+    }, [setActiveNodeId, setBasicBlocksMenu]);
 
     const handleSourceClick = useCallback((nodeId: string) => {
-        const sourceNode = workbenchNodes.find((n) => n.id === nodeId);
+        const sourceNode = workbenchNodesRef.current.find((n) => n.id === nodeId);
         if (sourceNode) {
             const rect = document.querySelector(`[data-id="${nodeId}"]`)?.getBoundingClientRect();
             if (rect) {
@@ -174,7 +142,7 @@ export function useWorkbenchNodeHandlers({
                 });
             }
         }
-    }, [workbenchNodes, setBasicBlocksMenu]);
+    }, [setBasicBlocksMenu]);
 
     const handleResize = useCallback((nodeId: string, width: number, height: number, x?: number, y?: number) => {
         if (isRemotelyLocked(nodeId)) return;
@@ -182,7 +150,7 @@ export function useWorkbenchNodeHandlers({
             return;
         }
 
-        const node = workbenchNodes.find((n) => n.id === nodeId);
+        const node = workbenchNodesRef.current.find((n) => n.id === nodeId);
         if (!node) {
             return;
         }
@@ -228,7 +196,7 @@ export function useWorkbenchNodeHandlers({
         }
 
         updateWorkbenchNodeTransient(nodeId, updates);
-    }, [beginWorkbenchGesture, updateWorkbenchNodeTransient, workbenchNodes]);
+    }, [beginWorkbenchGesture, updateWorkbenchNodeTransient]);
 
     const handleResizeEnd = useCallback((nodeId: string, width: number, height: number, x?: number, y?: number) => {
         handleResize(nodeId, width, height, x, y);
@@ -238,7 +206,7 @@ export function useWorkbenchNodeHandlers({
 
     const handleTransientDataChange = useCallback((nodeId: string, data: Record<string, unknown>) => {
         if (isRemotelyLocked(nodeId)) return;
-        const node = workbenchNodes.find((candidate) => candidate.id === nodeId);
+        const node = workbenchNodesRef.current.find((candidate) => candidate.id === nodeId);
         if (!node || !('data' in node)) {
             return;
         }
@@ -249,7 +217,7 @@ export function useWorkbenchNodeHandlers({
                 ...data,
             },
         } as Partial<WorkbenchNode>);
-    }, [updateWorkbenchNodeTransient, workbenchNodes]);
+    }, [updateWorkbenchNodeTransient]);
 
     const handleGestureStart = useCallback((nodeId: string, kind: 'move' | 'resize' | 'arrow-handle') => {
         beginWorkbenchGesture(kind, [nodeId]);
@@ -268,7 +236,7 @@ export function useWorkbenchNodeHandlers({
 
     const handleDataChange = useCallback((nodeId: string, data: Record<string, unknown>) => {
         if (isRemotelyLocked(nodeId)) return;
-        const node = workbenchNodes.find((n) => n.id === nodeId);
+        const node = workbenchNodesRef.current.find((n) => n.id === nodeId);
         if (!node || !('data' in node)) {
             return;
         }
@@ -281,7 +249,7 @@ export function useWorkbenchNodeHandlers({
         } as Partial<WorkbenchNode>;
 
         updateWorkbenchNode(nodeId, updates);
-    }, [updateWorkbenchNode, workbenchNodes]);
+    }, [updateWorkbenchNode]);
 
     return {
         contextMenu,

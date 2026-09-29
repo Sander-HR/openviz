@@ -21,7 +21,7 @@ interface SectionNodeProps {
  * Section entry. Membership/wrapping ("Wrap in section") is deferred — v1 only
  * needs a creatable, selectable card with a label.
  */
-export const SectionNode: React.FC<SectionNodeProps> = ({ data, selected }) => {
+export const SectionNode = React.memo(({ data, selected }: SectionNodeProps) => {
     return (
         <div className={cn(nodeCardClass(selected), 'flex flex-col')}>
             <NodeCardHeader icon={SquareStack} label="Section" />
@@ -30,4 +30,6 @@ export const SectionNode: React.FC<SectionNodeProps> = ({ data, selected }) => {
             </div>
         </div>
     );
-};
+});
+
+SectionNode.displayName = 'SectionNode';

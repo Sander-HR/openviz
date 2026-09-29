@@ -19,7 +19,7 @@ interface TextNodeProps {
     height?: number;
 }
 
-export const TextNode: React.FC<TextNodeProps> = ({ id, data, selected, width, height }) => {
+export const TextNode = React.memo(({ id, data, selected, width, height }: TextNodeProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [nodeSize, setNodeSize] = useState({ width: width || 240, height: height || 72 });
@@ -117,4 +117,6 @@ export const TextNode: React.FC<TextNodeProps> = ({ id, data, selected, width, h
             />
         </div>
     );
-};
+});
+
+TextNode.displayName = 'TextNode';

@@ -20,7 +20,7 @@ function renderGraph(nodeLocks: Record<string, NodeLockState> = {}, workbenchNod
     const options = {
         workbenchNodes,
         connections: [],
-        selectedNodeIds: ['n1'],
+        flowSelectedNodeIds: ['n1'],
         nodeLocks,
         handleSourceClick: vi.fn(),
         handleResize: vi.fn(),
@@ -32,6 +32,42 @@ function renderGraph(nodeLocks: Record<string, NodeLockState> = {}, workbenchNod
     };
     return renderHook(() => useWorkbenchGraph(options));
 }
+
+describe('useWorkbenchGraph selection ownership', () => {
+    it('uses React Flow selection flags rather than the Zustand selection mirror', () => {
+        const { result } = renderGraph();
+
+        expect(result.current.nodes.map((node) => [node.id, node.selected])).toEqual([
+            ['n1', true],
+            ['n2', false],
+        ]);
+    });
+
+    it('reuses unaffected flow node objects across a transient node update', () => {
+        const { result, rerender } = renderHook(
+            ({ nodes }) => useWorkbenchGraph({
+                workbenchNodes: nodes,
+                connections: [],
+                flowSelectedNodeIds: [],
+                nodeLocks: {},
+                handleSourceClick: () => {},
+                handleResize: () => {},
+                handleResizeEnd: () => {},
+                handleTransientDataChange: () => {},
+                handleGestureStart: () => {},
+                handleGestureEnd: () => {},
+                handleDataChange: () => {},
+            }),
+            { initialProps: { nodes: [text, note] } }
+        );
+        const unchangedNode = result.current.nodes[1];
+
+        rerender({ nodes: [{ ...text, x: 15 }, note] });
+
+        expect(result.current.nodes[0].position).toEqual({ x: 15, y: 0 });
+        expect(result.current.nodes[1]).toBe(unchangedNode);
+    });
+});
 
 describe('useWorkbenchGraph remote soft locks (spec FR-015)', () => {
     it('marks remotely locked nodes as not selectable and not draggable', () => {

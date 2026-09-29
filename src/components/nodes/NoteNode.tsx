@@ -19,7 +19,7 @@ interface NoteNodeProps {
     height?: number;
 }
 
-export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, height }) => {
+export const NoteNode = React.memo(({ id, data, selected, width, height }: NoteNodeProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [nodeSize, setNodeSize] = useState({ width: width || 220, height: height || 180 });
@@ -123,4 +123,6 @@ export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, h
             />
         </div>
     );
-};
+});
+
+NoteNode.displayName = 'NoteNode';

@@ -25,7 +25,7 @@ interface ArrowNodeProps {
     height?: number;
 }
 
-export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width, height }) => {
+export const ArrowNode = React.memo(({ id, data, selected, width, height }: ArrowNodeProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const nodeWidth = Number.isFinite(width) && (width as number) > 0 ? (width as number) : 220;
     const nodeHeight = Number.isFinite(height) && (height as number) > 0 ? (height as number) : 140;
@@ -157,4 +157,6 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
             />
         </div>
     );
-};
+});
+
+ArrowNode.displayName = 'ArrowNode';

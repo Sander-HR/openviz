@@ -20,7 +20,7 @@ interface ImageNodeProps {
     height?: number;
 }
 
-export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConnectable = true, width, height }) => {
+export const ImageNode = React.memo(({ id, data, selected, isConnectable = true, width, height }: ImageNodeProps) => {
     const connection = useConnection();
     const [isHovered, setIsHovered] = useState(false);
     const [nodeSize, setNodeSize] = useState({ width: width || 256, height: height || 256 });
@@ -146,4 +146,6 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
             />
         </div>
     );
-};
+});
+
+ImageNode.displayName = 'ImageNode';

@@ -10,7 +10,7 @@ interface RenderNodeProps {
     selected: boolean;
 }
 
-export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) => {
+export const RenderNode = React.memo(({ id, data, selected }: RenderNodeProps) => {
     const {
         settings,
         availableStyles,
@@ -169,4 +169,6 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
             </div>
         </div>
     );
-};
+});
+
+RenderNode.displayName = 'RenderNode';
