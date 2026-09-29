@@ -16,9 +16,27 @@ export function buildArrowPath(start: ArrowPoint, control: ArrowPoint, end: Arro
     return `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`;
 }
 
-/** Two-segment arrowhead terminating at the end point (matches v1 rendering). */
-export function buildArrowheadPath(end: ArrowPoint): string {
-    return `M ${end.x - 12} ${end.y - 4} L ${end.x} ${end.y} L ${end.x - 4} ${end.y + 12}`;
+/**
+ * Two-segment arrowhead whose tip is `end` and whose axis follows `direction`.
+ * Keeping the direction calculation here prevents the arrowhead from becoming
+ * a fixed, screen-oriented decoration when the vector is rotated.
+ */
+export function buildArrowheadPath(end: ArrowPoint, direction: ArrowPoint): string {
+    const length = Math.hypot(direction.x, direction.y) || 1;
+    const unit = { x: direction.x / length, y: direction.y / length };
+    const perpendicular = { x: -unit.y, y: unit.x };
+    const base = { x: end.x - unit.x * 14, y: end.y - unit.y * 14 };
+    const halfWidth = 6;
+    const first = {
+        x: base.x + perpendicular.x * halfWidth,
+        y: base.y + perpendicular.y * halfWidth,
+    };
+    const second = {
+        x: base.x - perpendicular.x * halfWidth,
+        y: base.y - perpendicular.y * halfWidth,
+    };
+
+    return `M ${first.x} ${first.y} L ${end.x} ${end.y} L ${second.x} ${second.y}`;
 }
 
 /** Clamp a point into the node box [0,width] x [0,height]. */

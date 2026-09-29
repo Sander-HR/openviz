@@ -5,7 +5,6 @@ import { ArrowWorkbenchNode } from '@/types';
 import {
     buildArrowheadPath,
     buildArrowPath,
-    clampPointToBox,
 } from '@/services/workbench/arrowGeometry';
 import { cn, resizeHandleClassName } from './nodeUi';
 
@@ -33,13 +32,11 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
     const strokeColor = data.data?.strokeColor ?? '#111827';
     const strokeWidth = Number.isFinite(data.data?.strokeWidth) ? Math.max(1, data.data.strokeWidth) : 2;
     const geometry = useMemo(() => {
-        const start = clampPointToBox(data.data?.start ?? { x: 12, y: nodeHeight - 12 }, nodeWidth, nodeHeight);
-        const end = clampPointToBox(data.data?.end ?? { x: nodeWidth - 16, y: 16 }, nodeWidth, nodeHeight);
-        const control = clampPointToBox(
-            data.data?.control ?? { x: nodeWidth / 2, y: nodeHeight / 2 },
-            nodeWidth,
-            nodeHeight
-        );
+        // Points intentionally are not clamped to the node. The node is only
+        // the editing frame; the vector may extend beyond it while dragging.
+        const start = data.data?.start ?? { x: 12, y: nodeHeight - 12 };
+        const end = data.data?.end ?? { x: nodeWidth - 16, y: 16 };
+        const control = data.data?.control ?? { x: nodeWidth / 2, y: nodeHeight / 2 };
         return { start, end, control };
     }, [data.data, nodeHeight, nodeWidth]);
 
@@ -57,14 +54,10 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
             }
 
             const rect = container.getBoundingClientRect();
-            const nextPoint = clampPointToBox(
-                {
-                    x: moveEvent.clientX - rect.left,
-                    y: moveEvent.clientY - rect.top,
-                },
-                nodeWidth,
-                nodeHeight
-            );
+            const nextPoint = {
+                x: moveEvent.clientX - rect.left,
+                y: moveEvent.clientY - rect.top,
+            };
 
             const updateData = data.onTransientDataChange ?? data.onDataChange;
             updateData?.(id, {
@@ -94,8 +87,8 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
         <div
             ref={containerRef}
             className={cn(
-                'relative h-full w-full rounded-xl2 border border-transparent bg-transparent',
-                selected && 'ring-2 ring-viz-accent'
+                'relative h-full w-full overflow-visible rounded-xl2 border bg-transparent',
+                selected ? 'border-viz-accent ring-2 ring-viz-accent' : 'border-viz-border'
             )}
         >
             <svg className="h-full w-full overflow-visible" viewBox={`0 0 ${nodeWidth} ${nodeHeight}`} role="img" aria-label="Arrow node">
@@ -107,7 +100,10 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
                     strokeLinecap="round"
                 />
                 <path
-                    d={buildArrowheadPath(geometry.end)}
+                    d={buildArrowheadPath(geometry.end, {
+                        x: geometry.end.x - geometry.control.x,
+                        y: geometry.end.y - geometry.control.y,
+                    })}
                     fill="none"
                     stroke={strokeColor}
                     strokeWidth={strokeWidth}

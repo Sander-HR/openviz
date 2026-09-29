@@ -3,6 +3,7 @@ import type { ChangeEvent, RefObject } from 'react';
 
 import type { ImageNode } from '@/types';
 import { buildImageNode, isImageFile, resolveCenterFlowPoint } from '@/services/workbench/mediaUploadLogic';
+import { fileToDataUrl } from '@/services/imageSource';
 
 interface UseWorkbenchMediaUploadOptions {
     flowWrapperRef: RefObject<HTMLDivElement | null>;
@@ -27,6 +28,13 @@ export function useWorkbenchMediaUpload({ flowWrapperRef, screenToFlowPosition, 
         setIsPhoneUploadModalOpen(true);
     }, []);
 
+    const addImageFile = useCallback(async (file: File | undefined) => {
+        if (!file || !isImageFile(file)) return;
+        const dataUrl = await fileToDataUrl(file);
+        const centerPoint = resolveCenterFlowPoint(flowWrapperRef.current?.getBoundingClientRect(), screenToFlowPosition);
+        makeOneShotNode(buildImageNode({ src: dataUrl, fileName: file.name, mimeType: file.type, centerPoint }));
+    }, [flowWrapperRef, makeOneShotNode, screenToFlowPosition]);
+
     const closePhoneUploadModal = useCallback(() => {
         setIsPhoneUploadModalOpen(false);
     }, []);
@@ -46,22 +54,10 @@ export function useWorkbenchMediaUpload({ flowWrapperRef, screenToFlowPosition, 
 
     const handleMediaUploadChange = useCallback(
         (event: ChangeEvent<HTMLInputElement>) => {
-            const file = event.target.files?.[0];
-            // FR-012: image-only validation lives in the pure module (T023).
-            if (!file || !isImageFile(file)) {
-                return;
-            }
-
-            const objectUrl = URL.createObjectURL(file);
-            const centerPoint = resolveCenterFlowPoint(
-                flowWrapperRef.current?.getBoundingClientRect(),
-                screenToFlowPosition
-            );
-
-            makeOneShotNode(buildImageNode({ src: objectUrl, fileName: file.name, mimeType: file.type, centerPoint }));
+            void addImageFile(event.target.files?.[0]);
             event.target.value = '';
         },
-        [flowWrapperRef, makeOneShotNode, screenToFlowPosition]
+        [addImageFile]
     );
 
     return {
@@ -72,5 +68,6 @@ export function useWorkbenchMediaUpload({ flowWrapperRef, screenToFlowPosition, 
         handleMediaUploadFromPhone,
         handlePhoneUploadComplete,
         handleMediaUploadChange,
+        addImageFile,
     };
 }

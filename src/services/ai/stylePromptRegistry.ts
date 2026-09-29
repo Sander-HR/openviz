@@ -81,3 +81,13 @@ export function composeStylePrompt(userPrompt: string, style: string | undefined
     if (!prompt || !styleLayer) return prompt;
     return `${prompt}\n\nStyle direction: ${styleLayer.promptLayer}`;
 }
+
+/**
+ * Build the prompt for a named-view render (spec 006 S-5 `new-view`). The
+ * reference images carry the subject's geometry — a product, an animal, or
+ * any other object; the prompt only pins the camera angle so the model keeps
+ * the subject's appearance and proportions.
+ */
+export function composeNewViewPrompt(view: string): string {
+    return `Render the ${view} of this exact subject, keeping its appearance, details and proportions identical to the reference images.`;
+}

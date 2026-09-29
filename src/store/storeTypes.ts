@@ -112,6 +112,7 @@ export interface AppState {
     duplicateLayer: (id: string) => void;
     copyLayer: (id: string) => void;
     pasteLayer: () => void;
+    addImageLayer: (image: string, name?: string) => void;
 
     // Render Results Actions
     addRenderResultGroup: (settings: RenderSettings, images: string[], width: number, height: number, sourceNodeId?: string) => void;

@@ -1,8 +1,8 @@
-import { RenderService, GenerateRequest, GenerateResponse } from './types';
+import { RenderOperation, RenderService, GenerateRequest, GenerateResponse, NewViewRequest } from './types';
 import { createOpenAIImageTarget } from './ai/targets/openAIImageTarget';
 import { useStore } from '@/store/useStore';
 import { createGenerationQueue, type GenerationQueueSnapshot } from '@/services/ai/generationQueue';
-import { composeStylePrompt } from './ai/stylePromptRegistry';
+import { composeNewViewPrompt, composeStylePrompt } from './ai/stylePromptRegistry';
 
 const openAIImageGenerationQueue = createGenerationQueue();
 
@@ -86,8 +86,53 @@ export const openAIImageRenderService: RenderService = {
         }).promise;
     },
 
+    async newView(request: NewViewRequest): Promise<GenerateResponse> {
+        const settings = useStore.getState().computeSettings;
+        const endpoint = settings.imageApiEndpoint ?? '';
+        openAIImageGenerationQueue.setConcurrency(settings.endpointConcurrency ?? 2);
+
+        return openAIImageGenerationQueue.enqueue(endpoint, async () => {
+            const size = normalizeImageApiSize(request.width, request.height);
+            const target = createOpenAIImageTarget({
+                id: 'image-api',
+                endpoint,
+                model: settings.imageApiModel ?? '',
+                apiKey: settings.imageApiKey ?? '',
+                keyless: settings.imageApiKeyless ?? false,
+                size,
+            });
+
+            try {
+                const submitted = await target.submit({
+                    workflowId: 'new-view',
+                    prompt: composeNewViewPrompt(request.view),
+                    references: [],
+                    width: request.width,
+                    height: request.height,
+                    batchSize: 1,
+                    initImage: request.init_image,
+                    referenceImages: request.referenceImages,
+                    imageWorkflow: 'reference',
+                    parameters: {},
+                });
+                const outputs = await target.getOutputs(submitted.jobId);
+                return { success: true, images: outputs.map((output) => output.url) };
+            } catch (error) {
+                return {
+                    success: false,
+                    images: [],
+                    error: error instanceof Error ? error.message : 'OpenAI-compatible new-view generation failed.',
+                };
+            }
+        }).promise;
+    },
+
     async animate(): Promise<GenerateResponse> {
         return { success: false, images: [], error: 'The OpenAI-compatible image API does not support animation.' };
+    },
+
+    capabilities(): RenderOperation[] {
+        return ['generate', 'new-view'];
     },
 
     async checkConnection(): Promise<boolean> {

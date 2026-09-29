@@ -3,6 +3,8 @@ import { useStore } from '../../store/useStore';
 import { ToolType } from '../../types';
 import { Paintbrush, PaintBucket } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
+import { readClipboardImage } from '@/services/clipboardImage';
+import { fileToDataUrl } from '@/services/imageSource';
 
 interface ToolContextMenuProps {
     x: number;
@@ -12,7 +14,7 @@ interface ToolContextMenuProps {
 }
 
 export const ToolContextMenu: React.FC<ToolContextMenuProps> = ({ x, y, tool, onClose }) => {
-    const { toolSettings, setBrushSize, setBrushColor, setBrushOpacity, setBrushStabilizer, setBrushHardness, setEraserSize } = useStore();
+    const { toolSettings, setBrushSize, setBrushColor, setBrushOpacity, setBrushStabilizer, setBrushHardness, setEraserSize, addImageLayer } = useStore();
     const [isVisible, setIsVisible] = useState(false);
     const [showColorPicker, setShowColorPicker] = useState(false);
 
@@ -23,7 +25,13 @@ export const ToolContextMenu: React.FC<ToolContextMenuProps> = ({ x, y, tool, on
         return () => window.removeEventListener('click', handleGlobalClick);
     }, [onClose]);
 
-    if (tool !== 'brush' && tool !== 'eraser') return null;
+    const handlePasteImage = async () => {
+        const file = await readClipboardImage();
+        if (!file) return;
+        const image = await fileToDataUrl(file);
+        addImageLayer(image, file.name);
+        onClose();
+    };
 
     const size = tool === 'brush' ? toolSettings.brushSize : toolSettings.eraserSize;
     const color = tool === 'brush' ? toolSettings.brushColor : '#ffffff'; // Eraser usually visualizes as white or checkboard
@@ -36,6 +44,15 @@ export const ToolContextMenu: React.FC<ToolContextMenuProps> = ({ x, y, tool, on
             style={{ left: Math.min(x, window.innerWidth - 440), top: Math.min(y, window.innerHeight - 300) }}
             onClick={(e) => e.stopPropagation()}
         >
+            <button
+                type="button"
+                className="mb-4 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10"
+                onClick={handlePasteImage}
+            >
+                <span>Paste image from clipboard</span>
+                <span className="text-[10px] opacity-50">⌘V</span>
+            </button>
+            {tool !== 'brush' && tool !== 'eraser' ? null : <>
             {/* Header / Tool Selector style */}
             <div className="flex gap-2 mb-6 border-b border-white/5 pb-2">
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${tool === 'brush' ? 'bg-white/10' : 'opacity-50'}`}>
@@ -180,6 +197,7 @@ export const ToolContextMenu: React.FC<ToolContextMenuProps> = ({ x, y, tool, on
                     </div>
                 </div>
             </div>
+            </>}
         </div>
     );
 };

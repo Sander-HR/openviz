@@ -81,6 +81,7 @@ export interface ImageNode extends BaseNode {
     name: string;
     project: Project;
     status?: 'rendering' | 'done' | 'error';
+    errorMessage?: string;
     renderResults?: RenderGroup[];
 }
 
@@ -155,7 +156,16 @@ export interface ArrowWorkbenchNode extends BaseNode {
         control: { x: number; y: number };
         strokeColor: string;
         strokeWidth: number;
+        temporary?: boolean;
+        startAttachment?: ArrowNodeAttachment;
+        endAttachment?: ArrowNodeAttachment;
     };
+}
+
+export interface ArrowNodeAttachment {
+    nodeId: string;
+    side: 'left' | 'right' | 'top' | 'bottom';
+    offset: number;
 }
 
 /** Shared text formatting fields used by the text/note formatting toolbar. */

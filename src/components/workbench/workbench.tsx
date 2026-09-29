@@ -49,6 +49,7 @@ import { NodeLockBadges } from './NodeLockBadges';
 import { WorkbenchOverlayLayer } from './WorkbenchOverlayLayer';
 import { useShallow } from 'zustand/react/shallow';
 import { WorkbenchConnectionLine } from '../nodes/WorkbenchConnectionLine';
+import { FloatingArrowOverlay } from './FloatingArrowOverlay';
 import { WorkbenchCanvasBackground } from './WorkbenchCanvasBackground';
 import { useWorkbenchThemeStore } from '../../store/slices/workbenchThemeSlice';
 import { DrawingOverlay } from '@/drawing/DrawingOverlay';
@@ -61,6 +62,7 @@ import {
     getWorkbenchViewport,
     saveWorkbenchViewport,
 } from './hooks/workbenchViewportPersistence';
+import { readClipboardImage } from '@/services/clipboardImage';
 
 const nodeTypes: NodeTypes = {
     imageNode: ImageNode,
@@ -118,6 +120,7 @@ const WorkbenchContent: React.FC = () => {
         handleMediaUploadFromPhone,
         handlePhoneUploadComplete,
         handleMediaUploadChange,
+        addImageFile,
     } = useWorkbenchMediaUpload({
         flowWrapperRef,
         screenToFlowPosition,
@@ -171,6 +174,7 @@ const WorkbenchContent: React.FC = () => {
             onConnectEnd,
             handleNodeDoubleClick,
             handleNodeContextMenu,
+            handlePaneContextMenu,
             handlePaneClick,
             handleSourceClick,
             handleBlockSelect,
@@ -300,6 +304,7 @@ const WorkbenchContent: React.FC = () => {
     // node is selected, otherwise on the single node.
     const contextMenuNodes = React.useMemo<WorkbenchNode[]>(() => {
         if (!contextMenu) return [];
+        if (!contextMenu.nodeId) return [];
         if (selectedNodeIds.includes(contextMenu.nodeId)) {
             return workbenchNodes.filter((node) => selectedNodeIds.includes(node.id));
         }
@@ -310,6 +315,11 @@ const WorkbenchContent: React.FC = () => {
         if (!contextMenu) return;
         pasteFromClipboard(screenToFlowPosition({ x: contextMenu.x, y: contextMenu.y }));
     }, [contextMenu, pasteFromClipboard, screenToFlowPosition]);
+
+    const handleContextMenuPasteImage = useCallback(async () => {
+        const file = await readClipboardImage();
+        if (file) addImageFile(file);
+    }, [addImageFile]);
 
     // FR-007: one-shot creation is an atomic store action (T006) — the view
     // only builds the node payload; select + tool switch happen in one update.
@@ -377,6 +387,7 @@ const WorkbenchContent: React.FC = () => {
                 onConnectEnd={onConnectEnd}
                 onNodeDoubleClick={handleNodeDoubleClick}
                 onNodeContextMenu={handleNodeContextMenu}
+                onPaneContextMenu={handlePaneContextMenu}
                 onPaneClick={handlePaneClickWithTool}
                 deleteKeyCode={['Backspace', 'Delete']}
                 selectionMode={SelectionMode.Partial}
@@ -400,6 +411,20 @@ const WorkbenchContent: React.FC = () => {
             >
                 <WorkbenchCanvasBackground />
             </ReactFlow>
+            <FloatingArrowOverlay
+                arrows={workbenchNodes.filter((node): node is Extract<WorkbenchNode, { type: 'arrow' }> => node.type === 'arrow')}
+                selectedNodeIds={selectedNodeIds}
+                viewport={viewport}
+                wrapperRef={flowWrapperRef}
+                onDataChange={handleDataChange}
+                onTransientDataChange={handleTransientDataChange}
+                onGestureStart={handleGestureStart}
+                onGestureEnd={handleGestureEnd}
+                onSelect={(nodeId) => {
+                    setActiveNodeId(nodeId);
+                    setSelectedNodeIds([nodeId]);
+                }}
+            />
             {/* Awareness overlays (US2): remote cursors + soft-lock badges. */}
             <CursorOverlay remoteCursors={remoteCursors} viewport={viewport} />
             <NodeLockBadges nodes={nodes} nodeLocks={nodeLocks} viewport={viewport} />
@@ -409,6 +434,7 @@ const WorkbenchContent: React.FC = () => {
                 onCloseContextMenu={() => setContextMenu(null)}
                 contextNodes={contextMenuNodes}
                 onPaste={handleContextMenuPaste}
+                onPasteImage={handleContextMenuPasteImage}
             />
             {/* Collab session state (US3, SC-004). The PresenceIndicator chips
                 are intentionally not rendered — the component is kept for a

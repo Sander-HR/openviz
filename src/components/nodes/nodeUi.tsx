@@ -38,7 +38,7 @@ export function NodeCardHeader({
 }) {
     return (
         <div className="flex h-9 shrink-0 items-center gap-2 border-b border-viz-border px-3">
-            <Icon size={14} className="shrink-0 text-viz-accent" />
+            <Icon size={14} className="shrink-0 text-white" />
             <h3 className="truncate text-xs font-medium text-white">{label}</h3>
             {badge ? <span className="ml-auto shrink-0">{badge}</span> : null}
         </div>
@@ -98,7 +98,7 @@ export function NodeTargetHandle({ id, selected }: { id: string; selected: boole
 export function mediaNodeFrameClass(selected: boolean): string {
     return cn(
         'h-full w-full rounded bg-viz-panel shadow-viz overflow-hidden box-border',
-        selected ? 'border-2 border-viz-accent ring-2 ring-viz-accent' : 'border border-amber-200',
+        selected ? 'border-2 border-viz-accent ring-2 ring-viz-accent' : 'border border-white',
     );
 }
 

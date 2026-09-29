@@ -92,15 +92,15 @@ describe('ArrowNode handles (C-5.2)', () => {
         expect(onDataChange).toHaveBeenCalledWith('arrow-1', { control: { x: 30, y: 40 } });
     });
 
-    it('clamps drags that leave the node box instead of throwing (C-5.2 edge)', () => {
+    it('allows endpoint drags outside the node box', () => {
         const { handles, onDataChange } = renderArrow();
         fireEvent.pointerDown(handles[1], { pointerId: 1, clientX: 200, clientY: 20 });
 
         expect(() => fireWindowPointer('pointermove', -50, -50)).not.toThrow();
-        expect(onDataChange).toHaveBeenCalledWith('arrow-1', { end: { x: 0, y: 0 } });
+        expect(onDataChange).toHaveBeenCalledWith('arrow-1', { end: { x: -50, y: -50 } });
 
         fireWindowPointer('pointermove', 999, 999);
-        expect(onDataChange).toHaveBeenCalledWith('arrow-1', { end: { x: NODE_W, y: NODE_H } });
+        expect(onDataChange).toHaveBeenCalledWith('arrow-1', { end: { x: 999, y: 999 } });
     });
 
     it('stops reporting after pointer-up (release outside the canvas is safe)', () => {

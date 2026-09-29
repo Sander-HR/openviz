@@ -12,10 +12,10 @@ describe('buildArrowPath', () => {
 });
 
 describe('buildArrowheadPath', () => {
-    it('produces the two-segment arrowhead ending at the end point', async () => {
+    it('orients the two-segment arrowhead along the vector direction', async () => {
         const { buildArrowheadPath } = await import('./arrowGeometry');
-        const d = buildArrowheadPath({ x: 90, y: 30 });
-        expect(d).toBe('M 78 26 L 90 30 L 86 42');
+        const d = buildArrowheadPath({ x: 90, y: 30 }, { x: 1, y: 0 });
+        expect(d).toBe('M 76 36 L 90 30 L 76 24');
     });
 });
 

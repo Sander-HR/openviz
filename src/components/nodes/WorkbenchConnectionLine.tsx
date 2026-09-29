@@ -26,5 +26,28 @@ export function WorkbenchConnectionLine({
         return null;
     }
 
-    return <path d={path} fill="none" stroke="#475569" strokeWidth={2} />;
+    return (
+        <>
+            <defs>
+                <marker
+                    id="workbench-connection-arrow"
+                    viewBox="0 0 10 10"
+                    refX={8}
+                    refY={5}
+                    markerWidth={7}
+                    markerHeight={7}
+                    orient="auto-start-reverse"
+                >
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#4C4CEF" />
+                </marker>
+            </defs>
+            <path
+                d={path}
+                fill="none"
+                stroke="#4C4CEF"
+                strokeWidth={2}
+                markerEnd="url(#workbench-connection-arrow)"
+            />
+        </>
+    );
 }

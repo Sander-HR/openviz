@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Edge, Node } from "@xyflow/react";
 import { Connection, NodeLockState, WorkbenchNode } from "@/types";
+import { getGenerationRetry } from "@/services/workbench/generationRetryRegistry";
 
 type WorkbenchGraphOptions = {
     workbenchNodes: WorkbenchNode[];
@@ -101,7 +102,9 @@ export function useWorkbenchGraph({
     handleDataChange,
 }: WorkbenchGraphOptions) {
     const nodes = useMemo<Array<Node<Record<string, unknown>, WorkbenchFlowNodeType>>>(() => {
-        return workbenchNodes.map((node) => {
+        return workbenchNodes
+            .filter((node) => !(node.type === 'arrow' && node.data.temporary))
+            .map((node) => {
             const { width, height } = getNodeSize(node);
 
             return {
@@ -122,6 +125,7 @@ export function useWorkbenchGraph({
                     onGestureStart: handleGestureStart,
                     onGestureEnd: handleGestureEnd,
                     onDataChange: handleDataChange,
+                    onRetry: getGenerationRetry(node.id),
                 } as Record<string, unknown>,
                 selected: selectedNodeIds.includes(node.id),
                 // Remote soft locks (spec FR-015): a node another collaborator
@@ -129,12 +133,12 @@ export function useWorkbenchGraph({
                 selectable: !nodeLocks[node.id],
                 draggable: !nodeLocks[node.id],
             };
-        });
+            });
     }, [workbenchNodes, selectedNodeIds, nodeLocks, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
 
     const edges = useMemo<Array<Edge>>(() => {
         const nodeById = new Map(workbenchNodes.map((node) => [node.id, node]));
-        return connections.flatMap((conn) => {
+        const regularEdges = connections.flatMap((conn) => {
             const sourceNode = nodeById.get(conn.from);
             const targetNode = nodeById.get(conn.to);
 
@@ -153,6 +157,7 @@ export function useWorkbenchGraph({
                 animated: false,
             }];
         });
+        return regularEdges;
     }, [connections, workbenchNodes]);
 
     return { nodes, edges };

@@ -8,6 +8,7 @@ import type {
     TargetHealth,
 } from '@/types/executionTarget.types';
 import type { ProductWorkflowRequest } from '@/types/productWorkflow.types';
+import { blobToDataUrl } from '@/services/imageSource';
 
 type Fetcher = typeof fetch;
 type JsonRecord = Record<string, unknown>;
@@ -133,6 +134,41 @@ function resolveNativeImageUrl(endpoint: string, url: string): string {
     return `${endpointRoot(endpoint)}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+    }
+    return btoa(binary);
+}
+
+async function normalizeInputImage(input: string | undefined, fetcher: Fetcher): Promise<string | undefined> {
+    if (!input?.trim()) return undefined;
+    const value = input.trim();
+
+    if (value.startsWith('data:')) {
+        const match = value.match(/^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/i);
+        if (!match || match[2].length % 4 === 1) {
+            throw new Error('The source image is not valid base64 image data.');
+        }
+        return value;
+    }
+
+    if (/^(?:https?:|blob:)/i.test(value)) {
+        // Source images belong to the user's project or a third-party host.
+        // Never forward the image API's Authorization header to that host.
+        const response = await fetcher(value);
+        if (!response.ok) throw new Error(`Source image download failed (${response.status}).`);
+        const contentType = response.headers.get('content-type')?.split(';')[0] ?? 'image/png';
+        if (!contentType.startsWith('image/')) throw new Error('The source image URL did not return an image.');
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        return `data:${contentType};base64,${bytesToBase64(bytes)}`;
+    }
+
+    throw new Error('The source image must be a data URL or an image URL.');
+}
+
 function parseNativeImageOutputs(body: unknown, endpoint: string): GenerationOutput[] {
     const images = asRecord(body).images;
     if (!Array.isArray(images)) return [];
@@ -150,14 +186,14 @@ async function materializeNativeImageOutputs(
     fetcher: Fetcher,
 ): Promise<GenerationOutput[]> {
     return Promise.all(outputs.map(async (output) => {
-        if (!/^https?:\/\//.test(output.url) || typeof URL.createObjectURL !== 'function') return output;
+        if (!/^https?:\/\//.test(output.url)) return output;
 
         const response = await fetcher(output.url, { headers: headers(options) });
         if (!response.ok) {
             throw new Error(`Rendered image download failed (${response.status}).`);
         }
         const blob = await response.blob();
-        return { ...output, url: URL.createObjectURL(blob) };
+        return { ...output, url: await blobToDataUrl(blob) };
     }));
 }
 
@@ -217,8 +253,13 @@ export function createOpenAIImageTarget(options: OpenAIImageTargetOptions): Exec
         },
 
         async submit(request: ProductWorkflowRequest): Promise<SubmittedJob> {
-            const hasInputImage = Boolean(request.initImage);
-            const referenceImages = request.referenceImages?.filter((image) => image.trim().length > 0) ?? [];
+            const initImage = await normalizeInputImage(request.initImage, fetcher);
+            const referenceImages = await Promise.all(
+                (request.referenceImages ?? [])
+                    .filter((image) => image.trim().length > 0)
+                    .map((image) => normalizeInputImage(image, fetcher)),
+            ).then((images) => images.filter((image): image is string => Boolean(image)));
+            const hasInputImage = Boolean(initImage);
             const hasImageConditions = hasInputImage || referenceImages.length > 0 || Boolean(request.maskImage);
             const targetUrl = hasImageConditions
                 ? `${endpointRoot(endpoint)}/api/inference/images/generate`
@@ -234,7 +275,7 @@ export function createOpenAIImageTarget(options: OpenAIImageTargetOptions): Exec
                     width: dimensions.width,
                     height: dimensions.height,
                     batch_size: request.batchSize,
-                    ...(request.initImage ? { init_image: request.initImage } : {}),
+                    ...(initImage ? { init_image: initImage } : {}),
                     mask_image: request.maskImage,
                     ...(referenceImages.length > 0 ? { reference_images: referenceImages } : {}),
                     ...(request.referenceResolution ? { reference_resolution: request.referenceResolution } : {}),
