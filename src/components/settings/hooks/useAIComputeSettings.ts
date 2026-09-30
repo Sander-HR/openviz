@@ -62,21 +62,40 @@ export function useAIComputeSettings() {
         return () => { cancelled = true; };
     }, [applyComputeSettings, setImageApiKey]);
 
+    const saveSettings = useCallback(async (): Promise<void> => {
+        setSyncStatus('saving');
+        try {
+            const response = await fetch('/api/ai/settings', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    targetKind: settings.targetKind,
+                    protocol,
+                    preference: settings.preference,
+                    localEndpoint: settings.localEndpoint,
+                    hostedEndpoint: settings.hostedEndpoint,
+                    imageApiEndpoint,
+                    imageApiKey: imageApiKey || undefined,
+                    imageApiKeyless,
+                    imageApiModel,
+                    imageApiSize,
+                    endpointConcurrency,
+                }),
+            });
+            if (!response.ok) throw new Error('Unable to save AI settings.');
+            setSyncStatus('saved');
+        } catch {
+            setSyncStatus('error');
+        }
+    }, [endpointConcurrency, imageApiEndpoint, imageApiKey, imageApiKeyless, imageApiModel, imageApiSize, protocol, settings.hostedEndpoint, settings.localEndpoint, settings.preference, settings.targetKind]);
+
     useEffect(() => {
         if (!hydratedFromServer.current) return;
         const timer = window.setTimeout(() => {
-            setSyncStatus('saving');
-            fetch('/api/ai/settings', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetKind: settings.targetKind, protocol, preference: settings.preference, localEndpoint: settings.localEndpoint, hostedEndpoint: settings.hostedEndpoint, imageApiEndpoint, imageApiKey: imageApiKey || undefined, imageApiKeyless, imageApiModel, imageApiSize, endpointConcurrency }),
-            }).then((response) => {
-                if (!response.ok) throw new Error('Unable to save AI settings.');
-                setSyncStatus('saved');
-            }).catch(() => setSyncStatus('error'));
+            void saveSettings();
         }, 700);
         return () => window.clearTimeout(timer);
-    }, [endpointConcurrency, imageApiEndpoint, imageApiKey, imageApiKeyless, imageApiModel, imageApiSize, protocol, settings.hostedEndpoint, settings.localEndpoint, settings.preference, settings.targetKind]);
+    }, [saveSettings]);
 
     const refreshCapabilities = useCallback(async () => {
         const [statsResponse, objectInfoResponse] = await Promise.all([
@@ -143,6 +162,7 @@ export function useAIComputeSettings() {
         capabilities,
         refreshCapabilities,
         testConnection,
+        saveSettings,
         syncStatus,
     };
 }

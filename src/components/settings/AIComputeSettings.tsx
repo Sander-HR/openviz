@@ -29,6 +29,7 @@ export const AIComputeSettings: React.FC = () => {
         capabilities,
         refreshCapabilities,
         testConnection,
+        saveSettings,
         syncStatus,
     } = useAIComputeSettings();
 
@@ -185,6 +186,18 @@ export const AIComputeSettings: React.FC = () => {
                     <option value="hosted">Hosted GPU</option>
                 </select>
             </section>
+
+            <div className="flex items-center justify-end gap-3 border-t border-zinc-800 pt-5">
+                <p className="mr-auto text-xs text-zinc-600">Changes are also saved automatically.</p>
+                <button
+                    type="button"
+                    onClick={() => void saveSettings()}
+                    disabled={syncStatus === 'loading' || syncStatus === 'saving'}
+                    className="rounded-xl bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:cursor-wait disabled:opacity-60"
+                >
+                    {syncStatus === 'saving' ? 'Saving…' : 'Save settings'}
+                </button>
+            </div>
         </div>
     );
 };
