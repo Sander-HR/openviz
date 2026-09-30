@@ -1,33 +1,28 @@
 {
   "url": "http://localhost:3000/projects/9ad32117-9cda-4a96-a112-b7591439e61f/workbench",
   "singleNodeDrag": {
-    "frames": 322,
-    "avgFps": 54.73,
+    "frames": 316,
+    "avgFps": 55.12,
     "p95FrameMs": 33.3,
-    "worstFrameMs": 33.4,
+    "worstFrameMs": 33.9,
     "droppedFrames": 0,
     "longTasks": []
   },
   "marqueeSelect": {
-    "frames": 253,
-    "avgFps": 55.4,
-    "p95FrameMs": 31.8,
-    "worstFrameMs": 100,
-    "droppedFrames": 4,
-    "longTasks": [
-      55,
-      98,
-      72,
-      54
-    ],
+    "frames": 243,
+    "avgFps": 56.51,
+    "p95FrameMs": 32.2,
+    "worstFrameMs": 50,
+    "droppedFrames": 1,
+    "longTasks": [],
     "selectedCount": 5,
     "enclosedApprox": 4
   },
   "multiNodeDrag": {
-    "frames": 277,
-    "avgFps": 55.78,
-    "p95FrameMs": 33.3,
-    "worstFrameMs": 34.4,
+    "frames": 295,
+    "avgFps": 56.37,
+    "p95FrameMs": 32.3,
+    "worstFrameMs": 34.5,
     "droppedFrames": 1,
     "longTasks": []
   }
