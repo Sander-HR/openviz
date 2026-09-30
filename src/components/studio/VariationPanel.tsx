@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, MoreHorizontal, Plus, RefreshCw, Shuffle, X } from 'lucide-react';
 import { StudioPanelFrame } from './StudioPanelFrame';
 import { useStore } from '../../store/useStore';
@@ -54,6 +54,9 @@ export const VariationPanel: React.FC<VariationPanelProps> = ({ collapsed, onCol
     const [palette, setPalette] = useState(colorPresets[0].colors);
     const [selectedColorIndex, setSelectedColorIndex] = useState<number | null>(null);
     const [selectedPreset, setSelectedPreset] = useState(colorPresets[0].name);
+    const [outputsMenuOpen, setOutputsMenuOpen] = useState(false);
+    const [editingLabel, setEditingLabel] = useState<{ axis: 'horizontal' | 'vertical'; index: 0 | 1 } | null>(null);
+    const outputsMenuRef = useRef<HTMLDivElement>(null);
     const adapter = useMemo(() => {
         if (computeSettings.protocol === 'openai-image' && computeSettings.imageApiEndpoint) {
             return createOpenAIImageTarget({
@@ -73,6 +76,57 @@ export const VariationPanel: React.FC<VariationPanelProps> = ({ collapsed, onCol
     const activeReference = activeProductReferenceId ? productReferences[activeProductReferenceId] : undefined;
     const variationAreaRef = useRef<HTMLDivElement>(null);
     const activePreset = presetIndex === variationPresets.length - 1 ? customLabels : variationPresets[presetIndex];
+
+    useEffect(() => {
+        if (!outputsMenuOpen) return;
+        const handlePointerDown = (event: MouseEvent) => {
+            if (outputsMenuRef.current && !outputsMenuRef.current.contains(event.target as Node)) setOutputsMenuOpen(false);
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setOutputsMenuOpen(false);
+        };
+        document.addEventListener('mousedown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [outputsMenuOpen]);
+
+    const updateLabel = (axis: 'horizontal' | 'vertical', index: 0 | 1, value: string) => {
+        if (presetIndex === variationPresets.length - 1) {
+            setCustomLabels((current) => ({ ...current, [axis]: index === 0 ? [value, current[axis][1]] : [current[axis][0], value] }));
+        } else {
+            const source = variationPresets[presetIndex];
+            const next: VariationPreset = { name: 'Custom', horizontal: [...source.horizontal], vertical: [...source.vertical] };
+            next[axis][index] = value;
+            setCustomLabels(next);
+            setPresetIndex(variationPresets.length - 1);
+        }
+    };
+
+    const renderEditableLabel = (axis: 'horizontal' | 'vertical', index: 0 | 1, className: string) => {
+        const isEditing = editingLabel?.axis === axis && editingLabel.index === index;
+        if (isEditing) {
+            return (
+                <input
+                    autoFocus
+                    defaultValue={activePreset[axis][index]}
+                    onBlur={(event) => { updateLabel(axis, index, event.target.value.trim() || activePreset[axis][index]); setEditingLabel(null); }}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+                        if (event.key === 'Escape') { event.stopPropagation(); setEditingLabel(null); }
+                    }}
+                    className="w-24 rounded border border-viz-accent bg-viz-surface px-1 py-0.5 text-[10px] leading-none text-white outline-none"
+                />
+            );
+        }
+        return (
+            <button type="button" onClick={() => setEditingLabel({ axis, index })} className={`cursor-text whitespace-nowrap rounded px-1 text-[10px] leading-none text-white/70 hover:bg-white/10 hover:text-white ${className}`}>
+                {activePreset[axis][index]}
+            </button>
+        );
+    };
 
     const updateColor = (color: string) => {
         if (selectedColorIndex === null) return;
@@ -164,10 +218,10 @@ export const VariationPanel: React.FC<VariationPanelProps> = ({ collapsed, onCol
                     <div className="absolute inset-y-0 left-2/3 w-px bg-white/5" />
                     <div className="absolute inset-x-0 top-1/3 h-px bg-white/5" />
                     <div className="absolute inset-x-0 top-2/3 h-px bg-white/5" />
-                    <span className="absolute left-1/2 top-2 flex h-4 -translate-x-1/2 items-center justify-center"><span className="whitespace-nowrap text-[10px] leading-none text-white/70">{activePreset.vertical[0]}</span></span>
-                    <span className="absolute bottom-2 left-1/2 flex h-4 -translate-x-1/2 items-center justify-center"><span className="whitespace-nowrap text-[10px] leading-none text-white/70">{activePreset.vertical[1]}</span></span>
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2"><span className="flex h-4 w-4 items-center justify-center overflow-visible"><span className="-rotate-90 whitespace-nowrap text-[10px] leading-none text-white/70">{activePreset.horizontal[0]}</span></span></span>
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2"><span className="flex h-4 w-4 items-center justify-center overflow-visible"><span className="rotate-90 whitespace-nowrap text-[10px] leading-none text-white/70">{activePreset.horizontal[1]}</span></span></span>
+                    <span className="absolute left-1/2 top-2 flex h-4 -translate-x-1/2 items-center justify-center">{renderEditableLabel('vertical', 0, '')}</span>
+                    <span className="absolute bottom-2 left-1/2 flex h-4 -translate-x-1/2 items-center justify-center">{renderEditableLabel('vertical', 1, '')}</span>
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2"><span className="flex h-4 w-4 items-center justify-center overflow-visible">{renderEditableLabel('horizontal', 0, '-rotate-90')}</span></span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2"><span className="flex h-4 w-4 items-center justify-center overflow-visible">{renderEditableLabel('horizontal', 1, 'rotate-90')}</span></span>
                     <button type="button" role="slider" aria-label="Form variation position" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(horizontal)} aria-valuetext={`${activePreset.vertical[vertical < 50 ? 0 : 1]}, ${activePreset.horizontal[horizontal < 50 ? 0 : 1]}`} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); updatePosition(event.clientX, event.clientY); }} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) updatePosition(event.clientX, event.clientY); }} onKeyDown={(event) => { const step = event.shiftKey ? 10 : 25; if (event.key === 'ArrowLeft') commitPosition(horizontal - step, vertical); if (event.key === 'ArrowRight') commitPosition(horizontal + step, vertical); if (event.key === 'ArrowUp') commitPosition(horizontal, vertical - step); if (event.key === 'ArrowDown') commitPosition(horizontal, vertical + step); }} className="absolute h-7 w-7 touch-none cursor-grab -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-viz-accent shadow-lg shadow-viz-accent/30 active:cursor-grabbing" style={{ left: `${horizontal}%`, top: `${vertical}%` }} />
                 </div>}
 
@@ -192,14 +246,15 @@ export const VariationPanel: React.FC<VariationPanelProps> = ({ collapsed, onCol
                     <select id="variation-preset" value={presetIndex} onChange={(event) => setPresetIndex(Number(event.target.value))} className="min-h-8 min-w-0 flex-1 rounded-lg border border-viz-border bg-viz-surface px-3 text-xs text-white outline-none focus:ring-1 focus:ring-viz-accent">
                         {variationPresets.map((preset, index) => <option key={preset.name} value={index}>{preset.name}</option>)}
                     </select>
-                    <ChevronDown size={18} aria-hidden="true" />
-                </div>}
-                {mode === 'form' && presetIndex === variationPresets.length - 1 && <div className="grid grid-cols-2 gap-2 text-[10px]">
-                    {(['horizontal', 'vertical'] as const).map((axis) => <div key={axis} className="space-y-1"><label htmlFor={`custom-${axis}-start`} className="text-white/50">{axis}</label><div className="flex gap-1"><input id={`custom-${axis}-start`} value={customLabels[axis][0]} onChange={(event) => setCustomLabels((current) => ({ ...current, [axis]: [event.target.value, current[axis][1]] }))} className="min-w-0 w-1/2 rounded border border-viz-border bg-viz-surface px-1.5 py-1 text-xs text-white outline-none" /><input aria-label={`${axis} end label`} value={customLabels[axis][1]} onChange={(event) => setCustomLabels((current) => ({ ...current, [axis]: [current[axis][0], event.target.value] }))} className="min-w-0 w-1/2 rounded border border-viz-border bg-viz-surface px-1.5 py-1 text-xs text-white outline-none" /></div></div>)}
                 </div>}
             </div>
             <div className="flex shrink-0 gap-3 p-3">
-                <button type="button" aria-label="Number of outputs" className="flex h-8 min-w-12 items-center justify-between rounded-lg bg-viz-surface px-3 text-xs font-medium text-white/90 hover:bg-white/10 transition-colors" onClick={() => setOutputs((count) => count === 4 ? 1 : count + 1)}>{outputs}<ChevronDown size={13} /></button>
+                <div ref={outputsMenuRef} className="relative">
+                    <button type="button" aria-label="Number of outputs" aria-haspopup="menu" aria-expanded={outputsMenuOpen} onClick={() => setOutputsMenuOpen((open) => !open)} className="flex h-8 min-w-12 items-center justify-between gap-1 rounded-lg bg-viz-surface px-3 text-xs font-medium text-white/90 hover:bg-white/10 transition-colors">{outputs}<ChevronDown size={13} /></button>
+                    {outputsMenuOpen && <div role="menu" aria-label="Number of outputs" className="absolute bottom-full left-0 z-50 mb-1 w-24 overflow-hidden rounded-lg border border-viz-border bg-viz-panel py-1 shadow-viz">
+                        {[1, 2, 4].map((count) => <button key={count} type="button" role="menuitemradio" aria-checked={outputs === count} onClick={() => { setOutputs(count); setOutputsMenuOpen(false); }} className={`flex w-full items-center justify-between px-3 py-1.5 text-xs transition ${outputs === count ? 'text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'}`}>{count} images{outputs === count && <span className="h-1.5 w-1.5 rounded-full bg-viz-accent" />}</button>)}
+                    </div>}
+                </div>
                 <button type="button" onClick={handleGenerate} disabled={mode === 'color' ? generation.isGenerating || !activeReference : isRendering || !renderSettings.prompt.trim()} className="min-h-9 flex-1 rounded-lg bg-viz-accent text-xs font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">{mode === 'color' ? (generation.isGenerating ? 'Generating...' : 'Generate') : (isRendering ? 'Generating...' : 'Generate')}</button>
             </div>
         </StudioPanelFrame>

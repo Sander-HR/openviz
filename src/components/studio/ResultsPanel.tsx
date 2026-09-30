@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
+import type { ImageNode, RenderGroup, RenderNode } from '../../types';
 import { ChevronDown, MoreHorizontal, RotateCcw, Eye, Download, ArrowLeft, ArrowRight, Archive, PlusSquare, Check, LoaderCircle, TriangleAlert } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -16,9 +17,62 @@ interface ResultsPanelProps {
     height: number;
 }
 
+function getLegacyRenderGroups(
+    activeNodeId: string | null,
+    workbenchNodes: ReturnType<typeof useStore.getState>['workbenchNodes'],
+    connections: ReturnType<typeof useStore.getState>['connections']
+): RenderGroup[] {
+    if (!activeNodeId) return [];
+
+    const renderNodes = workbenchNodes.filter((node): node is RenderNode =>
+        node.type === 'render' && connections.some((connection) =>
+            connection.from === activeNodeId && connection.to === node.id
+        )
+    );
+
+    return renderNodes.flatMap((renderNode) => {
+        const prompt = renderNode.data.prompt.trim();
+        if (!prompt) return [];
+
+        const promptPrefix = prompt.toLowerCase().slice(0, 20);
+        const source = workbenchNodes.find((node) => node.id === activeNodeId);
+        const outputNodes = workbenchNodes
+            .filter((node): node is ImageNode =>
+                node.type === 'image' &&
+                node.id !== activeNodeId &&
+                Boolean(node.project.thumbnail) &&
+                node.name.toLowerCase().startsWith(promptPrefix)
+            )
+            .sort((left, right) => {
+                const leftDistance = Math.hypot(left.x - renderNode.x, left.y - renderNode.y);
+                const rightDistance = Math.hypot(right.x - renderNode.x, right.y - renderNode.y);
+                return leftDistance - rightDistance;
+            })
+            .slice(0, renderNode.data.numImages || 1);
+
+        const images = outputNodes
+            .map((node) => node.project.thumbnail)
+            .filter((thumbnail): thumbnail is string => Boolean(thumbnail));
+        if (images.length === 0) return [];
+
+        return [{
+            id: `legacy-${renderNode.id}`,
+            prompt,
+            style: renderNode.data.stylePreset,
+            settings: { ...renderNode.data },
+            images,
+            timestamp: 0,
+            width: source?.type === 'image' || source?.type === 'video' ? source.project.canvas.width : 1024,
+            height: source?.type === 'image' || source?.type === 'video' ? source.project.canvas.height : 1024,
+            sourceNodeId: activeNodeId,
+        } satisfies RenderGroup];
+    });
+}
+
 export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
     const {
         renderResults,
+        project,
         activeNodeId,
         resultsPanelOpen,
         setResultsPanelOpen,
@@ -31,19 +85,47 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
         addGroupToWorkbench,
         addImageToWorkbench,
         productJobs,
-        isRendering
+        isRendering,
+        workbenchNodes = [],
+        connections = [],
     } = useStore();
+
+    // A direct /studio load can restore the source project without restoring
+    // the workbench selection. The project id is also the image-node id for
+    // persisted image nodes, so use it as the source fallback.
+    const effectiveActiveNodeId = activeNodeId ?? project?.id ?? null;
 
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
     const [isExporting, setIsExporting] = React.useState<string | null>(null);
     const [lastPreviewedImage, setLastPreviewedImage] = useState<string | null>(null);
     const [showFooterInCollapsed, setShowFooterInCollapsed] = useState(false);
 
-    // Filter render results to show only those for the current active node
-    const filteredRenderResults = renderResults.filter(group =>
-        group.sourceNodeId === activeNodeId ||
-        (!group.sourceNodeId && activeNodeId === 'default')
+    // Results are persisted on the source image node so reopening a node can
+    // restore its history. Keep the global list as a compatibility fallback,
+    // then filter by the active source node. This also handles older scenes
+    // where the node-owned result groups were saved before sourceNodeId was
+    // added to the global render group.
+    const activeSourceNode = workbenchNodes.find((node): node is ImageNode =>
+        node.id === effectiveActiveNodeId && node.type === 'image'
     );
+    const activeVideoNode = workbenchNodes.find((node) =>
+        node.id === effectiveActiveNodeId && node.type === 'video'
+    );
+    const activeSourceResults = activeSourceNode?.renderResults ??
+        (activeVideoNode?.type === 'video' ? activeVideoNode.renderResults : undefined) ?? [];
+    const legacyRenderResults = useMemo(
+        () => getLegacyRenderGroups(effectiveActiveNodeId, workbenchNodes, connections),
+        [effectiveActiveNodeId, workbenchNodes, connections]
+    );
+    const resultGroups: RenderGroup[] = [...activeSourceResults, ...renderResults, ...legacyRenderResults];
+    const seenResultIds = new Set<string>();
+    const filteredRenderResults = resultGroups.filter((group) => {
+        if (seenResultIds.has(group.id)) return false;
+        seenResultIds.add(group.id);
+        return activeSourceResults.includes(group) ||
+            group.sourceNodeId === effectiveActiveNodeId ||
+            (!group.sourceNodeId && effectiveActiveNodeId === 'default');
+    });
     const colorJobs = Object.values(productJobs ?? {}).filter((job) => job.workflowId === 'material_study' && job.parameters.variableType === 'color');
 
     // Flatten all images for navigation

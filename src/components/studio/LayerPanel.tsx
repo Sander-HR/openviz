@@ -134,7 +134,7 @@ export const LayerPanel: React.FC = () => {
                                     <img
                                         src={layer.thumbnail}
                                         alt={layer.name}
-                                        className="w-full h-full object-contain"
+                                        className="w-full h-full object-cover"
                                     />
                                 ) : (
                                     <div className="text-[10px] text-text-secondary uppercase opacity-40">

@@ -84,8 +84,10 @@ export const useCanvasViewport = () => {
     const updateLayerThumbnail = useCallback((layerId: string) => {
         if (!stageRef.current) return;
         const stage = stageRef.current;
-        const layers = stage.getLayers();
-        const layerNode = layers.find(l => l.id() === layerId);
+        // The layer id belongs to the Group rendered inside Konva.Layer;
+        // Konva.Layer itself does not receive the application layer id.
+        const group = stage.findOne('#' + layerId) as Konva.Group | null;
+        const layerNode = group?.getLayer() ?? null;
 
         if (layerNode) {
             const oldAttrs = {
@@ -98,12 +100,23 @@ export const useCanvasViewport = () => {
             try {
                 stage.setAttrs({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
                 layerNode.draw();
+
+                // Crop to the layer's actual content bounds so the thumbnail
+                // represents what is on the layer (centered), not the whole canvas.
+                const rect = group ? group.getClientRect() : { x: 0, y: 0, width: 0, height: 0 };
+                const hasContent = rect.width > 0 && rect.height > 0;
+
+                const cropX = hasContent ? Math.max(0, rect.x) : 0;
+                const cropY = hasContent ? Math.max(0, rect.y) : 0;
+                const cropW = hasContent ? Math.min(canvas.width - cropX, rect.width) : canvas.width;
+                const cropH = hasContent ? Math.min(canvas.height - cropY, rect.height) : canvas.height;
+
                 const thumb = layerNode.toDataURL({
-                    x: 0,
-                    y: 0,
-                    width: canvas.width,
-                    height: canvas.height,
-                    pixelRatio: 256 / Math.max(canvas.width, canvas.height)
+                    x: cropX,
+                    y: cropY,
+                    width: cropW,
+                    height: cropH,
+                    pixelRatio: 256 / Math.max(cropW, cropH)
                 });
                 updateLayer(layerId, { thumbnail: thumb });
             } catch (e) {
@@ -126,18 +139,33 @@ export const useCanvasViewport = () => {
         };
     }, [fitToScreen, getFlattenedCanvas, updateLayerThumbnail]);
 
+    // Refresh thumbnails after the Konva tree has reconciled with the latest
+    // layer state. Thumbnail updates themselves are intentionally excluded
+    // from this signature so writing a thumbnail cannot trigger a refresh
+    // loop. Debouncing also prevents one thumbnail capture per pointer move
+    // while a stroke is being drawn.
+    const layerVisualSignature = project.layers.map((layer) => JSON.stringify({
+        id: layer.id,
+        x: layer.x,
+        y: layer.y,
+        width: layer.width,
+        height: layer.height,
+        rotation: layer.rotation,
+        scaleX: layer.scaleX,
+        scaleY: layer.scaleY,
+        image: layer.image,
+        strokes: layer.strokes,
+        adjustments: layer.adjustments,
+        adjustmentsEnabled: layer.adjustmentsEnabled,
+    })).join('|');
+
     useEffect(() => {
-        const updateAllThumbnails = async () => {
-            if (!stageRef.current) return;
-            project.layers.forEach(layer => {
-                if (!layer.thumbnail) {
-                    updateLayerThumbnail(layer.id);
-                }
-            });
-        };
-        const timer = setTimeout(updateAllThumbnails, 1000);
+        const timer = setTimeout(() => {
+            project.layers.forEach((layer) => updateLayerThumbnail(layer.id));
+        }, 100);
+
         return () => clearTimeout(timer);
-    }, [project.layers.length, updateLayerThumbnail]);
+    }, [layerVisualSignature, updateLayerThumbnail]);
 
     const handleMouseDown = (e: any) => {
         const mouseButton = e.evt.button;

@@ -26,6 +26,7 @@ describe('ResultsPanel', () => {
             addGroupToWorkbench: vi.fn(),
             addImageToWorkbench: vi.fn(),
             isRendering: false,
+            workbenchNodes: [],
         } as ReturnType<typeof useStore>);
     });
 

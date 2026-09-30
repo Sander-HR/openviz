@@ -223,7 +223,6 @@ export const RenderPanel: React.FC<RenderPanelProps> = ({ height, collapsed, onC
 
                     {showNumImagesDropdown && (
                         <div className="absolute bottom-full left-0 mb-2 bg-viz-surface border border-viz-border rounded-lg shadow-viz z-50 overflow-hidden p-1 min-w-[60px]">
-                            <div className="px-4 py-1.5 text-[10px] font-semibold text-viz-muted">COUNT</div>
                             {[1, 2, 3, 4].map(n => (
                                 <button
                                     key={n}

@@ -189,7 +189,9 @@ export function useRenderNodeGeneration(id: string, data: RenderNodeType) {
             });
 
             if (response.success && response.images.length > 0) {
-                addRenderResultGroup(settings, response.images, canvasWidth, canvasHeight, id);
+                // Results belong to the connected source image, not to this render node.
+                // The source node owns the results so reopening it restores the panel.
+                addRenderResultGroup(settings, response.images, canvasWidth, canvasHeight, sourceNodeId);
 
                 response.images.forEach((imageUrl, index) => {
                     if (index < placeholderIds.length) {
