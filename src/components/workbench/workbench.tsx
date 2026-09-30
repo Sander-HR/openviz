@@ -242,6 +242,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     const {
         state: {
             workbenchNodes,
+            transientPositions,
             connections,
             canUndoWorkbench,
             canRedoWorkbench,
@@ -281,6 +282,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
         gesture: {
             beginWorkbenchGesture,
             commitWorkbenchGesture,
+            commitTransientPositions,
         },
         actions: {
             pasteFromClipboard,
@@ -324,6 +326,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     useWorkbenchCenterOnReturn({ viewMode, activeNodeId, workbenchNodes, projectId: currentProjectId, setCenter });
     const { nodes, edges } = useWorkbenchGraph({
         workbenchNodes,
+        transientPositions,
         connections,
         flowSelectedNodeIds,
         nodeLocks,
@@ -446,11 +449,15 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     // When a node drag finishes (mouse released), commit the complete final
     // state and sync it immediately so a reload never shows stale state.
     const handleNodeDragStop = useCallback<OnNodeDrag>(
-        () => {
+        (_event, _node, draggedNodes) => {
+            commitTransientPositions(draggedNodes.map((draggedNode) => ({
+                id: draggedNode.id,
+                position: draggedNode.position,
+            })));
             commitWorkbenchGesture();
             requestImmediateSceneSave();
         },
-        [commitWorkbenchGesture]
+        [commitTransientPositions, commitWorkbenchGesture]
     );
 
     // FR-015: canvas theme (light default / dark optional), restyled in place.

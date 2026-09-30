@@ -20,11 +20,13 @@ const note: NoteWorkbenchNode = {
 function renderHandlers(workbenchNode: NoteWorkbenchNode | MediaWorkbenchNode = note) {
     const updateWorkbenchNode = vi.fn();
     const updateWorkbenchNodeTransient = vi.fn();
+    const onTransientPositionChange = vi.fn();
     const openNodeInStudio = vi.fn();
     const options = {
         workbenchNodes: [workbenchNode],
         updateWorkbenchNode,
         updateWorkbenchNodeTransient,
+        onTransientPositionChange,
         beginWorkbenchGesture: vi.fn(),
         commitWorkbenchGesture: vi.fn(),
         cancelWorkbenchGesture: vi.fn(),
@@ -38,6 +40,7 @@ function renderHandlers(workbenchNode: NoteWorkbenchNode | MediaWorkbenchNode = 
         ...renderHook(() => useWorkbenchNodeHandlers(options)),
         updateWorkbenchNode,
         updateWorkbenchNodeTransient,
+        onTransientPositionChange,
         openNodeInStudio,
     };
 }
@@ -90,8 +93,8 @@ describe('useWorkbenchNodeHandlers gesture updates', () => {
         }).not.toThrow();
     });
 
-    it('routes position changes to transient updates during drag', () => {
-        const { result, updateWorkbenchNode, updateWorkbenchNodeTransient } = renderHandlers();
+    it('routes position changes to local transient positions during drag', () => {
+        const { result, updateWorkbenchNode, updateWorkbenchNodeTransient, onTransientPositionChange } = renderHandlers();
 
         act(() => {
             result.current.handleNodesChange([
@@ -99,7 +102,8 @@ describe('useWorkbenchNodeHandlers gesture updates', () => {
             ]);
         });
 
-        expect(updateWorkbenchNodeTransient).toHaveBeenCalledWith('note-1', { x: 50, y: 60 });
+        expect(onTransientPositionChange).toHaveBeenCalledWith('note-1', { x: 50, y: 60 });
+        expect(updateWorkbenchNodeTransient).not.toHaveBeenCalled();
         expect(updateWorkbenchNode).not.toHaveBeenCalled();
     });
 });

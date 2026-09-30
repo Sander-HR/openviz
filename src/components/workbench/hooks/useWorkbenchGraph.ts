@@ -5,6 +5,7 @@ import { getGenerationRetry } from "@/services/workbench/generationRetryRegistry
 
 type WorkbenchGraphOptions = {
     workbenchNodes: WorkbenchNode[];
+    transientPositions?: Record<string, { x: number; y: number }>;
     connections: Connection[];
     /** React Flow's internal selection mirror; never read from Zustand. */
     flowSelectedNodeIds: string[];
@@ -92,6 +93,7 @@ function getNodeSize(node: WorkbenchNode) {
 
 export function useWorkbenchGraph({
     workbenchNodes,
+    transientPositions = {},
     connections,
     flowSelectedNodeIds,
     nodeLocks,
@@ -118,16 +120,19 @@ export function useWorkbenchGraph({
             .map((node) => {
             const remotelyLocked = Boolean(nodeLocks[node.id]);
             const selected = selectionIds.includes(node.id);
+            const transientPosition = transientPositions[node.id];
+            const position = transientPosition ?? { x: node.x, y: node.y };
             const cached = nextCache.get(node.id);
 
             if (cached?.sourceNode === node && cached.remotelyLocked === remotelyLocked) {
-                if (cached.node.selected === selected && cached.node.data.isTransitioningToStudio === isTransitioningToStudio) {
+                if (cached.node.selected === selected && cached.node.data.isTransitioningToStudio === isTransitioningToStudio && cached.node.position.x === position.x && cached.node.position.y === position.y) {
                     return cached.node;
                 }
 
                 const selectedNode = {
                     ...cached.node,
                     selected,
+                    position,
                     data: {
                         ...cached.node.data,
                         isTransitioningToStudio,
@@ -142,7 +147,7 @@ export function useWorkbenchGraph({
             const flowNode: Node<Record<string, unknown>, WorkbenchFlowNodeType> = {
                 id: node.id,
                 type: mapNodeType(node),
-                position: { x: node.x, y: node.y },
+                position,
                 width,
                 height,
                 style: { width, height },
@@ -177,7 +182,7 @@ export function useWorkbenchGraph({
         }
         flowNodeCacheRef.current = nextCache;
         return nextNodes;
-    }, [workbenchNodes, flowSelectedNodeIds, nodeLocks, isTransitioningToStudio, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
+    }, [workbenchNodes, transientPositions, flowSelectedNodeIds, nodeLocks, isTransitioningToStudio, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
 
     const edges = useMemo<Array<Edge>>(() => {
         const nodeById = new Map(workbenchNodes.map((node) => [node.id, node]));

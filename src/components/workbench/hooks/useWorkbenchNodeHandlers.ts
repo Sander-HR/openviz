@@ -14,6 +14,7 @@ type UseWorkbenchNodeHandlersOptions = {
     workbenchNodes: WorkbenchNode[];
     updateWorkbenchNode: (id: string, updates: Partial<WorkbenchNode>) => void;
     updateWorkbenchNodeTransient: (id: string, updates: Partial<WorkbenchNode>) => void;
+    onTransientPositionChange?: (id: string, position: { x: number; y: number }) => void;
     beginWorkbenchGesture: (kind: 'move' | 'resize' | 'arrow-handle', affectedNodeIds?: string[]) => void;
     commitWorkbenchGesture: () => void;
     cancelWorkbenchGesture: () => void;
@@ -34,6 +35,7 @@ export function useWorkbenchNodeHandlers({
     workbenchNodes,
     updateWorkbenchNode,
     updateWorkbenchNodeTransient,
+    onTransientPositionChange,
     beginWorkbenchGesture,
     commitWorkbenchGesture,
     cancelWorkbenchGesture,
@@ -64,10 +66,7 @@ export function useWorkbenchNodeHandlers({
                 const movedNode = currentNodes.find((node) => node.id === change.id);
                 const movedPosition = change.position;
                 if (!movedPosition) return;
-                updateWorkbenchNodeTransient(change.id, {
-                    x: movedPosition.x,
-                    y: movedPosition.y,
-                });
+                onTransientPositionChange?.(change.id, movedPosition);
 
                 // Temporary attached arrows are uncommon during a normal node
                 // drag. Walk only those arrows and update them directly instead
@@ -101,7 +100,7 @@ export function useWorkbenchNodeHandlers({
                 removeWorkbenchNode(change.id);
             }
         });
-    }, [removeWorkbenchNode, updateWorkbenchNodeTransient]);
+    }, [onTransientPositionChange, removeWorkbenchNode, updateWorkbenchNodeTransient]);
 
     const handleNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
         if (isRemotelyLocked(node.id)) return;
