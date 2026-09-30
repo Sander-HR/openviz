@@ -33,6 +33,7 @@ export function useWorkbenchSelectionSync(options: UseWorkbenchSelectionSyncOpti
     const { setNodes, getNodes } = options;
     const selectedNodeIds = useStore((state) => state.selectedNodeIds);
     const lastReactFlowSelectionKeyRef = useRef<string | null>(selectionKey(selectedNodeIds));
+    const selectionWriteTimerRef = useRef<number | null>(null);
 
     const applySelectionToReactFlow = useCallback(
         (ids: string[]) => {
@@ -54,7 +55,19 @@ export function useWorkbenchSelectionSync(options: UseWorkbenchSelectionSyncOpti
         }
 
         store.setSelectedNodeIds(unlocked);
-    }, []);
+
+        // React Flow can emit several selection snapshots while a marquee is
+        // moving. Coalesce the controlled projection until the gesture settles
+        // so selection remains correct without writing the full node list on
+        // every marquee mousemove.
+        if (selectionWriteTimerRef.current !== null) {
+            window.clearTimeout(selectionWriteTimerRef.current);
+        }
+        selectionWriteTimerRef.current = window.setTimeout(() => {
+            selectionWriteTimerRef.current = null;
+            applySelectionToReactFlow(unlocked);
+        }, 80);
+    }, [applySelectionToReactFlow]);
 
     const setSelection = useCallback(
         (ids: string[]) => {
@@ -68,6 +81,12 @@ export function useWorkbenchSelectionSync(options: UseWorkbenchSelectionSyncOpti
         },
         [applySelectionToReactFlow, getNodes]
     );
+
+    useEffect(() => () => {
+        if (selectionWriteTimerRef.current !== null) {
+            window.clearTimeout(selectionWriteTimerRef.current);
+        }
+    }, []);
 
     useEffect(() => {
         const store = useStore.getState();
