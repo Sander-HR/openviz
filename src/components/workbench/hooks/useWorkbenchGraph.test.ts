@@ -20,7 +20,6 @@ function renderGraph(nodeLocks: Record<string, NodeLockState> = {}, workbenchNod
     const options = {
         workbenchNodes,
         connections: [],
-        flowSelectedNodeIds: ['n1'],
         nodeLocks,
         handleSourceClick: vi.fn(),
         handleResize: vi.fn(),
@@ -34,12 +33,12 @@ function renderGraph(nodeLocks: Record<string, NodeLockState> = {}, workbenchNod
 }
 
 describe('useWorkbenchGraph selection ownership', () => {
-    it('uses React Flow selection flags rather than the Zustand selection mirror', () => {
+    it('leaves interactive selection ownership to React Flow', () => {
         const { result } = renderGraph();
 
         expect(result.current.nodes.map((node) => [node.id, node.selected])).toEqual([
-            ['n1', true],
-            ['n2', false],
+            ['n1', undefined],
+            ['n2', undefined],
         ]);
     });
 
@@ -48,7 +47,6 @@ describe('useWorkbenchGraph selection ownership', () => {
             ({ isTransitioningToStudio }) => useWorkbenchGraph({
                 workbenchNodes: [text],
                 connections: [],
-                flowSelectedNodeIds: ['n1'],
                 nodeLocks: {},
                 isTransitioningToStudio,
                 handleSourceClick: () => {},
@@ -72,7 +70,6 @@ describe('useWorkbenchGraph selection ownership', () => {
             ({ nodes }) => useWorkbenchGraph({
                 workbenchNodes: nodes,
                 connections: [],
-                flowSelectedNodeIds: [],
                 nodeLocks: {},
                 handleSourceClick: () => {},
                 handleResize: () => {},

@@ -10,8 +10,6 @@ import {
     SelectionMode,
     OnNodeDrag,
     type Viewport,
-    type ReactFlowState,
-    useStore as useReactFlowStore,
     useStoreApi,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -70,14 +68,6 @@ import { readClipboardImage } from '@/services/clipboardImage';
 import { startImageCanvasTransition } from '@/services/workbench/imageCanvasTransition';
 import { useWorkbenchSelectionSync, type SelectionSyncSetNodes } from './hooks/useWorkbenchSelectionSync';
 
-function selectFlowSelectedNodeIds(state: ReactFlowState): string[] {
-    return state.nodes.filter((node) => node.selected).map((node) => node.id);
-}
-
-function areStringArraysEqual(left: string[], right: string[]): boolean {
-    return left.length === right.length && left.every((id, index) => id === right[index]);
-}
-
 const nodeTypes: NodeTypes = {
     imageNode: ImageNode,
     videoNode: VideoNode,
@@ -104,7 +94,6 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     const viewportInitializedForProjectRef = useRef<string | null>(null);
     const { setCenter, getNode, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
     const reactFlowStore = useStoreApi();
-    const flowSelectedNodeIds = useReactFlowStore(selectFlowSelectedNodeIds, areStringArraysEqual);
     const setFlowNodes = useCallback<SelectionSyncSetNodes>((payload) => {
         const flowState = reactFlowStore.getState();
         const nextNodes = typeof payload === 'function' ? payload(flowState.nodes) : payload;
@@ -328,7 +317,6 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
         workbenchNodes,
         transientPositions,
         connections,
-        flowSelectedNodeIds,
         nodeLocks,
         isTransitioningToStudio,
         handleSourceClick,
