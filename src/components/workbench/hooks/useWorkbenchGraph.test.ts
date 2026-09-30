@@ -43,6 +43,30 @@ describe('useWorkbenchGraph selection ownership', () => {
         ]);
     });
 
+    it('updates transition state on cached nodes so selection chrome returns after Studio', () => {
+        const { result, rerender } = renderHook(
+            ({ isTransitioningToStudio }) => useWorkbenchGraph({
+                workbenchNodes: [text],
+                connections: [],
+                flowSelectedNodeIds: ['n1'],
+                nodeLocks: {},
+                isTransitioningToStudio,
+                handleSourceClick: () => {},
+                handleResize: () => {},
+                handleResizeEnd: () => {},
+                handleTransientDataChange: () => {},
+                handleGestureStart: () => {},
+                handleGestureEnd: () => {},
+                handleDataChange: () => {},
+            }),
+            { initialProps: { isTransitioningToStudio: true } },
+        );
+
+        expect(result.current.nodes[0].data.isTransitioningToStudio).toBe(true);
+        rerender({ isTransitioningToStudio: false });
+        expect(result.current.nodes[0].data.isTransitioningToStudio).toBe(false);
+    });
+
     it('reuses unaffected flow node objects across a transient node update', () => {
         const { result, rerender } = renderHook(
             ({ nodes }) => useWorkbenchGraph({

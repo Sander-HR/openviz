@@ -125,7 +125,14 @@ export function useWorkbenchGraph({
                     return cached.node;
                 }
 
-                const selectedNode = { ...cached.node, selected };
+                const selectedNode = {
+                    ...cached.node,
+                    selected,
+                    data: {
+                        ...cached.node.data,
+                        isTransitioningToStudio,
+                    },
+                };
                 nextCache.set(node.id, { ...cached, node: selectedNode });
                 return selectedNode;
             }
