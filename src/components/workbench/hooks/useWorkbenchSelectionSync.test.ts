@@ -16,7 +16,7 @@ function resetSelection(): void {
 afterEach(() => act(resetSelection));
 
 describe('useWorkbenchSelectionSync', () => {
-    it('mirrors React Flow selection into Zustand without writing back to React Flow', () => {
+    it('mirrors React Flow selection into Zustand and the node projection', () => {
         const setNodes = vi.fn<SelectionSyncSetNodes>();
         const { result } = renderHook(() => useWorkbenchSelectionSync({ setNodes }));
 
@@ -25,7 +25,7 @@ describe('useWorkbenchSelectionSync', () => {
         });
 
         expect(useStore.getState().selectedNodeIds).toEqual(['a', 'b']);
-        expect(setNodes).not.toHaveBeenCalled();
+        expect(setNodes).toHaveBeenCalledTimes(1);
     });
 
     it('drops remotely locked nodes from the mirrored selection', () => {

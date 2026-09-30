@@ -54,7 +54,11 @@ export function useWorkbenchSelectionSync(options: UseWorkbenchSelectionSyncOpti
         }
 
         store.setSelectedNodeIds(unlocked);
-    }, []);
+        // Keep the controlled node projection aligned at the selection boundary.
+        // This is deliberately limited to selection events, not onNodesChange,
+        // so dragging still avoids rebuilding the graph on every pointer move.
+        applySelectionToReactFlow(unlocked);
+    }, [applySelectionToReactFlow]);
 
     const setSelection = useCallback(
         (ids: string[]) => {
