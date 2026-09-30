@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image as ImageIcon, ImageOff } from 'lucide-react';
-import { NodeResizer, useInternalNode } from '@xyflow/react';
+import { NodeResizer, useStore } from '@xyflow/react';
 
 import { MediaWorkbenchNode } from '@/types';
 import { nodeCardClass, NodeCardHeader, resizeHandleClassName } from './nodeUi';
@@ -19,8 +19,8 @@ interface MediaNodeProps {
 }
 
 export const MediaNode = React.memo(({ id, data, selected, width, height }: MediaNodeProps) => {
-    const internalNode = useInternalNode(id);
-    const isSelected = selected || internalNode?.selected === true;
+    const internalSelected = useStore((state) => state.nodeLookup.get(id)?.selected === true);
+    const isSelected = selected || internalSelected;
     const [nodeSize, setNodeSize] = useState({ width: width || 260, height: height || 180 });
     const [loadError, setLoadError] = useState(false);
     const src = data.data?.src;
