@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NodeResizer } from '@xyflow/react';
 
 import { NoteWorkbenchNode } from '@/types';
+import { cn, resizeHandleClassName } from './nodeUi';
+import { TextFormattingToolbar } from './TextFormattingToolbar';
 
 interface NoteNodeData extends NoteWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -17,11 +19,30 @@ interface NoteNodeProps {
     height?: number;
 }
 
-export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, height }) => {
+export const NoteNode = React.memo(({ id, data, selected, width, height }: NoteNodeProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [nodeSize, setNodeSize] = useState({ width: width || 220, height: height || 180 });
     const textValue = useMemo(() => data.data?.text ?? '', [data.data?.text]);
+
+    const textColor = data.data?.color ?? '#78350f';
+    const rawFontSize = data.data?.fontSize;
+    const fontSize = typeof rawFontSize === 'number' && Number.isFinite(rawFontSize) ? Math.max(12, rawFontSize) : 16;
+    const fontWeight = data.data?.fontWeight ?? 400;
+    const fontStyle = data.data?.fontStyle ?? 'normal';
+    const underline = data.data?.underline === true;
+    const align = data.data?.align ?? 'left';
+    const fontFamily = data.data?.fontFamily;
+
+    const textStyle: React.CSSProperties = {
+        color: textColor,
+        fontSize,
+        fontWeight,
+        fontStyle,
+        textDecoration: underline ? 'underline' : undefined,
+        textAlign: align,
+        fontFamily,
+    };
 
     useEffect(() => {
         if (width && height && width > 0 && height > 0) {
@@ -37,19 +58,30 @@ export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, h
 
     return (
         <div style={{ width: nodeSize.width, height: nodeSize.height }}
-            className={`relative rounded-md border bg-amber-100 shadow-lg ${selected ? 'border-blue-400' : 'border-amber-200'}`}
+            className={cn(
+                'relative flex flex-col overflow-visible rounded border bg-amber-100 shadow-viz',
+                selected ? 'border-amber-200 ring-2 ring-viz-accent' : 'border-amber-200'
+            )}
             onDoubleClick={() => setIsEditing(true)}
         >
+            {selected && (
+                <TextFormattingToolbar
+                    state={{ fontSize, color: textColor, fontWeight, fontStyle, underline, align, fontFamily }}
+                    onChange={(patch) => data.onDataChange?.(id, patch)}
+                />
+            )}
+
             {isEditing ? (
                 <textarea
                     ref={textareaRef}
                     value={textValue}
                     onChange={(event) => data.onDataChange?.(id, { text: event.target.value })}
                     onBlur={() => setIsEditing(false)}
-                    className="nodrag nowheel h-full w-full resize-none bg-transparent p-3 text-sm leading-relaxed text-amber-900 outline-none"
+                    className="nodrag nowheel font-note min-h-0 w-full flex-1 resize-none bg-transparent p-3 leading-relaxed outline-none"
+                    style={textStyle}
                 />
             ) : (
-                <div className="h-full w-full whitespace-pre-wrap p-3 text-sm leading-relaxed text-amber-900">
+                <div className="font-note min-h-0 w-full flex-1 whitespace-pre-wrap overflow-hidden p-3 leading-relaxed" style={textStyle}>
                     {textValue || 'Note'}
                 </div>
             )}
@@ -58,12 +90,11 @@ export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, h
                 isVisible={selected}
                 minWidth={120}
                 minHeight={100}
-                color="#ffffff"
+                color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}
@@ -92,4 +123,6 @@ export const NoteNode: React.FC<NoteNodeProps> = ({ id, data, selected, width, h
             />
         </div>
     );
-};
+});
+
+NoteNode.displayName = 'NoteNode';

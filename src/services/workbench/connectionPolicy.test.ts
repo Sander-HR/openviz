@@ -72,6 +72,19 @@ function makeNode(id: string, type: WorkbenchNode['type']): WorkbenchNode {
         };
     }
 
+    if (type === 'new-view') {
+        return {
+            id,
+            type: 'new-view',
+            x: 0,
+            y: 0,
+            data: {
+                prompt: '',
+                view: null,
+            },
+        };
+    }
+
     return {
         id,
         type: 'render',
@@ -118,6 +131,22 @@ describe('connectionPolicy', () => {
 
         const selfConnection = addConnectionWithPolicy(seed, nodes, 'img-1', 'img-1');
         expect(selfConnection).toHaveLength(1);
+    });
+
+    it('allows image-to-modify connections with one inbound source', () => {
+        const nodes = [makeNode('image-1', 'image'), makeNode('modify-1', 'modify')];
+        const connections = addConnectionWithPolicy([], nodes, 'image-1', 'modify-1', 'image-source', 'modify-target-visible');
+
+        expect(connections).toHaveLength(1);
+        expect(connections[0]).toMatchObject({ from: 'image-1', to: 'modify-1' });
+    });
+
+    it('allows image-to-new-view connections (spec 008 FR-005)', () => {
+        const nodes = [makeNode('image-1', 'image'), makeNode('newview-1', 'new-view')];
+        const connections = addConnectionWithPolicy([], nodes, 'image-1', 'newview-1', 'image-source', 'newview-target-visible');
+
+        expect(connections).toHaveLength(1);
+        expect(connections[0]).toMatchObject({ from: 'image-1', to: 'newview-1' });
     });
 
     it('rejects any connection with a video endpoint', () => {

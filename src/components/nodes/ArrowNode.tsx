@@ -5,8 +5,8 @@ import { ArrowWorkbenchNode } from '@/types';
 import {
     buildArrowheadPath,
     buildArrowPath,
-    clampPointToBox,
 } from '@/services/workbench/arrowGeometry';
+import { cn, resizeHandleClassName } from './nodeUi';
 
 interface ArrowNodeData extends ArrowWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -25,20 +25,18 @@ interface ArrowNodeProps {
     height?: number;
 }
 
-export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width, height }) => {
+export const ArrowNode = React.memo(({ id, data, selected, width, height }: ArrowNodeProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const nodeWidth = Number.isFinite(width) && (width as number) > 0 ? (width as number) : 220;
     const nodeHeight = Number.isFinite(height) && (height as number) > 0 ? (height as number) : 140;
     const strokeColor = data.data?.strokeColor ?? '#111827';
     const strokeWidth = Number.isFinite(data.data?.strokeWidth) ? Math.max(1, data.data.strokeWidth) : 2;
     const geometry = useMemo(() => {
-        const start = clampPointToBox(data.data?.start ?? { x: 12, y: nodeHeight - 12 }, nodeWidth, nodeHeight);
-        const end = clampPointToBox(data.data?.end ?? { x: nodeWidth - 16, y: 16 }, nodeWidth, nodeHeight);
-        const control = clampPointToBox(
-            data.data?.control ?? { x: nodeWidth / 2, y: nodeHeight / 2 },
-            nodeWidth,
-            nodeHeight
-        );
+        // Points intentionally are not clamped to the node. The node is only
+        // the editing frame; the vector may extend beyond it while dragging.
+        const start = data.data?.start ?? { x: 12, y: nodeHeight - 12 };
+        const end = data.data?.end ?? { x: nodeWidth - 16, y: 16 };
+        const control = data.data?.control ?? { x: nodeWidth / 2, y: nodeHeight / 2 };
         return { start, end, control };
     }, [data.data, nodeHeight, nodeWidth]);
 
@@ -56,14 +54,10 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
             }
 
             const rect = container.getBoundingClientRect();
-            const nextPoint = clampPointToBox(
-                {
-                    x: moveEvent.clientX - rect.left,
-                    y: moveEvent.clientY - rect.top,
-                },
-                nodeWidth,
-                nodeHeight
-            );
+            const nextPoint = {
+                x: moveEvent.clientX - rect.left,
+                y: moveEvent.clientY - rect.top,
+            };
 
             const updateData = data.onTransientDataChange ?? data.onDataChange;
             updateData?.(id, {
@@ -90,7 +84,13 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
     };
 
     return (
-        <div ref={containerRef} className="relative h-full w-full rounded-lg border border-transparent bg-transparent">
+        <div
+            ref={containerRef}
+            className={cn(
+                'relative h-full w-full overflow-visible rounded-xl2 border bg-transparent',
+                selected ? 'border-viz-accent ring-2 ring-viz-accent' : 'border-viz-border'
+            )}
+        >
             <svg className="h-full w-full overflow-visible" viewBox={`0 0 ${nodeWidth} ${nodeHeight}`} role="img" aria-label="Arrow node">
                 <path
                     d={buildArrowPath(geometry.start, geometry.control, geometry.end)}
@@ -100,7 +100,10 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
                     strokeLinecap="round"
                 />
                 <path
-                    d={buildArrowheadPath(geometry.end)}
+                    d={buildArrowheadPath(geometry.end, {
+                        x: geometry.end.x - geometry.control.x,
+                        y: geometry.end.y - geometry.control.y,
+                    })}
                     fill="none"
                     stroke={strokeColor}
                     strokeWidth={strokeWidth}
@@ -112,17 +115,17 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
             {selected && (
                 <>
                     <div
-                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border border-white bg-blue-500 shadow"
+                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-viz-bg bg-viz-accent shadow"
                         style={{ left: geometry.start.x, top: geometry.start.y }}
                         onPointerDown={(event) => updatePointDrag('start', event)}
                     />
                     <div
-                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border border-white bg-blue-500 shadow"
+                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-viz-bg bg-viz-accent shadow"
                         style={{ left: geometry.end.x, top: geometry.end.y }}
                         onPointerDown={(event) => updatePointDrag('end', event)}
                     />
                     <div
-                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border border-white bg-amber-400 shadow"
+                        className="nodrag absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-viz-bg bg-viz-muted shadow"
                         style={{ left: geometry.control.x, top: geometry.control.y }}
                         onPointerDown={(event) => updatePointDrag('control', event)}
                     />
@@ -133,12 +136,11 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
                 isVisible={selected}
                 minWidth={80}
                 minHeight={60}
-                color="#ffffff"
+                color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}
@@ -155,4 +157,6 @@ export const ArrowNode: React.FC<ArrowNodeProps> = ({ id, data, selected, width,
             />
         </div>
     );
-};
+});
+
+ArrowNode.displayName = 'ArrowNode';

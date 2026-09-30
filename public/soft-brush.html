@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f4efe8" />
+  <title>Soft Brush — OpenViz</title>
+  <script src="https://unpkg.com/konva@10.2.0/konva.min.js"></script>
+  <style>
+    :root {
+      --ink: #262624;
+      --muted: #77736d;
+      --paper: #f4efe8;
+      --panel: rgba(255, 253, 249, 0.86);
+      --line: #ded7cc;
+      --blue: #0a72d7;
+      --blue-soft: #dceefe;
+      --shadow: 0 1.25rem 3rem rgba(64, 52, 37, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      overflow: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 11% 8%, rgba(255, 255, 255, .92), transparent 27rem),
+        radial-gradient(circle at 92% 90%, rgba(215, 229, 240, .48), transparent 30rem),
+        var(--paper);
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+
+    #app { min-height: 100vh; position: relative; }
+    #container { position: fixed; inset: 0; z-index: 0; cursor: crosshair; touch-action: none; }
+
+    .shell {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      min-height: 100vh;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 1.25rem;
+      pointer-events: none;
+    }
+
+    header, .controls, .tip { pointer-events: auto; }
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .eyebrow {
+      margin: 0 0 .4rem;
+      color: var(--blue);
+      font: 700 .68rem/1.2 ui-sans-serif, system-ui, sans-serif;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 3.4rem); font-weight: 400; letter-spacing: -.06em; }
+    .subtitle { max-width: 22rem; margin: .55rem 0 0; color: var(--muted); font-size: .95rem; line-height: 1.45; }
+    .mark {
+      display: grid;
+      width: 2.75rem;
+      height: 2.75rem;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: rgba(255,255,255,.52);
+      color: var(--blue);
+      font: 700 .9rem ui-sans-serif, system-ui, sans-serif;
+    }
+
+    .controls {
+      position: absolute;
+      top: 1.25rem;
+      left: 1.25rem;
+      align-self: flex-start;
+      display: grid;
+      width: min(15rem, calc(100vw - 2.5rem));
+      gap: .72rem;
+      padding: .75rem .8rem;
+      border: 1px solid rgba(214, 205, 192, .9);
+      border-radius: .8rem;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(1rem);
+    }
+    .control-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .control-head strong { font: 700 .67rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+    .swatches { display: grid; grid-template-columns: repeat(10, 1fr); gap: .25rem; }
+    .swatch { width: 1.15rem; height: 1.15rem; min-height: 0; padding: 0; border: 2px solid transparent; border-radius: 50%; background: var(--swatch); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+    .swatch:hover { transform: scale(1.12); }
+    .swatch.active { border-color: var(--ink); box-shadow: 0 0 0 1px #fffdf9, 0 0 0 2px var(--ink); }
+    .preview {
+      display: grid;
+      width: 7.5rem;
+      height: 3.25rem;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: .8rem;
+      background-color: #fbf8f3;
+      background-image: linear-gradient(45deg, #eee8de 25%, transparent 25%), linear-gradient(-45deg, #eee8de 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee8de 75%), linear-gradient(-45deg, transparent 75%, #eee8de 75%);
+      background-size: .7rem .7rem;
+      background-position: 0 0, 0 .35rem, .35rem -.35rem, -.35rem 0;
+      overflow: hidden;
+    }
+    #brush-preview-stroke { width: 100%; height: 100%; display: block; }
+    .slider-row { display: grid; gap: .48rem; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font: .68rem ui-sans-serif, system-ui, sans-serif; }
+    output { color: var(--ink); font-variant-numeric: tabular-nums; }
+    input[type="range"] { width: 100%; accent-color: var(--blue); cursor: pointer; }
+    .actions { display: flex; gap: .6rem; }
+    button {
+      min-height: 2.25rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0 .7rem;
+      background: #fffdf9;
+      color: var(--ink);
+      font: 700 .62rem ui-sans-serif, system-ui, sans-serif;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform .2s ease, border-color .2s ease, background .2s ease;
+    }
+    button:hover { border-color: var(--blue); background: var(--blue-soft); transform: translateY(-1px); }
+    button.primary { flex: 1; border-color: var(--blue); background: var(--blue); color: white; }
+    button.primary:hover { background: #075fad; }
+
+    .tip {
+      align-self: flex-start;
+      color: var(--muted);
+      font: .72rem/1.45 ui-sans-serif, system-ui, sans-serif;
+    }
+    .tip kbd { padding: .15rem .35rem; border: 1px solid var(--line); border-radius: .3rem; background: rgba(255,255,255,.6); font-size: .65rem; }
+    @media (min-width: 48rem) {
+      .shell { padding: 2rem 2.5rem; }
+      .controls { top: 2rem; left: 2.5rem; }
+    }
+    @media (max-width: 30rem) { .subtitle { max-width: 15rem; } .mark { display: none; } }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <div id="container" aria-label="Soft brush drawing canvas"></div>
+    <section class="shell">
+      <header>
+        <div>
+          <p class="eyebrow">OpenViz / Study 01</p>
+          <h1>Soft brush</h1>
+          <p class="subtitle">A quiet instrument for loose marks, translucent edges, and happy accidents.</p>
+        </div>
+        <div class="mark" aria-hidden="true">OV</div>
+      </header>
+
+      <section class="controls" aria-label="Brush settings">
+        <div class="control-head">
+          <strong>Brush settings</strong>
+          <div class="preview" aria-label="Brush stroke preview"><canvas id="brush-preview-stroke" width="240" height="104"></canvas></div>
+        </div>
+        <div class="swatches" aria-label="Brush colors">
+          <button class="swatch active" type="button" aria-label="Blue" data-color="#0a72d7" style="--swatch:#0a72d7"></button>
+          <button class="swatch" type="button" aria-label="Ink" data-color="#252525" style="--swatch:#252525"></button>
+          <button class="swatch" type="button" aria-label="Coral" data-color="#ef6f61" style="--swatch:#ef6f61"></button>
+          <button class="swatch" type="button" aria-label="Orange" data-color="#f2994a" style="--swatch:#f2994a"></button>
+          <button class="swatch" type="button" aria-label="Gold" data-color="#e2b93b" style="--swatch:#e2b93b"></button>
+          <button class="swatch" type="button" aria-label="Green" data-color="#48a868" style="--swatch:#48a868"></button>
+          <button class="swatch" type="button" aria-label="Teal" data-color="#28a7a0" style="--swatch:#28a7a0"></button>
+          <button class="swatch" type="button" aria-label="Purple" data-color="#8b6bd1" style="--swatch:#8b6bd1"></button>
+          <button class="swatch" type="button" aria-label="Pink" data-color="#d95c9b" style="--swatch:#d95c9b"></button>
+          <button class="swatch" type="button" aria-label="White" data-color="#fffdf9" style="--swatch:#fffdf9"></button>
+        </div>
+        <label class="slider-row" for="brush-size"><span class="slider-label"><span>Brush size</span><output id="size-val">24</output></span><input id="brush-size" type="range" min="0" max="100" value="24" /></label>
+        <label class="slider-row" for="brush-opacity"><span class="slider-label"><span>Opacity</span><output id="opacity-val">100</output></span><input id="brush-opacity" type="range" min="0" max="100" value="100" /></label>
+        <label class="slider-row" for="brush-hardness"><span class="slider-label"><span>Hardness</span><output id="hardness-val">25</output></span><input id="brush-hardness" type="range" min="0" max="100" value="25" /></label>
+        <label class="slider-row" for="brush-dynamic"><span class="slider-label"><span>Dynamic stroke</span><output id="dynamic-val">0</output></span><input id="brush-dynamic" type="range" min="0" max="100" value="0" /></label>
+        <label class="slider-row" for="brush-smoothing"><span class="slider-label"><span>Smoothing</span><output id="smoothing-val">1x</output></span><input id="brush-smoothing" type="range" min="1" max="4" value="1" /></label>
+        <div class="actions">
+          <button class="primary" id="clear-btn" type="button">Clear canvas</button>
+          <button id="undo-btn" type="button">Undo</button>
+        </div>
+      </section>
+
+      <p class="tip"><kbd>Click</kbd> to place a dot · <kbd>Shift</kbd> + <kbd>click</kbd> to connect · <kbd>⌘ Z</kbd> to undo</p>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const stage = new Konva.Stage({ container: 'container', width: window.innerWidth, height: window.innerHeight });
+      const airbrushLayer = new Konva.Layer({ listening: true });
+      stage.add(airbrushLayer);
+
+      let brushColor = '#0a72d7';
+      const settings = {
+        size: 24,
+        opacity: 100,
+        hardness: 25,
+        spacing: 100,
+        dynamic: 0,
+        smoothing: 10
+      };
+      let pendingOrigin = null;
+      let previewLine = null;
+      let currentStroke = null;
+      let currentStrokeLayer = null;
+      let lastPoint = null;
+      let currentPoints = [];
+      let isShiftClick = false;
+      let pointerDown = false;
+
+      const previewStroke = document.getElementById('brush-preview-stroke');
+      const settingInputs = Object.keys(settings).filter((name) => name !== 'spacing').map((name) => ({
+        name,
+        input: document.getElementById(`brush-${name}`),
+        output: document.getElementById(`${name}-val`)
+      }));
+
+      function updatePreview() {
+        const radius = Math.max(1, settings.size / 2);
+        const hardRadius = Math.max(.5, radius * settings.hardness / 100);
+        const context = previewStroke.getContext('2d');
+        if (!context) return;
+        const scale = Math.min(88 / radius, 1);
+        const scaledRadius = Math.max(radius * scale, 2);
+        const width = previewStroke.width;
+        const height = previewStroke.height;
+        const centerY = height / 2;
+        context.clearRect(0, 0, width, height);
+        const previewPoints = [];
+        const startX = scaledRadius + 12;
+        const endX = width - scaledRadius - 12;
+        for (let index = 0; index <= 48; index += 1) {
+          const t = index / 48;
+          previewPoints.push({
+            x: startX + (endX - startX) * t,
+            y: centerY + Math.sin(t * Math.PI * 2) * height * .18
+          });
+        }
+        drawCanvasStroke(context, smoothPoints(previewPoints), scaledRadius);
+      }
+      function syncBrush() {
+        settingInputs.forEach(({ name, input, output }) => {
+          settings[name] = Number(input.value);
+          output.textContent = name === 'smoothing' ? `${settings[name]}x` : settings[name];
+        });
+        updatePreview();
+        stage.getLayers().forEach((layer) => layer.batchDraw());
+      }
+      settingInputs.forEach(({ input }) => input.addEventListener('input', syncBrush));
+      document.querySelectorAll('.swatch').forEach((swatch) => swatch.addEventListener('click', () => {
+        brushColor = swatch.dataset.color;
+        document.querySelectorAll('.swatch').forEach((item) => item.classList.toggle('active', item === swatch));
+        updatePreview();
+      }));
+
+      function createStroke() {
+        return new Konva.Group({ listening: false, brushSettings: { ...settings } });
+      }
+
+      function dynamicRadius(radius, progress, dynamic) {
+        const edgeFactor = Math.abs(progress * 2 - 1);
+        return radius * (1 - (dynamic / 100) * .75 * edgeFactor);
+      }
+
+      function smoothPoints(points) {
+        const passes = Math.max(0, settings.smoothing - 1);
+        let smoothed = points;
+        for (let pass = 0; pass < passes; pass += 1) {
+          smoothed = smoothed.map((point, index, source) => {
+            if (index === 0 || index === source.length - 1) return point;
+            return {
+              x: (source[index - 1].x + point.x + source[index + 1].x) / 3,
+              y: (source[index - 1].y + point.y + source[index + 1].y) / 3
+            };
+          });
+        }
+        return smoothed;
+      }
+
+      function drawCanvasStroke(context, points, baseRadius) {
+        if (points.length === 0) return;
+        const total = points.slice(1).reduce((sum, point, index) => sum + Math.hypot(point.x - points[index].x, point.y - points[index].y), 0);
+        let travelled = 0;
+        const spacing = Math.max(.5, baseRadius * Math.max(.025, settings.spacing / 100));
+        for (let index = 0; index < points.length; index += 1) {
+          const point = points[index];
+          const progress = total === 0 ? .5 : travelled / total;
+          const radius = dynamicRadius(baseRadius, progress, settings.dynamic);
+          const hardStop = settings.hardness / 100;
+          const opacity = settings.opacity / 100 * flowForHardness(settings.hardness);
+          const gradient = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius);
+          if (settings.hardness === 0) {
+            gradient.addColorStop(0, rgba(brushColor, opacity * .26));
+            gradient.addColorStop(.18, rgba(brushColor, opacity * .26));
+            gradient.addColorStop(.58, rgba(brushColor, opacity * .12));
+          } else {
+            gradient.addColorStop(0, rgba(brushColor, opacity));
+            gradient.addColorStop(hardStop, rgba(brushColor, opacity));
+            gradient.addColorStop(Math.min(hardStop + (1 - hardStop) * .55, .92), rgba(brushColor, opacity * .35));
+          }
+          gradient.addColorStop(1, rgba(brushColor, 0));
+          context.fillStyle = gradient;
+          context.beginPath();
+          context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+          context.fill();
+          if (index < points.length - 1) travelled += Math.hypot(points[index + 1].x - point.x, points[index + 1].y - point.y);
+        }
+      }
+
+      function renderStrokePath(group, points) {
+        group.destroyChildren();
+        const brush = group.getAttr('brushSettings');
+        const path = smoothPoints(points);
+        if (path.length === 0) return;
+        const distances = path.slice(1).map((point, index) => Math.hypot(point.x - path[index].x, point.y - path[index].y));
+        const total = distances.reduce((sum, distance) => sum + distance, 0);
+        let travelled = 0;
+        addBrushStamp(group, path[0].x, path[0].y, dynamicRadius(Math.max(.5, brush.size / 2), 0, brush.dynamic));
+        for (let index = 1; index < path.length; index += 1) {
+          const progress = total === 0 ? 1 : travelled / total;
+          addBrushStamp(group, path[index].x, path[index].y, dynamicRadius(Math.max(.5, brush.size / 2), progress, brush.dynamic));
+          travelled += distances[index - 1];
+        }
+      }
+
+      function flowForHardness(hardness) {
+        return 0.35 + (hardness / 100) * 0.65;
+      }
+
+      function rgba(color, alpha) {
+        const value = color.replace('#', '');
+        const red = Number.parseInt(value.slice(0, 2), 16);
+        const green = Number.parseInt(value.slice(2, 4), 16);
+        const blue = Number.parseInt(value.slice(4, 6), 16);
+        return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+      }
+
+      function addBrushStamp(group, x, y, radiusOverride = null) {
+        const brush = group.getAttr('brushSettings');
+        const radius = radiusOverride ?? Math.max(0.5, brush.size / 2);
+        const hardStop = brush.hardness / 100;
+        const opacity = brush.opacity / 100 * flowForHardness(brush.hardness);
+        const color = brushColor;
+        const stamp = new Konva.Circle({
+          x, y, radius,
+          fillRadialGradientStartPoint: { x: 0, y: 0 },
+          fillRadialGradientEndPoint: { x: 0, y: 0 },
+          fillRadialGradientStartRadius: 0,
+          fillRadialGradientEndRadius: radius,
+          fillRadialGradientColorStops: [
+            0, rgba(color, hardStop === 0 ? opacity * 0.26 : opacity),
+            hardStop === 0 ? 0.18 : hardStop, rgba(color, hardStop === 0 ? opacity * 0.26 : opacity),
+            hardStop === 0 ? 0.58 : Math.min(hardStop + (1 - hardStop) * 0.55, 0.92), rgba(color, hardStop === 0 ? opacity * 0.12 : opacity * 0.35),
+            1, rgba(color, 0)
+          ],
+          listening: false
+        });
+        group.add(stamp);
+      }
+
+      function addBrushStampsBetween(group, from, to, progressStart = 0, progressEnd = 1) {
+        const brush = group.getAttr('brushSettings');
+        const radius = Math.max(0.5, brush.size / 2);
+        const distance = Math.hypot(to.x - from.x, to.y - from.y);
+        const spacing = Math.max(0.5, radius * Math.max(0.025, brush.spacing / 100));
+        const steps = Math.max(Math.ceil(distance / spacing), 1);
+        for (let index = 1; index <= steps; index += 1) {
+          const amount = index / steps;
+          const x = from.x + (to.x - from.x) * amount;
+          const y = from.y + (to.y - from.y) * amount;
+          const progress = progressStart + (progressEnd - progressStart) * amount;
+          addBrushStamp(group, x, y, dynamicRadius(radius, progress, brush.dynamic));
+        }
+      }
+
+      function addCommittedStamp(point) {
+        const strokeLayer = new Konva.Layer({ listening: false });
+        const stroke = createStroke();
+        addBrushStamp(stroke, point.x, point.y);
+        strokeLayer.add(stroke);
+        stage.add(strokeLayer);
+        strokeLayer.batchDraw();
+      }
+
+      function addCommittedLine(from, to) {
+        const strokeLayer = new Konva.Layer({ listening: false });
+        const stroke = createStroke();
+        renderStrokePath(stroke, [from, to]);
+        strokeLayer.add(stroke);
+        stage.add(strokeLayer);
+        strokeLayer.batchDraw();
+      }
+
+      function createPreviewLine(from, to) {
+        if (previewLine) previewLine.destroy();
+        previewLine = createStroke();
+        renderStrokePath(previewLine, [from, to]);
+        airbrushLayer.add(previewLine);
+        airbrushLayer.batchDraw();
+      }
+
+      function clearPreviewLine() {
+        if (!previewLine) return;
+        previewLine.destroy();
+        previewLine = null;
+        airbrushLayer.batchDraw();
+      }
+
+      stage.on('mousedown touchstart', (event) => {
+        const pos = stage.getPointerPosition();
+        if (!pos) return;
+        pointerDown = true;
+        isShiftClick = event.evt.shiftKey && pendingOrigin !== null;
+        if (isShiftClick) {
+          createPreviewLine(pendingOrigin, pos);
+        } else {
+          currentStrokeLayer = new Konva.Layer({ listening: false });
+          currentStroke = createStroke();
+          currentPoints = [pos];
+          renderStrokePath(currentStroke, currentPoints);
+          currentStrokeLayer.add(currentStroke);
+          stage.add(currentStrokeLayer);
+          lastPoint = pos;
+          currentStrokeLayer.batchDraw();
+        }
+      });
+      stage.on('mousemove touchmove', (event) => {
+        if (event.type === 'touchmove') event.evt.preventDefault();
+        if (!pointerDown) return;
+        const pos = stage.getPointerPosition();
+        if (!pos) return;
+        if (isShiftClick && pendingOrigin) {
+          createPreviewLine(pendingOrigin, pos);
+        } else if (currentStroke && lastPoint) {
+          currentPoints.push(pos);
+          renderStrokePath(currentStroke, currentPoints);
+          lastPoint = pos;
+          currentStrokeLayer.batchDraw();
+        }
+      });
+      stage.on('mouseup mouseleave touchend', () => {
+        if (!pointerDown) return;
+        const pos = stage.getPointerPosition();
+        if (pos) {
+          if (isShiftClick && pendingOrigin) {
+            addCommittedLine(pendingOrigin, pos);
+            pendingOrigin = pos;
+          } else {
+            pendingOrigin = pos;
+          }
+        }
+        pointerDown = false;
+        isShiftClick = false;
+        currentStroke = null;
+        currentStrokeLayer = null;
+        currentPoints = [];
+        lastPoint = null;
+        clearPreviewLine();
+      });
+      document.getElementById('clear-btn').addEventListener('click', () => { stage.getLayers().slice(1).forEach((layer) => layer.destroy()); pendingOrigin = null; clearPreviewLine(); stage.batchDraw(); });
+      document.getElementById('undo-btn').addEventListener('click', () => { const layers = stage.getLayers(); if (layers.length > 1) layers[layers.length - 1].destroy(); pendingOrigin = null; clearPreviewLine(); stage.batchDraw(); });
+      document.addEventListener('keydown', (event) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') document.getElementById('undo-btn').click(); });
+      window.addEventListener('resize', () => { stage.size({ width: window.innerWidth, height: window.innerHeight }); });
+      syncBrush();
+    })();
+  </script>
+</body>
+</html>

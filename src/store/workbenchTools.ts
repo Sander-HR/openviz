@@ -8,6 +8,7 @@ import type { WorkbenchToolType } from '@/types';
 
 export const TOOL_SHORTCUT_MAP: Record<string, WorkbenchToolType> = {
     v: 'select',
+    h: 'hand',
     d: 'draw',
     e: 'eraser',
     a: 'arrow',

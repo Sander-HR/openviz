@@ -102,11 +102,11 @@ export const LayerDropdown: React.FC<LayerDropdownProps> = ({ layerId, onClose, 
                     left: position.x,
                     zIndex: 9999
                 }}
-                className="w-48 bg-neutral-900 border border-neutral-800 rounded-lg shadow-2xl py-1 overflow-hidden pointer-events-auto"
+                className="w-48 bg-viz-surface border border-viz-border rounded-lg shadow-viz p-1 overflow-hidden pointer-events-auto"
             >
                 {actions.map((action, index) => (
                     'type' in action && action.type === 'divider' ? (
-                        <div key={index} className="h-px bg-neutral-800 my-1" />
+                        <div key={index} className="h-px bg-white/10 my-1" />
                     ) : (
                         <button
                             key={index}
@@ -118,10 +118,10 @@ export const LayerDropdown: React.FC<LayerDropdownProps> = ({ layerId, onClose, 
                             }}
                             disabled={'disabled' in action ? action.disabled : false}
                             className={cn(
-                                "w-full flex items-center justify-between px-3 py-2 text-xs transition-colors text-left",
+                                "w-full flex items-center justify-between px-4 py-2.5 text-xs transition-colors text-left",
                                 'danger' in action && (action as any).danger
                                     ? "text-red-400 hover:bg-red-500/10"
-                                    : "text-neutral-300 hover:bg-neutral-800 hover:text-white",
+                                    : "text-white hover:bg-white/10",
                                 'disabled' in action && (action as any).disabled && "opacity-30 cursor-not-allowed grayscale"
                             )}
                         >

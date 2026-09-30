@@ -29,30 +29,26 @@ export function getWorkbenchNodeSize(node: WorkbenchNode) {
     };
 }
 
-export function mapWorkbenchFlowNodeType(node: WorkbenchNode): Node['type'] {
-    if (node.type === 'image') return 'imageNode';
-    if (node.type === 'video') return 'videoNode';
-    if (node.type === 'animate') return 'animateNode';
-    if (node.type === 'freehand') return 'freehandNode';
-    if (node.type === 'arrow') return 'arrowNode';
-    if (node.type === 'text') return 'textNode';
-    if (node.type === 'note') return 'noteNode';
-    if (node.type === 'media') return 'mediaNode';
-    return 'renderNode';
-}
-
-export function buildFlowNodes(workbenchNodes: WorkbenchNode[], selectedNodeIds: string[]) {
+/**
+ * Creates the lightweight React Flow representation needed when applying
+ * controlled node changes. The graph hook adds node-specific callbacks and
+ * component types; change application only needs geometry and selection.
+ */
+export function buildFlowNodes(
+    workbenchNodes: WorkbenchNode[],
+    selectedNodeIds: string[],
+): Node<Record<string, unknown>>[] {
     return workbenchNodes.map((node) => {
         const { width, height } = getWorkbenchNodeSize(node);
+
         return {
             id: node.id,
-            type: mapWorkbenchFlowNodeType(node),
             position: { x: node.x, y: node.y },
             width,
             height,
             style: { width, height },
+            data: { ...node },
             selected: selectedNodeIds.includes(node.id),
-            data: {},
-        } as Node;
+        };
     });
 }

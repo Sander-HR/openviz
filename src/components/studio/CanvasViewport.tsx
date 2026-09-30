@@ -1,11 +1,23 @@
 import { useEffect, useRef } from 'react';
+import Konva from 'konva';
 import { Stage, Layer as KonvaLayer, Line, Rect, Circle, Image as KonvaImage, Transformer, Group } from 'react-konva';
 import { useStore } from '../../store/useStore';
 import useImage from 'use-image';
 import { ToolContextMenu } from './ToolContextMenu';
 import { useCanvasViewport } from '../hooks/useCanvasViewport';
+import type { Layer } from '../../types';
+import { createAdjustmentsFilter, hasAdjustments } from '../../types/adjustments';
+import { completeImageCanvasTransition } from '@/services/workbench/imageCanvasTransition';
 
-const URLImage = ({ src, x, y, width, height }: any) => {
+interface URLImageProps {
+    src: string;
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+}
+
+const URLImage = ({ src, x, y, width, height }: URLImageProps) => {
     const [image] = useImage(src, "anonymous");
     return <KonvaImage image={image} x={x} y={y} width={width} height={height} />;
 };
@@ -82,7 +94,65 @@ const RenderStroke = ({ stroke, i }: { stroke: any, i: number }) => {
     return null;
 };
 
-export const CanvasViewport = () => {
+interface LayerGroupProps {
+    layer: Layer;
+    activeLayerId: string | null;
+    activeTool: string;
+    previewShape: any | null;
+    updateLayer: (id: string, updates: Partial<Layer>) => void;
+    canvasWidth: number;
+    canvasHeight: number;
+}
+
+const LayerGroup = ({ layer, activeLayerId, activeTool, previewShape, updateLayer, canvasWidth, canvasHeight }: LayerGroupProps) => {
+    const groupRef = useRef<Konva.Group>(null);
+    const width = layer.width ?? canvasWidth;
+    const height = layer.height ?? canvasHeight;
+    const filterEnabled = layer.id === activeLayerId && layer.adjustmentsEnabled !== false && hasAdjustments(layer.adjustments);
+
+    useEffect(() => {
+        const group = groupRef.current;
+        if (!group) return;
+        group.clearCache();
+        group.filters(filterEnabled && layer.adjustments ? [createAdjustmentsFilter(layer.adjustments)] : []);
+        if (filterEnabled) group.cache({ x: 0, y: 0, width, height, pixelRatio: 1 });
+        group.getLayer()?.batchDraw();
+    }, [filterEnabled, height, layer.adjustments, width]);
+
+    return (
+        <Group
+            ref={groupRef}
+            id={layer.id}
+            x={layer.x}
+            y={layer.y}
+            width={width}
+            height={height}
+            rotation={layer.rotation}
+            scaleX={layer.scaleX}
+            scaleY={layer.scaleY}
+            draggable={activeTool === 'select' && activeLayerId === layer.id}
+            onDragEnd={(event) => {
+                updateLayer(layer.id, { x: event.target.x(), y: event.target.y() });
+                setTimeout(() => (window as unknown as { updateLayerThumbnail?: (id: string) => void }).updateLayerThumbnail?.(layer.id), 100);
+            }}
+            onTransformEnd={(event) => {
+                const node = event.target;
+                updateLayer(layer.id, { x: node.x(), y: node.y(), rotation: node.rotation(), scaleX: node.scaleX(), scaleY: node.scaleY() });
+                setTimeout(() => (window as unknown as { updateLayerThumbnail?: (id: string) => void }).updateLayerThumbnail?.(layer.id), 100);
+            }}
+        >
+            {layer.image && <URLImage src={layer.image} x={0} y={0} width={width} height={height} />}
+            {layer.strokes.map((stroke, index) => <RenderStroke key={index} stroke={stroke} i={index} />)}
+            {previewShape && activeLayerId === layer.id && <RenderStroke stroke={previewShape} i={-1} />}
+        </Group>
+    );
+};
+
+interface CanvasViewportProps {
+    onRasterizeReady?: (rasterize: () => boolean) => void;
+}
+
+export const CanvasViewport = ({ onRasterizeReady }: CanvasViewportProps) => {
     const {
         project,
         toolSettings,
@@ -106,8 +176,18 @@ export const CanvasViewport = () => {
         handleContextMenu,
         handleWheel,
         handleExitStudio,
+        rasterizeActiveLayer,
         fitToScreen
     } = useCanvasViewport();
+
+    useEffect(() => {
+        const revealTimer = window.setTimeout(completeImageCanvasTransition, 220);
+        return () => window.clearTimeout(revealTimer);
+    }, []);
+
+    useEffect(() => {
+        onRasterizeReady?.(rasterizeActiveLayer);
+    }, [onRasterizeReady, rasterizeActiveLayer]);
 
     const transformerRef = useRef<any>(null);
 
@@ -214,49 +294,15 @@ export const CanvasViewport = () => {
                         clipWidth={canvas.width}
                         clipHeight={canvas.height}
                     >
-                        <Group
-                            id={layer.id}
-                            x={layer.x}
-                            y={layer.y}
-                            width={layer.width}
-                            height={layer.height}
-                            rotation={layer.rotation}
-                            scaleX={layer.scaleX}
-                            scaleY={layer.scaleY}
-                            draggable={toolSettings.activeTool === 'select' && activeLayerId === layer.id}
-                            onDragEnd={(e) => {
-                                updateLayer(layer.id, {
-                                    x: e.target.x(),
-                                    y: e.target.y()
-                                });
-                            }}
-                            onTransformEnd={(e) => {
-                                const node = e.target;
-                                updateLayer(layer.id, {
-                                    x: node.x(),
-                                    y: node.y(),
-                                    rotation: node.rotation(),
-                                    scaleX: node.scaleX(),
-                                    scaleY: node.scaleY()
-                                });
-                            }}
-                        >
-                            {layer.image && (
-                                <URLImage
-                                    src={layer.image}
-                                    x={0}
-                                    y={0}
-                                    width={layer.width}
-                                    height={layer.height}
-                                />
-                            )}
-                            {layer.strokes.map((stroke, i) => (
-                                <RenderStroke key={i} stroke={stroke} i={i} />
-                            ))}
-                            {previewShape && activeLayerId === layer.id && (
-                                <RenderStroke stroke={previewShape} i={-1} />
-                            )}
-                        </Group>
+                        <LayerGroup
+                            layer={layer}
+                            activeLayerId={activeLayerId}
+                            activeTool={toolSettings.activeTool}
+                            previewShape={previewShape}
+                            updateLayer={updateLayer}
+                            canvasWidth={canvas.width}
+                            canvasHeight={canvas.height}
+                        />
                     </KonvaLayer>
                 ))}
 

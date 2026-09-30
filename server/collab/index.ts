@@ -28,6 +28,9 @@ const persistence = createDbPersistence();
 
 const server = new Server({
     port,
+    // The collaboration server is reached by browsers outside the container
+    // (including remote Tailscale clients), so bind every container interface.
+    address: process.env.COLLAB_ADDRESS ?? '0.0.0.0',
     // ~2 s debounced saves per the persistence contract; hard cap so a busy
     // room still flushes regularly.
     debounce: 2000,

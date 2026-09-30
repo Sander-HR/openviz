@@ -27,7 +27,7 @@ const ContextMenuContent = React.forwardRef<
         <ContextMenuPrimitive.Content
             ref={ref}
             className={cn(
-                'z-[1000] bg-[#2c2c2c] text-[#e0e0e0] py-1 rounded-lg shadow-xl border border-[#3c3c3c] min-w-[220px] backdrop-blur-sm nowheel',
+                'z-[1000] bg-viz-surface text-foreground py-1 rounded-lg shadow-viz border border-viz-border min-w-[220px] backdrop-blur-sm nowheel',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
                 'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -60,10 +60,10 @@ const ContextMenuItem = React.forwardRef<
         ref={ref}
         className={cn(
             'w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors group cursor-pointer outline-none select-none',
-            disabled && 'opacity-30 cursor-not-allowed',
+            disabled && 'opacity-40 cursor-not-allowed pointer-events-none',
             !disabled && [
-                'focus:bg-[#3b82f6] focus:text-white',
-                type === 'danger' && 'focus:bg-red-500'
+                'focus:bg-viz-selected focus:text-white',
+                type === 'danger' && ['text-red-400', 'focus:bg-red-500/15']
             ]
         )}
         disabled={disabled}
@@ -71,7 +71,7 @@ const ContextMenuItem = React.forwardRef<
     >
         <span>{label}</span>
         {shortcut && (
-            <span className="text-[#808080] text-xs font-mono group-focus:text-white/80">
+            <span className="text-viz-muted text-xs font-mono group-focus:text-white/80">
                 {shortcut}
             </span>
         )}
@@ -85,7 +85,7 @@ const ContextMenuSeparator = React.forwardRef<
 >((props, ref) => (
     <ContextMenuPrimitive.Separator
         ref={ref}
-        className="my-1 border-t border-[#3c3c3c]"
+        className="my-1 h-px bg-viz-border/60"
         {...props}
     />
 ));
@@ -138,12 +138,13 @@ const PositionedMenu: React.FC<PositionedMenuProps> = ({ x, y, open, onClose, ac
     return (
         <DropdownMenuPrimitive.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
             <DropdownMenuPrimitive.Trigger asChild>
-                <span style={{ position: 'fixed', left: x, top: y, width: 1, height: 1 }} />
+                {/* Dynamic coordinates require inline positioning; static styling is in classes. */}
+                <span className="fixed block h-px w-px" style={{ left: x, top: y }} />
             </DropdownMenuPrimitive.Trigger>
             <DropdownMenuPrimitive.Portal>
                 <DropdownMenuPrimitive.Content
                     className={cn(
-                        'z-[1000] bg-[#2c2c2c] text-[#e0e0e0] py-1 rounded-lg shadow-xl border border-[#3c3c3c] min-w-[220px] backdrop-blur-sm nowheel',
+                        'z-[1000] bg-viz-surface text-foreground py-1 rounded-lg shadow-viz border border-viz-border min-w-[220px] backdrop-blur-sm nowheel',
                         'data-[state=open]:animate-in data-[state=closed]:animate-out',
                         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
                         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95'
@@ -159,10 +160,10 @@ const PositionedMenu: React.FC<PositionedMenuProps> = ({ x, y, open, onClose, ac
                                 <DropdownMenuPrimitive.Item
                                     className={cn(
                                         'w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors group cursor-pointer outline-none select-none',
-                                        action.disabled && 'opacity-30 cursor-not-allowed',
+                                        action.disabled && 'opacity-40 cursor-not-allowed pointer-events-none',
                                         !action.disabled && [
-                                            'focus:bg-[#3b82f6] focus:text-white',
-                                            action.type === 'danger' && 'focus:bg-red-500'
+                                            'focus:bg-viz-selected focus:text-white',
+                                            action.type === 'danger' && ['text-red-400', 'focus:bg-red-500/15']
                                         ]
                                     )}
                                     disabled={action.disabled}
@@ -170,13 +171,13 @@ const PositionedMenu: React.FC<PositionedMenuProps> = ({ x, y, open, onClose, ac
                                 >
                                     <span>{action.label}</span>
                                     {action.shortcut && (
-                                        <span className="text-[#808080] text-xs font-mono group-focus:text-white/80">
+                                        <span className="text-viz-muted text-xs font-mono group-focus:text-white/80">
                                             {action.shortcut}
                                         </span>
                                     )}
                                 </DropdownMenuPrimitive.Item>
                             )}
-                            {action.divider && <DropdownMenuPrimitive.Separator className="my-1 border-t border-[#3c3c3c]" />}
+                            {action.divider && <DropdownMenuPrimitive.Separator className="my-1 h-px bg-viz-border/60" />}
                         </React.Fragment>
                     ))}
                 </DropdownMenuPrimitive.Content>

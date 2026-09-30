@@ -1,8 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Home } from 'lucide-react';
+import { ChevronDown, Home, Moon, Settings, Sun } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useCurrentProject } from '../../hooks/useCurrentProject';
+import { useWorkbenchThemeStore } from '../../store/slices/workbenchThemeSlice';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import { MenuItemRow } from '../workbench/menu/MenuItemRow';
 
 interface ProjectHeaderProps {
     className?: string;
@@ -15,6 +25,10 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className, mode = 
     const { project: dbProject, updateProjectName, isUpdating } = useCurrentProject(currentProjectId);
     const localProject = useStore((state) => state.project);
     const setLocalName = useStore((state) => state.setName);
+
+    // FR-015: canvas theme preference (per-user, persisted client-side).
+    const canvasTheme = useWorkbenchThemeStore((state) => state.canvasTheme);
+    const setCanvasTheme = useWorkbenchThemeStore((state) => state.setCanvasTheme);
 
     // Studio mode uses local store project, workbench mode uses database with fallback
     const project = mode === 'studio' ? localProject : (dbProject || localProject);
@@ -70,14 +84,48 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ className, mode = 
                 }
             }}
         >
-            {/* Home Button */}
-            <button
-                onClick={() => router.push('/dashboard')}
-                className="w-9 h-9 flex items-center justify-center bg-panel border border-panel-border rounded-full shadow-2xl backdrop-blur-md bg-opacity-90 text-text-secondary hover:text-white transition-all group"
-                title="Go Home (Dashboard)"
-            >
-                <Home size={16} className="group-hover:scale-110 transition-transform" />
-            </button>
+            {/* FR-015: application menu — canvas theme select (Light default / Dark optional) */}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        className="h-8 px-2.5 flex items-center gap-1.5 bg-panel/95 border border-panel-border rounded-lg shadow-lg backdrop-blur-md text-xs font-medium text-studio-ink hover:bg-panel transition-colors"
+                        title="OpenViz settings"
+                    >
+                        OpenViz
+                        <ChevronDown size={12} className="text-text-secondary" />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[180px]">
+                    <DropdownMenuLabel>Canvas theme</DropdownMenuLabel>
+                    <DropdownMenuItem asChild>
+                        <MenuItemRow                            label="Light"
+                            icon={Sun}
+                            checked={canvasTheme === 'light'}
+                            onClick={() => setCanvasTheme('light')}
+                        />
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <MenuItemRow                            label="Dark"
+                            icon={Moon}
+                            checked={canvasTheme === 'dark'}
+                            onClick={() => setCanvasTheme('dark')}
+                        />
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                        <MenuItemRow                            label="Settings"
+                            icon={Settings}
+                            onClick={() => router.push('/settings')}
+                        />
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <MenuItemRow                            label="Home (Dashboard)"
+                            icon={Home}
+                            onClick={() => router.push('/dashboard')}
+                        />
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Project Name Display/Editor */}
             <div className="relative">

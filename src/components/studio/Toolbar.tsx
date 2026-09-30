@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     Circle,
     Eraser,
@@ -54,24 +54,22 @@ function ToolSection({
     onSelectTool: (tool: ToolType) => void;
 }) {
     return (
-        <div className="flex items-center gap-0.5 px-0.5 pr-1.5 border-r border-panel-border mr-0.5">
+        <div className="flex items-center gap-0.5">
             {TOOL_ACTIONS.map((tool) => (
                 <button
                     key={tool.id}
                     onClick={() => onSelectTool(tool.id)}
+                    aria-label={`${tool.label} tool`}
+                    aria-pressed={activeTool === tool.id}
                     className={cn(
-                        "p-1.5 rounded-full transition-all duration-200 group relative",
+                        "flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150",
                         activeTool === tool.id
-                            ? "bg-primary text-white shadow-lg"
-                            : "text-text-secondary hover:bg-neutral-800 hover:text-white"
+                            ? "bg-viz-accent text-white"
+                            : "text-viz-muted hover:bg-white/10 hover:text-white"
                     )}
                     title={`${tool.label} (${tool.shortcut})`}
                 >
-                    <tool.icon size={16} strokeWidth={2.3} />
-                    <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[10px] opacity-0 group-hover:opacity-60 transition-opacity">
-                        {tool.shortcut}
-                    </span>
-                    <span className="sr-only">{tool.label}</span>
+                    <tool.icon size={16} strokeWidth={2} />
                 </button>
             ))}
         </div>
@@ -80,20 +78,22 @@ function ToolSection({
 
 function HistorySection({ onUndo, onRedo }: { onUndo: () => void; onRedo: () => void }) {
     return (
-        <div className="flex items-center gap-0.5 px-0.5">
+        <div className="flex items-center gap-0.5">
             <button
                 onClick={onUndo}
-                className="p-1.5 rounded-full text-text-secondary hover:bg-neutral-800 hover:text-white transition-all"
+                aria-label="Undo"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-viz-muted transition-colors hover:bg-white/10 hover:text-white"
                 title="Undo (Ctrl+Z)"
             >
-                <Undo2 size={16} />
+                <Undo2 size={16} strokeWidth={2} />
             </button>
             <button
                 onClick={onRedo}
-                className="p-1.5 rounded-full text-text-secondary hover:bg-neutral-800 hover:text-white transition-all"
+                aria-label="Redo"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-viz-muted transition-colors hover:bg-white/10 hover:text-white"
                 title="Redo (Ctrl+Y)"
             >
-                <Redo2 size={16} />
+                <Redo2 size={16} strokeWidth={2} />
             </button>
         </div>
     );
@@ -110,15 +110,14 @@ function ModeSwitchSection({
         <button
             onClick={onToggleViewMode}
             className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200",
+                "flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150",
                 viewMode === "WORKBENCH"
-                    ? "bg-primary text-white"
-                    : "text-text-secondary hover:bg-neutral-800 hover:text-white"
+                    ? "bg-viz-surface text-white"
+                    : "text-viz-muted hover:bg-white/10 hover:text-white"
             )}
             title={viewMode === "STUDIO" ? "Switch to Workbench" : "Back to Studio"}
         >
-            <LayoutDashboard size={16} />
-            <span>Workbench</span>
+            <LayoutDashboard size={15} strokeWidth={2} />
         </button>
     );
 }
@@ -133,6 +132,7 @@ export const Toolbar: React.FC = () => {
         addLayer,
         updateLayer,
         saveCurrentToWorkbench,
+        setViewMode,
         viewMode,
         currentProjectId,
     } = useStore(
@@ -145,11 +145,13 @@ export const Toolbar: React.FC = () => {
             addLayer: state.addLayer,
             updateLayer: state.updateLayer,
             saveCurrentToWorkbench: state.saveCurrentToWorkbench,
+            setViewMode: state.setViewMode,
             viewMode: state.viewMode,
             currentProjectId: state.currentProjectId,
         }))
     );
     const router = useRouter();
+    const pathname = usePathname();
     const [showColorPicker, setShowColorPicker] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -204,21 +206,28 @@ export const Toolbar: React.FC = () => {
     };
 
     const handleToggleWorkbench = () => {
-        if (!currentProjectId) return;
+        // The URL is the source of truth for project workspaces. Fall back to
+        // it while the store is still hydrating so this button cannot become a
+        // no-op when the toolbar renders before currentProjectId is available.
+        const projectId = currentProjectId ?? pathname.match(/^\/projects\/([^/]+)/)?.[1];
+        if (!projectId) return;
+
         if (viewMode === "STUDIO") {
             const flattenedCanvas = (window as CanvasFlattenWindow).getFlattenedCanvas?.();
             if (flattenedCanvas) {
                 saveCurrentToWorkbench(flattenedCanvas);
             }
-            router.push(`/projects/${currentProjectId}/workbench`);
+            setViewMode("WORKBENCH");
+            router.push(`/projects/${projectId}/workbench`);
             return;
         }
 
-        router.push(`/projects/${currentProjectId}/studio`);
+        setViewMode("STUDIO");
+        router.push(`/projects/${projectId}/studio`);
     };
 
     return (
-        <div className="flex items-center gap-0.5 bg-panel border border-panel-border p-1 rounded-2xl shadow-2xl backdrop-blur-md bg-opacity-90 pointer-events-auto">
+        <div className="pointer-events-auto flex items-center gap-1.5 rounded-xl2 bg-viz-panel p-1 shadow-viz">
             <input
                 type="file"
                 ref={fileInputRef}
@@ -229,17 +238,17 @@ export const Toolbar: React.FC = () => {
 
             <ToolSection activeTool={toolSettings.activeTool} onSelectTool={setActiveTool} />
 
-            <div className="relative ml-0.5 mr-1">
+            <div className="relative">
                 <button
-                    className="w-7 h-7 rounded-full border-2 border-panel-border shadow-inner p-0.5 overflow-hidden hover:scale-105 active:scale-95 transition-transform relative"
+                    className="h-7 w-7 rounded-full border-2 border-viz-border p-0.5 overflow-hidden hover:scale-105 active:scale-95 transition-transform relative"
                     style={{ backgroundColor: toolSettings.brushColor }}
                     onClick={() => setShowColorPicker((prev) => !prev)}
                     title="Change Color"
                 >
                     <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent pointer-events-none" />
                 </button>
-                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-panel border-2 border-panel-border pointer-events-none overflow-hidden">
-                    <div className="w-full h-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 opacity-80" />
+                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-viz-panel pointer-events-none overflow-hidden">
+                    <div className="h-full w-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 opacity-80" />
                 </div>
 
                 {showColorPicker && (
@@ -259,10 +268,11 @@ export const Toolbar: React.FC = () => {
 
             <button
                 onClick={handleImportClick}
-                className="p-1.5 rounded-full text-text-secondary hover:bg-neutral-800 hover:text-white transition-all"
+                aria-label="Import image"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-viz-muted transition-colors hover:bg-white/10 hover:text-white"
                 title="Import Image (JPG/PNG)"
             >
-                <Import size={16} />
+                <Import size={16} strokeWidth={2} />
             </button>
 
             <ModeSwitchSection viewMode={viewMode} onToggleViewMode={handleToggleWorkbench} />

@@ -4,6 +4,7 @@ import { ImageNode } from '@/types';
 
 import {
     createAnimateNodeFromSource,
+    createModifyNodeFromSource,
     createRenderNodeFromSource,
 } from './workbenchBlockCreationLogic';
 
@@ -37,6 +38,25 @@ function createImageSourceNode(overrides: Partial<ImageNode> = {}): ImageNode {
 }
 
 describe('workbench block creation logic', () => {
+    it('creates a Vizcom-style modify node with a connected source reference', () => {
+        const sourceNode = createImageSourceNode();
+        const modifyNode = createModifyNodeFromSource(sourceNode, 'modify-1');
+
+        expect(modifyNode).toMatchObject({
+            id: 'modify-1',
+            type: 'modify',
+            x: 600,
+            y: 200,
+            width: 320,
+            data: {
+                workflowId: 'product_edit',
+                prompt: '',
+                preservation: 0.78,
+                references: [{ assetId: 'source-1', role: 'primary' }],
+            },
+        });
+    });
+
     it('creates render node with expected defaults and position', () => {
         const sourceNode = createImageSourceNode();
         const renderNode = createRenderNodeFromSource(sourceNode, 'render-1');
@@ -47,7 +67,7 @@ describe('workbench block creation logic', () => {
             x: 600,
             y: 200,
             width: 320,
-            height: 500,
+            height: 390,
             data: {
                 prompt: '',
                 stylePreset: 'Photorealistic',

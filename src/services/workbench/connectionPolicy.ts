@@ -6,10 +6,11 @@ const IMAGE_SOURCE_HANDLE = 'image-source';
 const INBOUND_CAPS: Partial<Record<NodeType, number>> = {
     animate: 2,
     render: 1,
+    modify: 1,
 };
 
 function isAllowedDirection(sourceType: NodeType, targetType: NodeType): boolean {
-    return sourceType === 'image' && (targetType === 'animate' || targetType === 'render');
+    return sourceType === 'image' && (targetType === 'animate' || targetType === 'render' || targetType === 'modify' || targetType === 'new-view');
 }
 
 function isVideoEndpoint(sourceType: NodeType, targetType: NodeType): boolean {

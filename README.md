@@ -56,6 +56,8 @@ Review [local development](docs/development/local-development.md) and [environme
 
 ```bash
 pnpm run dev              # Start Next.js in development
+pnpm run stop             # Stop host services and PostgreSQL/Redis
+pnpm run restart          # Stop everything and restart development
 pnpm run build            # Build for production
 pnpm run lint             # Run ESLint
 pnpm run test             # Run Vitest in watch mode

@@ -13,6 +13,7 @@ import { renderService } from '../../../services/renderService';
 import { getRenderStyles } from '../../../services/ai/workflowRegistry';
 import { findNonOverlappingPosition } from '../../../services/nodePositioning';
 import { generateUUID } from '@/utils/uuid';
+import { registerGenerationRetry, unregisterGenerationRetry } from '@/services/workbench/generationRetryRegistry';
 
 type CanvasFlattenWindow = Window & {
     getFlattenedCanvas?: () => string;
@@ -61,8 +62,8 @@ export function useRenderNodeGeneration(id: string, data: RenderNodeType) {
         } as Partial<WorkbenchNode>);
     };
 
-    const handleGenerate = async (e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleGenerate = async (e?: React.MouseEvent, existingPlaceholderIds?: string[]) => {
+        e?.stopPropagation();
         if (!settings.prompt?.trim()) return;
         setRendering(true);
 
@@ -124,7 +125,7 @@ export function useRenderNodeGeneration(id: string, data: RenderNodeType) {
 
             const batchNewNodes: WorkbenchNode[] = [];
             for (let i = 0; i < numImages; i++) {
-                const newId = generateUUID();
+                const newId = existingPlaceholderIds?.[i] ?? generateUUID();
                 placeholderIds.push(newId);
 
                 const { x: currentX, y: currentY } = findNonOverlappingPosition({
@@ -165,8 +166,15 @@ export function useRenderNodeGeneration(id: string, data: RenderNodeType) {
                     },
                 };
 
-                batchNewNodes.push(placeholderNode);
-                addWorkbenchNode(placeholderNode);
+                if (existingPlaceholderIds?.[i]) {
+                    updateWorkbenchNode(newId, {
+                        status: 'rendering',
+                        errorMessage: undefined,
+                    } as Partial<ImageNodeType>);
+                } else {
+                    batchNewNodes.push(placeholderNode);
+                    addWorkbenchNode(placeholderNode);
+                }
             }
 
             const selectedStyle = availableStyles.find(s => s.name === settings.stylePreset);
@@ -181,7 +189,9 @@ export function useRenderNodeGeneration(id: string, data: RenderNodeType) {
             });
 
             if (response.success && response.images.length > 0) {
-                addRenderResultGroup(settings, response.images, canvasWidth, canvasHeight, id);
+                // Results belong to the connected source image, not to this render node.
+                // The source node owns the results so reopening it restores the panel.
+                addRenderResultGroup(settings, response.images, canvasWidth, canvasHeight, sourceNodeId);
 
                 response.images.forEach((imageUrl, index) => {
                     if (index < placeholderIds.length) {
@@ -223,18 +233,29 @@ export function useRenderNodeGeneration(id: string, data: RenderNodeType) {
                             project,
                             status: 'done',
                             name: project.name,
+                            errorMessage: undefined,
                         } as Partial<ImageNodeType>);
+                        unregisterGenerationRetry(nodeId);
                     }
                 });
             } else {
                 placeholderIds.forEach(placeholderId => {
-                    updateWorkbenchNode(placeholderId, { status: 'error', name: 'Failed' } as Partial<ImageNodeType>);
+                    updateWorkbenchNode(placeholderId, {
+                        status: 'error',
+                        name: 'Failed',
+                        errorMessage: response.error ?? 'The image could not be generated. Try again.',
+                    } as Partial<ImageNodeType>);
+                    registerGenerationRetry(placeholderId, () => void handleGenerate(undefined, placeholderIds));
                 });
             }
         } catch (error) {
-            console.error('Generation failed', error);
             placeholderIds.forEach(placeholderId => {
-                updateWorkbenchNode(placeholderId, { status: 'error', name: 'Error' } as Partial<ImageNodeType>);
+                updateWorkbenchNode(placeholderId, {
+                    status: 'error',
+                    name: 'Error',
+                    errorMessage: error instanceof Error ? error.message : 'The image could not be generated. Try again.',
+                } as Partial<ImageNodeType>);
+                registerGenerationRetry(placeholderId, () => void handleGenerate(undefined, placeholderIds));
             });
         } finally {
             setRendering(false);

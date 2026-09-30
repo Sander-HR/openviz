@@ -1,9 +1,12 @@
+import type { BackgroundHandling, VaryMode, ViewName } from './workbenchParity.types';
+
 export type AspectRatio = '16:9' | '4:3' | '1:1' | '9:16' | '3:4' | 'square' | 'landscape' | 'portrait';
 export type ToolType = 'select' | 'brush' | 'eraser' | 'circle' | 'rectangle' | 'line' | 'paintbucket' | 'transform';
-export type WorkbenchToolType = 'select' | 'draw' | 'eraser' | 'arrow' | 'text' | 'note' | 'media';
+export type WorkbenchToolType = 'select' | 'hand' | 'draw' | 'eraser' | 'arrow' | 'text' | 'note' | 'media';
 export type LayerType = 'sketch' | 'image' | 'render';
 export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay';
 export type ViewMode = 'STUDIO' | 'WORKBENCH';
+export type { AdjustmentName, AdjustmentValues } from './adjustments';
 
 export interface CanvasState {
     width: number;
@@ -35,6 +38,8 @@ export interface Layer {
     blendMode: BlendMode;
     strokes: Stroke[];
     image?: string; // base64 or URL
+    adjustments?: import('./adjustments').AdjustmentValues;
+    adjustmentsEnabled?: boolean;
     // Transform properties
     x?: number;
     y?: number;
@@ -59,7 +64,7 @@ export interface Project {
     thumbnail?: string;
 }
 
-export type NodeType = 'image' | 'animate' | 'render' | 'video' | 'freehand' | 'arrow' | 'text' | 'note' | 'media';
+export type NodeType = 'image' | 'modify' | 'animate' | 'render' | 'video' | 'freehand' | 'arrow' | 'text' | 'note' | 'media' | 'variate' | 'new-view' | 'extract' | 'section';
 
 export interface BaseNode {
     id: string;
@@ -76,6 +81,7 @@ export interface ImageNode extends BaseNode {
     name: string;
     project: Project;
     status?: 'rendering' | 'done' | 'error';
+    errorMessage?: string;
     renderResults?: RenderGroup[];
 }
 
@@ -108,6 +114,29 @@ export interface RenderNode extends BaseNode {
     data: RenderSettings;
 }
 
+export type ModifyNodeStatus = 'idle' | 'validating' | 'rendering' | 'done' | 'error';
+
+export interface ModifyNode extends BaseNode {
+    type: 'modify';
+    data: {
+        workflowId: string;
+        prompt: string;
+        negativePrompt?: string;
+        aspectRatio: AspectRatio;
+        preservation: number;
+        structureStrength: number;
+        references: Array<{
+            assetId: string;
+            role: 'primary' | 'material' | 'color' | 'style' | 'environment' | 'annotation' | 'mask';
+            token?: string;
+        }>;
+        maskAssetId?: string;
+        numImages: number;
+        status: ModifyNodeStatus;
+        error?: string;
+    };
+}
+
 export interface FreehandNode extends BaseNode {
     type: 'freehand';
     data: {
@@ -127,7 +156,27 @@ export interface ArrowWorkbenchNode extends BaseNode {
         control: { x: number; y: number };
         strokeColor: string;
         strokeWidth: number;
+        temporary?: boolean;
+        startAttachment?: ArrowNodeAttachment;
+        endAttachment?: ArrowNodeAttachment;
     };
+}
+
+export interface ArrowNodeAttachment {
+    nodeId: string;
+    side: 'left' | 'right' | 'top' | 'bottom';
+    offset: number;
+}
+
+/** Shared text formatting fields used by the text/note formatting toolbar. */
+export interface TextFormattingData {
+    fontSize?: number;
+    fontWeight?: number;
+    fontStyle?: 'normal' | 'italic';
+    underline?: boolean;
+    align?: 'left' | 'center' | 'right';
+    fontFamily?: string;
+    color?: string;
 }
 
 export interface TextWorkbenchNode extends BaseNode {
@@ -136,6 +185,11 @@ export interface TextWorkbenchNode extends BaseNode {
         text: string;
         fontSize: number;
         color: string;
+        fontWeight?: number;
+        fontStyle?: 'normal' | 'italic';
+        underline?: boolean;
+        align?: 'left' | 'center' | 'right';
+        fontFamily?: string;
     };
 }
 
@@ -144,7 +198,7 @@ export interface NoteWorkbenchNode extends BaseNode {
     data: {
         text: string;
         colorVariant: 'yellow';
-    };
+    } & TextFormattingData;
 }
 
 export interface MediaWorkbenchNode extends BaseNode {
@@ -156,8 +210,48 @@ export interface MediaWorkbenchNode extends BaseNode {
     };
 }
 
+// US5 node types (data-model.md "WorkbenchNode (extended)"). Shells land in
+// US3 (T036); generation bodies arrive with the renderService ops in US5.
+export interface VariateWorkbenchNode extends BaseNode {
+    type: 'variate';
+    data: {
+        prompt: string;
+        count: 2 | 4 | 8;
+        varyMode?: VaryMode;
+    };
+}
+
+export interface NewViewWorkbenchNode extends BaseNode {
+    type: 'new-view';
+    data: {
+        prompt: string;
+        /** null = "Select a view" placeholder; Generate disabled until set (FR-007). */
+        view: ViewName | null;
+    };
+}
+
+export interface ExtractWorkbenchNode extends BaseNode {
+    type: 'extract';
+    data: {
+        prompt: string;
+        extractPrompt?: string;
+        backgroundHandling: BackgroundHandling;
+    };
+}
+
+// US3 (T036): lightweight grouping container for the add-node menu's Section
+// entry. Membership/wrapping behavior ("Wrap in section") is deferred; v1 only
+// needs a creatable, selectable placeholder card.
+export interface SectionWorkbenchNode extends BaseNode {
+    type: 'section';
+    data: {
+        label: string;
+    };
+}
+
 export type WorkbenchNode =
     | ImageNode
+    | ModifyNode
     | AnimateNode
     | RenderNode
     | VideoNode
@@ -165,7 +259,11 @@ export type WorkbenchNode =
     | ArrowWorkbenchNode
     | TextWorkbenchNode
     | NoteWorkbenchNode
-    | MediaWorkbenchNode;
+    | MediaWorkbenchNode
+    | VariateWorkbenchNode
+    | NewViewWorkbenchNode
+    | ExtractWorkbenchNode
+    | SectionWorkbenchNode;
 
 export interface Connection {
     id: string;
@@ -262,3 +360,54 @@ export interface PresenceState {
     };
     updatedAt: number;
 }
+
+export type {
+    ProductWorkflowCategory,
+    ProductModelFamily,
+    ModelTier,
+    Precision,
+    ProductWorkflowDefinition,
+    ProductWorkflowRequest,
+    ProductReferenceInput,
+    ProductReference,
+    ProductReferenceRole,
+    ProductVariantSet,
+    ProductVariantVariable,
+    ProductVariantSetStatus,
+    WorkflowDependency,
+    WorkflowInputDefinition,
+    WorkflowValidationIssue,
+    WorkflowValidationResult,
+} from './productWorkflow.types';
+export type {
+    ExecutionTarget,
+    ExecutionTargetKind,
+    ExecutionTargetProtocol,
+    ComputePreference,
+    ComputeSettings,
+    ExecutionTargetStatus,
+    TargetCapabilities,
+    TargetHealth,
+    PreflightResult,
+    ExecutionTargetAdapter,
+    ComfyDeviceCapability,
+} from './executionTarget.types';
+export type {
+    GenerationJob,
+    GenerationJobError,
+    GenerationJobOutput,
+    GenerationJobStatus,
+    ModelTierDecision,
+} from './generationJob.types';
+export type {
+    CanvasTheme,
+    AbsorbedAttributeType,
+    AbsorbedAttribute,
+    ExportFormat,
+    ExportScaling,
+    ExportOptions,
+    ViewName,
+    VaryMode,
+    BackgroundHandling,
+} from './workbenchParity.types';
+export { VIEW_NAMES } from './workbenchParity.types';

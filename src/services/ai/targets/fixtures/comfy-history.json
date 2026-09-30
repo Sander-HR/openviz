@@ -1,0 +1,10 @@
+{
+  "prompt-1": {
+    "status": { "status_str": "success", "completed": true, "messages": [] },
+    "outputs": {
+      "save_image": {
+        "images": [{ "filename": "product_00001.png", "subfolder": "", "type": "output" }]
+      }
+    }
+  }
+}

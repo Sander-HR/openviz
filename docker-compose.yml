@@ -62,6 +62,10 @@ services:
         condition: service_healthy
     ports:
       - "${APP_HOST_PORT:-3000}:3000"
+      # The collaboration server runs beside Next.js in the dev container.
+      # Publish it so remote browsers (for example over Tailscale) can open
+      # the WebSocket directly.
+      - "${COLLAB_HOST_PORT:-1234}:1234"
     command: ["bash", "scripts/dev-container.sh"]
 
 volumes:

@@ -10,6 +10,8 @@ import { createLayerSlice } from './slices/layerSlice';
 import { createWorkbenchSlice } from './slices/workbenchSlice';
 import { createHistorySlice } from './slices/historySlice';
 import { createWorkbenchCollaborationSlice } from './slices/workbenchCollaborationSlice';
+import { createAIComputeSlice } from './slices/aiComputeSlice';
+import { createProductDesignSlice } from './slices/productDesignSlice';
 
 // Custom storage object for IndexedDB with debouncing
 let saveTimeout: any = null;
@@ -38,6 +40,8 @@ export const useStore = create<AppState>()(
             ...createLayerSlice(...a),
             ...createWorkbenchSlice(...a),
             ...createWorkbenchCollaborationSlice(...a),
+            ...createAIComputeSlice(...a),
+            ...createProductDesignSlice(...a),
             ...createHistorySlice(...a),
         }),
         {
@@ -74,6 +78,11 @@ export const useStore = create<AppState>()(
                 clipboard: state.clipboard,
                 currentSceneVersion: state.currentSceneVersion,
                 activeWorkbenchTool: state.activeWorkbenchTool,
+                computeSettings: state.computeSettings,
+                productJobs: state.productJobs,
+                productReferences: state.productReferences,
+                productVariantSets: state.productVariantSets,
+                activeProductReferenceId: state.activeProductReferenceId,
             }),
         }
     )

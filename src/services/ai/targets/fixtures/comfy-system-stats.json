@@ -1,0 +1,6 @@
+{
+  "system": { "os": "posix", "comfyui_version": "0.3.0", "python_version": "3.12.0" },
+  "devices": [
+    { "name": "NVIDIA RTX 4090", "type": "cuda:0", "vram_total": 25769803776, "vram_free": 21474836480, "torch_vram_total": 25769803776, "torch_vram_free": 20132659200 }
+  ]
+}

@@ -18,8 +18,12 @@ import {
     Layer,
     NodeLockState,
     PresenceState,
+    ProductReference,
+    ProductVariantSet,
 } from '../types';
 import type { CollabPresencePeer, CollabRemoteAwarenessEntry, CollabRemoteCursorState } from '@/types/collab.types';
+import type { ComputeSettings } from '@/types/executionTarget.types';
+import type { GenerationJob } from '@/types/generationJob.types';
 
 export interface WorkbenchHistorySnapshot {
     workbenchNodes: WorkbenchNode[];
@@ -38,6 +42,11 @@ export interface AppState {
     isRendering: boolean;
     resultsPanelOpen: boolean;
     activeLayerId: string | null;
+    computeSettings: ComputeSettings;
+    productJobs: Record<string, GenerationJob>;
+    productReferences: Record<string, ProductReference>;
+    productVariantSets: Record<string, ProductVariantSet>;
+    activeProductReferenceId: string | null;
 
     // Workbench State
     viewMode: ViewMode;
@@ -103,6 +112,7 @@ export interface AppState {
     duplicateLayer: (id: string) => void;
     copyLayer: (id: string) => void;
     pasteLayer: () => void;
+    addImageLayer: (image: string, name?: string) => void;
 
     // Render Results Actions
     addRenderResultGroup: (settings: RenderSettings, images: string[], width: number, height: number, sourceNodeId?: string) => void;
@@ -113,6 +123,25 @@ export interface AppState {
     setIsPreviewVisible: (visible: boolean) => void;
     setRendering: (loading: boolean) => void;
     setResultsPanelOpen: (open: boolean) => void;
+    setComputePreference: (preference: import('@/types/executionTarget.types').ComputePreference) => void;
+    setLocalComfyEndpoint: (endpoint: string) => void;
+    setHostedComfyEndpoint: (endpoint: string) => void;
+    setExecutionTargetKind: (kind: import('@/types/executionTarget.types').ExecutionTargetKind) => void;
+    setExecutionTargetProtocol: (protocol: import('@/types/executionTarget.types').ExecutionTargetProtocol) => void;
+    setImageApiEndpoint: (endpoint: string) => void;
+    setImageApiKey: (key: string) => void;
+    setImageApiKeyless: (keyless: boolean) => void;
+    setImageApiModels: (models: string[]) => void;
+    setImageApiModel: (model: string) => void;
+    setImageApiSize: (size: string) => void;
+    setEndpointConcurrency: (concurrency: number) => void;
+    applyComputeSettings: (settings: Partial<ComputeSettings>) => void;
+    upsertProductJob: (job: GenerationJob) => void;
+    updateProductJob: (jobId: string, updates: Partial<GenerationJob>) => void;
+    removeProductJob: (jobId: string) => void;
+    upsertProductReference: (reference: ProductReference) => void;
+    setActiveProductReference: (referenceId: string | null) => void;
+    upsertProductVariantSet: (variantSet: ProductVariantSet) => void;
     addGroupToWorkbench: (group: RenderGroup) => void;
     addImageToWorkbench: (image: string) => void;
     addResultAsLayer: (image: string) => void;

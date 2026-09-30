@@ -88,3 +88,27 @@ export function hsvToHex(h: number, s: number, v: number): string {
     const rgb = hsvToRgb(h, s, v);
     return rgbToHex(rgb.r, rgb.g, rgb.b);
 }
+
+export function normalizeHex(hex: string): string | null {
+    const rgb = hexToRgb(hex.trim());
+    return rgb ? rgbToHex(rgb.r, rgb.g, rgb.b) : null;
+}
+
+export function extractPaletteFromImageData(imageData: ImageData, maxColors = 5): string[] {
+    const buckets = new Map<string, number>();
+    for (let index = 0; index < imageData.data.length; index += 4) {
+        const r = imageData.data[index];
+        const g = imageData.data[index + 1];
+        const b = imageData.data[index + 2];
+        const alpha = imageData.data[index + 3];
+        if (alpha < 128) continue;
+        const quantize = (channel: number) => Math.min(255, Math.round(channel / 16) * 16);
+        const key = rgbToHex(quantize(r), quantize(g), quantize(b));
+        buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    }
+
+    return [...buckets.entries()]
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, maxColors)
+        .map(([color]) => color);
+}

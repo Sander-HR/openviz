@@ -51,23 +51,40 @@ export const createRenderSlice: StateCreator<AppState, [], [], RenderSlice> = (s
     setRenderReferenceImage: (referenceImage) => set((state: AppState) => ({
         renderSettings: { ...state.renderSettings, referenceImage }
     })),
-    addRenderResultGroup: (settings, images, width, height, sourceNodeId) => set((state: AppState) => ({
-        renderResults: [
-            {
-                id: Math.random().toString(36).substr(2, 9),
-                prompt: settings.prompt,
-                style: settings.stylePreset,
-                settings: { ...settings },
-                images,
-                timestamp: Date.now(),
-                width,
-                height,
-                sourceNodeId
-            },
-            ...state.renderResults
-        ],
-        resultsPanelOpen: true
-    })),
+    addRenderResultGroup: (settings, images, width, height, sourceNodeId) => set((state: AppState) => {
+        const group: RenderGroup = {
+            id: Math.random().toString(36).substr(2, 9),
+            prompt: settings.prompt,
+            style: settings.stylePreset,
+            settings: { ...settings },
+            images,
+            timestamp: Date.now(),
+            width,
+            height,
+            sourceNodeId,
+        };
+        const renderResults = [group, ...state.renderResults];
+
+        // Keep results on the source image node as well as in the studio state.
+        // This makes them available when the source is reopened from the workbench.
+        const workbenchNodes = sourceNodeId
+            ? state.workbenchNodes.map((node) => {
+                if (node.id !== sourceNodeId || (node.type !== 'image' && node.type !== 'video')) {
+                    return node;
+                }
+                return {
+                    ...node,
+                    renderResults: [group, ...(node.renderResults ?? [])],
+                };
+            })
+            : state.workbenchNodes;
+
+        return {
+            renderResults,
+            workbenchNodes,
+            resultsPanelOpen: true,
+        };
+    }),
     loadRenderSettings: (settings) => set((state: AppState) => ({
         renderSettings: settings ? { ...state.renderSettings, ...settings } : state.renderSettings
     })),

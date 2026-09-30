@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { ProjectWorkspace } from "../ProjectWorkspace";
 
 /**
  * Single route handling both project views: /projects/[id]/studio and
@@ -18,12 +17,12 @@ function isViewSegment(value: string): value is ViewSegment {
 }
 
 export default async function ProjectViewPage({ params }: { params: Promise<{ id: string; view: string }> }) {
-    const { id, view } = await params;
+    const { view } = await params;
 
     if (!isViewSegment(view)) {
         // Unknown view segment (e.g. /projects/[id]/foo) → 404
         notFound();
     }
 
-    return <ProjectWorkspace id={id} mode={VIEW_MODES[view]} />;
+    return null;
 }

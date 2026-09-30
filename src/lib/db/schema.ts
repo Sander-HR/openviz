@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, boolean, integer, jsonb, customType, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, boolean, integer, jsonb, customType, primaryKey, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 /** Postgres `bytea` column type (removed from drizzle pg-core in 0.4x). */
@@ -106,11 +106,13 @@ export const phoneUploadSessions = pgTable('phone_upload_sessions', {
 export const jobs = pgTable('jobs', {
     id: uuid('id').defaultRandom().primaryKey(),
     projectId: uuid('project_id').references(() => projects.id).notNull(),
-    type: text('type', { enum: ['render', 'animate'] }).notNull(),
-    status: text('status', { enum: ['pending', 'processing', 'completed', 'failed'] }).default('pending').notNull(),
+    type: text('type', { enum: ['render', 'animate', 'product'] }).notNull(),
+    status: text('status', { enum: ['pending', 'processing', 'completed', 'partial', 'cancelled', 'failed'] }).default('pending').notNull(),
     progress: integer('progress').default(0).notNull(),
     resultUrl: text('result_url'),
     error: text('error'),
+    retryOf: uuid('retry_of'),
+    metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -118,11 +120,6 @@ export const jobs = pgTable('jobs', {
 /**
  * Relations
  */
-
-export const usersRelations = relations(users, ({ many }) => ({
-    memberships: many(workspaceMemberships),
-    ownedWorkspaces: many(workspaces),
-}));
 
 export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
     owner: one(users, { fields: [workspaces.ownerId], references: [users.id] }),
@@ -159,4 +156,74 @@ export const scenesRelations = relations(scenes, ({ one }) => ({
 
 export const jobsRelations = relations(jobs, ({ one }) => ({
     project: one(projects, { fields: [jobs.projectId], references: [projects.id] }),
+}));
+
+/** Redacted execution-target metadata. Provider credentials are not stored in this table. */
+export const executionTargets = pgTable('execution_targets', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id).notNull(),
+    kind: text('kind', { enum: ['local', 'hosted', 'hybrid'] }).notNull(),
+    endpoint: text('endpoint').notNull(),
+    displayName: text('display_name').notNull(),
+    status: text('status', { enum: ['unknown', 'checking', 'ready', 'degraded', 'unavailable', 'auth-required'] }).notNull(),
+    authState: text('auth_state', { enum: ['unknown', 'valid', 'missing', 'expired', 'invalid'] }).notNull(),
+    capabilities: jsonb('capabilities'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/** Per-user durable AI preferences. Secrets are encrypted server-side. */
+export const aiComputeSettings = pgTable('ai_compute_settings', {
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).primaryKey(),
+    targetKind: text('target_kind', { enum: ['local', 'hosted', 'hybrid'] }).notNull().default('local'),
+    protocol: text('protocol', { enum: ['comfyui', 'openai-image'] }).notNull().default('comfyui'),
+    preference: text('preference', { enum: ['automatic', 'low-memory', 'balanced', 'high-quality', 'hosted'] }).notNull().default('automatic'),
+    localEndpoint: text('local_endpoint').notNull().default('/comfy-api'),
+    hostedEndpoint: text('hosted_endpoint').notNull().default(''),
+    imageApiEndpoint: text('image_api_endpoint').notNull().default(''),
+    imageApiKeyCiphertext: text('image_api_key_ciphertext'),
+    imageApiKeyUpdatedAt: timestamp('image_api_key_updated_at'),
+    imageApiKeyless: boolean('image_api_keyless').notNull().default(false),
+    imageApiModel: text('image_api_model').notNull().default(''),
+    imageApiSize: text('image_api_size').notNull().default('1024x1024'),
+    endpointConcurrency: integer('endpoint_concurrency').notNull().default(2),
+    activeProfileId: uuid('active_profile_id'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+    activeProfileIdx: index('ai_compute_settings_active_profile_idx').on(table.activeProfileId),
+}));
+
+/** Reusable per-user AI endpoint profiles. API keys are not stored here. */
+export const aiEndpointProfiles = pgTable('ai_endpoint_profiles', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: ['local', 'hosted', 'hybrid'] }).notNull(),
+    protocol: text('protocol', { enum: ['comfyui', 'openai-image'] }).notNull(),
+    endpoint: text('endpoint').notNull(),
+    model: text('model').notNull().default(''),
+    imageSize: text('image_size').notNull().default('1024x1024'),
+    keyless: boolean('keyless').notNull().default(false),
+    hasApiKey: boolean('has_api_key').notNull().default(false),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+    userNameUnique: uniqueIndex('ai_endpoint_profiles_user_name_unique').on(table.userId, table.name),
+    userIdx: index('ai_endpoint_profiles_user_idx').on(table.userId),
+}));
+
+export const aiComputeSettingsRelations = relations(aiComputeSettings, ({ one }) => ({
+    user: one(users, { fields: [aiComputeSettings.userId], references: [users.id] }),
+}));
+
+export const aiEndpointProfilesRelations = relations(aiEndpointProfiles, ({ one }) => ({
+    user: one(users, { fields: [aiEndpointProfiles.userId], references: [users.id] }),
+}));
+
+export const usersRelations = relations(users, ({ many }) => ({
+    memberships: many(workspaceMemberships),
+    ownedWorkspaces: many(workspaces),
+    aiComputeSettings: many(aiComputeSettings),
+    aiEndpointProfiles: many(aiEndpointProfiles),
 }));

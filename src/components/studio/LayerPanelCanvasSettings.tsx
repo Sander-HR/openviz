@@ -92,8 +92,8 @@ export const LayerPanelCanvasSettings: React.FC = () => {
             <div
                 onClick={() => setIsCanvasExpanded(!isCanvasExpanded)}
                 className={cn(
-                    "group flex items-center gap-2 p-1.5 rounded-lg cursor-pointer border border-transparent hover:bg-neutral-800/50 transition-all",
-                    isCanvasExpanded && "bg-neutral-800/30"
+                    "group flex items-center gap-2 p-1.5 rounded-lg cursor-pointer border border-transparent hover:bg-white/5 transition-all",
+                    isCanvasExpanded && "bg-white/5"
                 )}
             >
                 <div className="text-text-secondary w-[14px] flex justify-center">
@@ -124,14 +124,14 @@ export const LayerPanelCanvasSettings: React.FC = () => {
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="overflow-hidden bg-black/20 rounded-lg border border-panel-border/30 mx-0.5"
+                        className="overflow-hidden bg-viz-surface/40 rounded-lg border border-viz-border/30 mx-0.5"
                     >
                         <div className="p-3 space-y-4">
                             {/* Size Selector */}
                             <div className="flex items-center justify-between gap-3">
                                 <label className="text-text-secondary text-[11px] font-medium shrink-0">Size</label>
                                 <div className="flex-1 relative group">
-                                    <div className="flex items-center gap-2 bg-neutral-900 px-2.5 py-1.5 rounded-md border border-panel-border/50 group-hover:border-primary/30 transition-colors">
+                                    <div className="flex items-center gap-2 bg-viz-surface px-2.5 py-1.5 rounded-md border border-viz-border/50 group-hover:border-viz-accent/40 transition-colors">
                                         <Maximize size={12} className="text-text-secondary" />
                                         <select
                                             value={project.canvas.aspectRatio}
@@ -142,7 +142,7 @@ export const LayerPanelCanvasSettings: React.FC = () => {
                                             className="bg-transparent text-white text-[11px] outline-none w-full appearance-none cursor-pointer pr-4 font-medium"
                                         >
                                             {ASPECT_RATIOS.map(ratio => (
-                                                <option key={ratio.value} value={ratio.value} className="bg-neutral-900">
+                                                <option key={ratio.value} value={ratio.value} className="bg-viz-surface">
                                                     {ratio.label}
                                                 </option>
                                             ))}
@@ -158,7 +158,7 @@ export const LayerPanelCanvasSettings: React.FC = () => {
                             {/* Color Picker Row */}
                             <div className="flex items-center justify-between gap-3 relative">
                                 <label className="text-text-secondary text-[11px] font-medium shrink-0">Color</label>
-                                <div className="flex-1 flex items-center gap-2 bg-neutral-900 px-2 py-1.5 rounded-md border border-panel-border/50 focus-within:border-primary/30 transition-colors">
+                                <div className="flex-1 flex items-center gap-2 bg-viz-surface px-2 py-1.5 rounded-md border border-viz-border/50 focus-within:border-viz-accent/40 transition-colors">
                                     <div 
                                         className="w-4 h-4 rounded-sm border border-white/10 shrink-0 shadow-sm cursor-pointer hover:scale-110 transition-transform"
                                         style={{ backgroundColor: project.canvas.backgroundColor }}

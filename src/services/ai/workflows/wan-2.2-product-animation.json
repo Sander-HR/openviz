@@ -1,0 +1,75 @@
+{
+    "clip": { "class_type": "CLIPLoader", "inputs": { "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "type": "wan" } },
+    "vae": { "class_type": "VAELoader", "inputs": { "vae_name": "wan_2.1_vae.safetensors" } },
+    "unet_high": {
+        "class_type": "UNETLoader",
+        "inputs": { "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "weight_dtype": "default" }
+    },
+    "unet_low": {
+        "class_type": "UNETLoader",
+        "inputs": { "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors", "weight_dtype": "default" }
+    },
+    "positive": { "class_type": "CLIPTextEncode", "inputs": { "text": "", "clip": ["clip", 0] } },
+    "negative": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+            "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑",
+            "clip": ["clip", 0]
+        }
+    },
+    "reference": { "class_type": "LoadImage", "inputs": { "image": "" } },
+    "video": {
+        "class_type": "WanImageToVideo",
+        "inputs": {
+            "positive": ["positive", 0],
+            "negative": ["negative", 0],
+            "vae": ["vae", 0],
+            "start_image": ["reference", 0],
+            "width": 640,
+            "height": 640,
+            "length": 81,
+            "batch_size": 1
+        }
+    },
+    "shift_high": { "class_type": "ModelSamplingSD3", "inputs": { "model": ["unet_high", 0], "shift": 5.0 } },
+    "shift_low": { "class_type": "ModelSamplingSD3", "inputs": { "model": ["unet_low", 0], "shift": 5.0 } },
+    "sampler_high": {
+        "class_type": "KSamplerAdvanced",
+        "inputs": {
+            "model": ["shift_high", 0],
+            "positive": ["video", 0],
+            "negative": ["video", 1],
+            "latent_image": ["video", 2],
+            "add_noise": true,
+            "noise_seed": 0,
+            "steps": 20,
+            "cfg": 1.0,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "start_at_step": 0,
+            "end_at_step": 10,
+            "return_with_leftover_noise": true
+        }
+    },
+    "sampler_low": {
+        "class_type": "KSamplerAdvanced",
+        "inputs": {
+            "model": ["shift_low", 0],
+            "positive": ["video", 0],
+            "negative": ["video", 1],
+            "latent_image": ["sampler_high", 0],
+            "add_noise": false,
+            "noise_seed": 0,
+            "steps": 20,
+            "cfg": 1.0,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "start_at_step": 10,
+            "end_at_step": 20,
+            "return_with_leftover_noise": false
+        }
+    },
+    "decode": { "class_type": "VAEDecode", "inputs": { "samples": ["sampler_low", 0], "vae": ["vae", 0] } },
+    "create_video": { "class_type": "CreateVideo", "inputs": { "images": ["decode", 0], "fps": 16 } },
+    "save": { "class_type": "SaveVideo", "inputs": { "images": ["create_video", 0], "filename_prefix": "product_animation" } }
+}

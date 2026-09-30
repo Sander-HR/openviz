@@ -16,8 +16,15 @@ import { useWorkbenchNodeHandlers } from './useWorkbenchNodeHandlers';
  * instead of the local store history.
  */
 export interface UseWorkbenchOptions {
+    enabled?: boolean;
     undoAction?: () => void;
     redoAction?: () => void;
+    /** US3 (ui-translation §6): `I` starts the image upload flow directly. */
+    onUploadImage?: () => void;
+    /** US3 (ui-translation §6): `/` opens the phone-upload flow. */
+    onUploadFromPhone?: () => void;
+    /** Called after a studio-capable node is installed in the editor state. */
+    onOpenNodeInStudio?: (id: string) => void | Promise<void>;
 }
 
 export const useWorkbench = (options?: UseWorkbenchOptions) => {
@@ -59,15 +66,23 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         undoWorkbench,
         redoWorkbench,
     } = useWorkbenchStore();
+    const commitNodePositions = useCallback((positions: Array<{ id: string; position: { x: number; y: number } }>) => {
+        positions.forEach(({ id, position }) => updateWorkbenchNode(id, { x: position.x, y: position.y }));
+    }, [updateWorkbenchNode]);
 
     const router = useRouter();
 
     const openNodeInStudioAndNavigate = useCallback((id: string) => {
+        if (options?.onOpenNodeInStudio) {
+            void options.onOpenNodeInStudio(id);
+            return;
+        }
+
         openNodeInStudio(id);
         if (currentProjectId) {
             router.push(`/projects/${currentProjectId}/studio`);
         }
-    }, [currentProjectId, openNodeInStudio, router]);
+    }, [currentProjectId, openNodeInStudio, options?.onOpenNodeInStudio, router]);
 
     const { showFormatDropdown, setShowFormatDropdown, dropdownRef, handleFormatSelect } =
         useWorkbenchFormatMenu({ createSketchWithFormat });
@@ -84,6 +99,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         handleNodesChange,
         handleNodeDoubleClick,
         handleNodeContextMenu,
+        handlePaneContextMenu,
         handlePaneClick,
         handleSourceClick,
         handleResize,
@@ -94,8 +110,6 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         handleDataChange,
     } = useWorkbenchNodeHandlers({
         workbenchNodes,
-        selectedNodeIds,
-        setSelectedNodeIds,
         updateWorkbenchNode,
         updateWorkbenchNodeTransient,
         beginWorkbenchGesture,
@@ -144,6 +158,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
     }, [setActiveNodeId, setBasicBlocksMenu, setContextMenu, setSelectedNodeIds]);
 
     useWorkbenchKeyboardShortcuts({
+        enabled: options?.enabled ?? true,
         copyToClipboard,
         pasteFromClipboard,
         duplicateWorkbenchNode,
@@ -163,6 +178,8 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         resetView,
         zoomTo100,
         clearSelection,
+        onUploadImage: options?.onUploadImage ?? (() => {}),
+        onUploadFromPhone: options?.onUploadFromPhone ?? (() => {}),
     });
 
     return {
@@ -195,6 +212,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
             onConnectEnd,
             handleNodeDoubleClick,
             handleNodeContextMenu,
+            handlePaneContextMenu,
             handlePaneClick,
             handleSourceClick,
             handleBlockSelect,
@@ -229,6 +247,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
             undoLastFreehandNode,
             undoWorkbench,
             redoWorkbench,
+            commitNodePositions,
         },
     };
 };

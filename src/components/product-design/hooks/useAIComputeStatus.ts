@@ -1,0 +1,211 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useStore } from '@/store/useStore';
+import { createLocalComfyTarget } from '@/services/ai/targets/localComfyTarget';
+import { createOpenAIImageTarget } from '@/services/ai/targets/openAIImageTarget';
+import { imageApiQueue } from '@/services/renderService';
+import {
+    fetchComfyQueueInfo,
+    resolveComputeEndpoint,
+    type ComfyQueueInfo,
+} from '@/services/ai/computeStatusService';
+import {
+    probeEndpointCapabilities,
+    type EndpointCapabilityProbe,
+} from '@/services/ai/targets/openApiDiscovery';
+import type {
+    ComfyDeviceCapability,
+    ExecutionTargetProtocol,
+    ExecutionTargetStatus,
+} from '@/types/executionTarget.types';
+
+export interface AIComputeQueueState {
+    active: number;
+    queued: number;
+    concurrency: number;
+}
+
+export interface AIComputeStatus {
+    protocol: ExecutionTargetProtocol;
+    endpoint: string;
+    displayEndpoint: string;
+    status: ExecutionTargetStatus;
+    message?: string;
+    selectedModel: string;
+    models: string[];
+    devices: ComfyDeviceCapability[];
+    /** Client-side OpenViz queue for the image API (this session only). */
+    queue: AIComputeQueueState | null;
+    /** Server-side ComfyUI queue when the endpoint exposes GET /queue. */
+    comfyQueue: ComfyQueueInfo | null;
+    /** Optional OpenAPI-discovered capabilities for image API endpoints. */
+    endpointProbe: EndpointCapabilityProbe | null;
+    lastCheckedAt: number | null;
+    isRefreshing: boolean;
+}
+
+const REFRESH_INTERVAL_MS = 30_000;
+
+function initialStatus(protocol: ExecutionTargetProtocol, displayEndpoint: string): AIComputeStatus {
+    return {
+        protocol,
+        endpoint: '',
+        displayEndpoint,
+        status: 'checking',
+        selectedModel: '',
+        models: [],
+        devices: [],
+        queue: null,
+        comfyQueue: null,
+        endpointProbe: null,
+        lastCheckedAt: null,
+        isRefreshing: false,
+    };
+}
+
+/**
+ * Live compute status for the workbench Compute popup. Derives the active
+ * endpoint from persisted AI settings, probes it through the existing target
+ * adapters, and tracks the client-side generation queue. All fetch/effect
+ * logic lives here; components only render the returned view model.
+ */
+export function useAIComputeStatus(open: boolean) {
+    const computeSettings = useStore((state) => state.computeSettings);
+    const resolved = resolveComputeEndpoint(computeSettings);
+
+    const [status, setStatus] = useState<AIComputeStatus>(() =>
+        initialStatus(resolved.protocol, resolved.displayEndpoint),
+    );
+    const sequenceRef = useRef(0);
+    const probeCacheRef = useRef(new Map<string, EndpointCapabilityProbe>());
+
+    const runCheck = useCallback(async () => {
+        const seq = ++sequenceRef.current;
+        setStatus((prev) => ({ ...prev, isRefreshing: true }));
+
+        try {
+            if (resolved.protocol === 'openai-image') {
+                if (!resolved.endpoint) {
+                    if (seq === sequenceRef.current) {
+                        setStatus((prev) => ({
+                            ...prev,
+                            status: 'unavailable',
+                            message: 'No image API endpoint configured.',
+                            models: [],
+                            devices: [],
+                            selectedModel: '',
+                            lastCheckedAt: Date.now(),
+                        }));
+                    }
+                    return;
+                }
+
+                const target = createOpenAIImageTarget({
+                    id: 'image-api',
+                    endpoint: resolved.endpoint,
+                    model: computeSettings.imageApiModel ?? '',
+                    apiKey: computeSettings.imageApiKey ?? '',
+                    keyless: computeSettings.imageApiKeyless ?? false,
+                });
+                const health = await target.health();
+
+                // Optional OpenAPI discovery — never blocks or fails the check.
+                let probe = probeCacheRef.current.get(resolved.endpoint) ?? null;
+                if (!probe) {
+                    probe = await probeEndpointCapabilities(resolved.endpoint, {
+                        apiKey: computeSettings.imageApiKey || undefined,
+                        keyless: computeSettings.imageApiKeyless ?? false,
+                    });
+                    probeCacheRef.current.set(resolved.endpoint, probe);
+                }
+
+                if (seq !== sequenceRef.current) return;
+                setStatus((prev) => ({
+                    ...prev,
+                    protocol: 'openai-image',
+                    endpoint: resolved.endpoint,
+                    displayEndpoint: resolved.displayEndpoint,
+                    status: health.status === 'ready' ? 'ready' : health.status,
+                    message: health.status === 'ready' ? undefined : health.message,
+                    selectedModel: computeSettings.imageApiModel ?? '',
+                    models: health.capabilities?.availableModels ?? [],
+                    devices: [],
+                    endpointProbe: probe,
+                    lastCheckedAt: Date.now(),
+                }));
+            } else {
+                const target = createLocalComfyTarget({ id: 'local-comfy', endpoint: resolved.endpoint });
+                const [health, comfyQueue] = await Promise.all([
+                    target.health(),
+                    fetchComfyQueueInfo(resolved.endpoint),
+                ]);
+                if (seq !== sequenceRef.current) return;
+                setStatus((prev) => ({
+                    ...prev,
+                    protocol: 'comfyui',
+                    endpoint: resolved.endpoint,
+                    displayEndpoint: resolved.displayEndpoint,
+                    status: health.status === 'ready' ? 'ready' : health.status,
+                    message: health.status === 'ready' ? undefined : health.message,
+                    selectedModel: '',
+                    models: [],
+                    devices: health.capabilities?.devices ?? [],
+                    comfyQueue,
+                    endpointProbe: null,
+                    lastCheckedAt: Date.now(),
+                }));
+            }
+        } catch {
+            if (seq !== sequenceRef.current) return;
+            setStatus((prev) => ({
+                ...prev,
+                status: 'unavailable',
+                message: 'Unable to reach the compute endpoint.',
+                lastCheckedAt: Date.now(),
+            }));
+        } finally {
+            if (seq === sequenceRef.current) {
+                setStatus((prev) => ({ ...prev, isRefreshing: false }));
+            }
+        }
+    }, [resolved.protocol, resolved.endpoint, resolved.displayEndpoint, computeSettings.imageApiModel, computeSettings.imageApiKey, computeSettings.imageApiKeyless]);
+
+    // Re-check whenever the active endpoint or credentials change.
+    useEffect(() => {
+        setStatus((prev) => ({
+            ...initialStatus(resolved.protocol, resolved.displayEndpoint),
+            lastCheckedAt: prev.lastCheckedAt,
+        }));
+        void runCheck();
+    }, [resolved.protocol, resolved.endpoint, resolved.displayEndpoint, computeSettings.imageApiKey, computeSettings.imageApiKeyless, runCheck]);
+
+    // Refresh on open and on a conservative interval while the popup is open.
+    useEffect(() => {
+        if (!open) return;
+        void runCheck();
+        const timer = setInterval(() => void runCheck(), REFRESH_INTERVAL_MS);
+        return () => clearInterval(timer);
+    }, [open, runCheck]);
+
+    // Track the client-side image API queue for the active endpoint.
+    useEffect(() => {
+        if (resolved.protocol !== 'openai-image' || !resolved.endpoint) {
+            setStatus((prev) => (prev.queue === null ? prev : { ...prev, queue: null }));
+            return;
+        }
+        const apply = (snapshot: { endpoint: string; active: number; queued: number; concurrency: number }) => {
+            if (snapshot.endpoint !== resolved.endpoint) return;
+            setStatus((prev) => ({
+                ...prev,
+                queue: { active: snapshot.active, queued: snapshot.queued, concurrency: snapshot.concurrency },
+            }));
+        };
+        apply(imageApiQueue.getSnapshot(resolved.endpoint));
+        return imageApiQueue.subscribe(apply);
+    }, [resolved.protocol, resolved.endpoint]);
+
+    const refresh = useCallback(() => {
+        void runCheck();
+    }, [runCheck]);
+
+    return { ...status, refresh };
+}

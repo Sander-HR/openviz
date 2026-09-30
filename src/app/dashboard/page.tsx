@@ -1,20 +1,27 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
+    const { status: sessionStatus } = useSession();
     const { currentWorkspace, isLoading } = useWorkspace();
     const router = useRouter();
 
     useEffect(() => {
+        if (sessionStatus === "unauthenticated") {
+            router.replace("/login");
+            return;
+        }
+
         if (currentWorkspace?.id) {
             router.replace(`/files/${currentWorkspace.id}`);
         }
-    }, [currentWorkspace?.id, router]);
+    }, [currentWorkspace?.id, router, sessionStatus]);
 
-    if (isLoading) {
+    if (sessionStatus !== "authenticated" || isLoading) {
         return (
             <div className="flex h-screen bg-[#0F0F0F] text-white w-full items-center justify-center">
                 <div className="text-zinc-400">Loading workspace...</div>

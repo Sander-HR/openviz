@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Handle, NodeResizer, Position, useConnection } from '@xyflow/react';
+import { Handle, NodeResizer, Position, useConnection, useStore } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { ImageNode as ImageNodeType } from '../../types';
-import { imageLikeHandleStyle } from './nodeUi';
+import { cn, imageLikeHandleStyle, mediaNodeFrameClass, mediaNodeTitleClass, resizeHandleClassName } from './nodeUi';
+import { getGenerationRetry } from '@/services/workbench/generationRetryRegistry';
 
 interface ImageNodeData extends ImageNodeType {
     onSourceClick?: (nodeId: string) => void;
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
     onResizeEnd?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
+    isTransitioningToStudio?: boolean;
 }
 
 interface ImageNodeProps {
@@ -19,7 +21,11 @@ interface ImageNodeProps {
     height?: number;
 }
 
-export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConnectable = true, width, height }) => {
+export const ImageNode = React.memo(({ id, data, selected, isConnectable = true, width, height }: ImageNodeProps) => {
+    const internalSelected = useStore((state) => state.nodeLookup.get(id)?.selected === true);
+    const isSelected = selected || internalSelected;
+    const isTransitioningToStudio = data.isTransitioningToStudio === true;
+    const showSelectionChrome = isSelected && !isTransitioningToStudio;
     const connection = useConnection();
     const [isHovered, setIsHovered] = useState(false);
     const [nodeSize, setNodeSize] = useState({ width: width || 256, height: height || 256 });
@@ -39,28 +45,52 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
         (connection.fromNode?.type === 'animateNode' || connection.fromNode?.type === 'renderNode');
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }}>
-            {selected && (
-                <div className="absolute -top-4 left-0 right-0 text-blue-500 text-xs truncate text-left px-1">
+        <div
+            className="relative"
+            style={{ width: nodeSize.width, height: nodeSize.height }}
+        >
+            {showSelectionChrome && (
+                <div className={mediaNodeTitleClass()}>
                     {data.name}
                 </div>
             )}
             <div
+                data-workbench-drawable={id}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className={`relative bg-white rounded-lg shadow-lg transition-all duration-200 border-2 overflow-hidden ${selected ? 'border-[#6366f1]' : 'border-transparent hover:border-[#6366f1]'} ${isHoverConnectable ? 'border-[#6366f1]' : ''}`}
-                style={{ width: '100%', height: '100%' }}
+                className={cn(mediaNodeFrameClass(showSelectionChrome), isHoverConnectable && 'border-viz-accent')}
             >
                 {data.status === 'rendering' ? (
                     <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center animate-pulse">
                         <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2"></div>
                         <span className="text-gray-400 text-xs font-medium">Rendering...</span>
                     </div>
+                ) : data.status === 'error' ? (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-red-50 p-4 text-center">
+                        <div role="alert" className="space-y-1">
+                            <p className="text-xs font-semibold text-red-700">Generation failed</p>
+                            <p className="line-clamp-3 text-[10px] text-red-600">
+                                {data.errorMessage ?? 'The image could not be generated.'}
+                            </p>
+                        </div>
+                        {getGenerationRetry(data.id) && (
+                            <button
+                                type="button"
+                                className="nodrag rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    getGenerationRetry(data.id)?.();
+                                }}
+                            >
+                                Retry
+                            </button>
+                        )}
+                    </div>
                 ) : data.project.thumbnail ? (
                     <img
                         src={data.project.thumbnail}
                         alt={data.name}
-                        className="w-full h-full object-cover"
+                        className="block h-full w-full object-cover"
                         draggable={false}
                     />
                 ) : (
@@ -78,10 +108,8 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
                     right: '0px',
                     top: '50%',
                     zIndex: 1000,
-                    opacity: selected || isHovered ? 1 : 0,
-                    pointerEvents: 'auto',
-                    width: 24,
-                    height: 24,
+                    opacity: showSelectionChrome || isHoverConnectable ? 1 : 0,
+                    pointerEvents: showSelectionChrome || isHoverConnectable ? 'auto' : 'none',
                 }}
                 isConnectable={isConnectable}
                 onClick={handleSourceClick}
@@ -89,16 +117,15 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
                 <Plus size={16} color="white" strokeWidth={3} className="pointer-events-none" />
             </Handle>
             <NodeResizer
-                isVisible={selected && data.status !== 'rendering'}
+                isVisible={showSelectionChrome && data.status !== 'rendering'}
                 minWidth={100}
                 minHeight={100}
                 keepAspectRatio={true}
-                color="#ffffff"
+                color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}
@@ -125,4 +152,6 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ id, data, selected, isConn
             />
         </div>
     );
-};
+});
+
+ImageNode.displayName = 'ImageNode';

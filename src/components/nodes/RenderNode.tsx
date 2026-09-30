@@ -1,9 +1,8 @@
 import React from 'react';
-import { Handle, Position } from '@xyflow/react';
-import { ChevronDown, Layers, Plus, Wand2 } from 'lucide-react';
+import { ChevronDown, Layers, Wand2 } from 'lucide-react';
 import { RenderNode as RenderNodeType } from '../../types';
 import { useRenderNodeGeneration } from './hooks/useRenderNodeGeneration';
-import { cn, elevatedFullNodeTargetHandleStyle, getNodeContainerClass, imageLikeHandleStyle } from './nodeUi';
+import { cn, nodeCardClass, NodeCardHeader, nodeCardBodyClass, NodeTargetHandle } from './nodeUi';
 
 interface RenderNodeProps {
     id: string;
@@ -11,7 +10,7 @@ interface RenderNodeProps {
     selected: boolean;
 }
 
-export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) => {
+export const RenderNode = React.memo(({ id, data, selected }: RenderNodeProps) => {
     const {
         settings,
         availableStyles,
@@ -30,35 +29,13 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
         <div
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={getNodeContainerClass(selected, isHoverConnectable)}
+            className={cn(nodeCardClass(selected), isHoverConnectable && 'border-viz-accent')}
         >
-            <Handle
-                type="target"
-                position={Position.Left}
-                id="render-target-visible"
-                style={{
-                    ...imageLikeHandleStyle,
-                    left: '13px',
-                    top: '50%',
-                    zIndex: 11000,
-                    opacity: selected ? 1 : 0,
-                    pointerEvents: selected ? 'auto' : 'none',
-                }}
-            >
-                <Plus size={16} color="white" strokeWidth={3} className="pointer-events-none" />
-            </Handle>
-            <Handle type="target" position={Position.Left} style={elevatedFullNodeTargetHandleStyle} />
+            <NodeTargetHandle id="render-target-visible" selected={selected} />
 
-            <div className="border-[#333] bg-[#222] p-4 border-b">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Wand2 size={16} className="text-[#6366f1]" />
-                        <h3 className="text-white font-medium text-lg">Render</h3>
-                    </div>
-                </div>
-            </div>
+            <NodeCardHeader icon={Wand2} label="Render" />
 
-            <div className="space-y-4 p-4">
+            <div className={nodeCardBodyClass()}>
                 <div className="space-y-2">
                     <div className="flex justify-between items-center">
                         <label className="text-gray-400 text-xs font-bold uppercase tracking-wider">Prompt</label>
@@ -192,4 +169,6 @@ export const RenderNode: React.FC<RenderNodeProps> = ({ id, data, selected }) =>
             </div>
         </div>
     );
-};
+});
+
+RenderNode.displayName = 'RenderNode';

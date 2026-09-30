@@ -1,0 +1,32 @@
+{
+    "unet": { "class_type": "UNETLoader", "inputs": { "unet_name": "qwen_image_2.1_bf16.safetensors", "weight_dtype": "default" } },
+    "clip": { "class_type": "CLIPLoader", "inputs": { "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors", "type": "qwen_image" } },
+    "vae": { "class_type": "VAELoader", "inputs": { "vae_name": "qwen_image_vae.safetensors" } },
+    "positive": { "class_type": "CLIPTextEncode", "inputs": { "text": "", "clip": ["clip", 0] } },
+    "negative": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+            "text": "低分辨率，低画质，肢体畸形，手指畸形，画面过饱和，蜡像感，人脸无细节，过度光滑，画面具有AI感。构图混乱。文字模糊，扭曲",
+            "clip": ["clip", 0]
+        }
+    },
+    "latent": { "class_type": "EmptySD3LatentImage", "inputs": { "width": 1328, "height": 1328, "batch_size": 1 } },
+    "shift": { "class_type": "ModelSamplingAuraFlow", "inputs": { "model": ["unet", 0], "shift": 3.1 } },
+    "sampler": {
+        "class_type": "KSampler",
+        "inputs": {
+            "model": ["shift", 0],
+            "positive": ["positive", 0],
+            "negative": ["negative", 0],
+            "latent_image": ["latent", 0],
+            "seed": 0,
+            "steps": 50,
+            "cfg": 4.0,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "denoise": 1.0
+        }
+    },
+    "decode": { "class_type": "VAEDecode", "inputs": { "samples": ["sampler", 0], "vae": ["vae", 0] } },
+    "save": { "class_type": "SaveImage", "inputs": { "images": ["decode", 0], "filename_prefix": "product_concept" } }
+}

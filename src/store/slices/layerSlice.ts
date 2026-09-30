@@ -12,6 +12,7 @@ export interface LayerSlice {
     duplicateLayer: (id: string) => void;
     copyLayer: (id: string) => void;
     pasteLayer: () => void;
+    addImageLayer: (image: string, name?: string) => void;
     addResultAsLayer: (image: string) => void;
 }
 
@@ -128,6 +129,16 @@ export const createLayerSlice: StateCreator<AppState, [], [], LayerSlice> = (set
             },
             activeLayerId: newLayer.id
         };
+    }),
+    addImageLayer: (image, name = 'Pasted image') => set((state: AppState) => {
+        const now = Date.now();
+        const newLayer: Layer = {
+            id: Math.random().toString(36).substr(2, 9), name, type: 'image', visible: true,
+            locked: false, opacity: 100, blendMode: 'normal', strokes: [], image, thumbnail: image,
+            x: 0, y: 0, width: state.project.canvas.width, height: state.project.canvas.height,
+            rotation: 0, scaleX: 1, scaleY: 1, order: state.project.layers.length, created: now, modified: now,
+        };
+        return { project: { ...state.project, layers: [...state.project.layers, newLayer], lastModifiedAt: now }, activeLayerId: newLayer.id };
     }),
     addResultAsLayer: (image) => set((state: AppState) => {
         const newLayerStyle = state.renderSettings.stylePreset;

@@ -1,9 +1,8 @@
 import React from 'react';
-import { Handle, Position } from '@xyflow/react';
 import { ChevronDown, Image as ImageIcon, Play, Plus, Settings2, Video, X } from 'lucide-react';
 import { AnimateNode as AnimateNodeType, ImageNode, VideoNode, WorkbenchNode } from '../../types';
 import { useAnimateNodeActions } from './hooks/useAnimateNodeActions';
-import { cn, elevatedFullNodeTargetHandleStyle, getNodeContainerClass, imageLikeHandleStyle } from './nodeUi';
+import { cn, nodeCardClass, NodeCardHeader, nodeCardBodyClass, NodeTargetHandle } from './nodeUi';
 
 interface AnimateNodeProps {
     id: string;
@@ -15,7 +14,7 @@ function isFrameNode(node: WorkbenchNode | undefined): node is ImageNode | Video
     return Boolean(node && (node.type === 'image' || node.type === 'video'));
 }
 
-export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) => {
+export const AnimateNode = React.memo(({ id, data, selected }: AnimateNodeProps) => {
     const {
         videoStyles,
         settings,
@@ -43,35 +42,13 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
             onClick={handleNodeClick}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={getNodeContainerClass(selected, isHoverConnectable)}
+            className={cn(nodeCardClass(selected), isHoverConnectable && 'border-viz-accent')}
         >
-            <Handle
-                type="target"
-                position={Position.Left}
-                id="animate-target-visible"
-                style={{
-                    ...imageLikeHandleStyle,
-                    left: '13px',
-                    top: '50%',
-                    zIndex: 11000,
-                    opacity: selected ? 1 : 0,
-                    pointerEvents: selected ? 'auto' : 'none',
-                }}
-            >
-                <Plus size={16} color="white" strokeWidth={3} className="pointer-events-none" />
-            </Handle>
-            <Handle type="target" position={Position.Left} style={elevatedFullNodeTargetHandleStyle} />
+            <NodeTargetHandle id="animate-target-visible" selected={selected} />
 
-            <div className="border-[#333] bg-[#222] p-4 border-b">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Video size={16} className="text-[#6366f1]" />
-                        <h3 className="text-white font-medium text-lg">Animate</h3>
-                    </div>
-                </div>
-            </div>
+            <NodeCardHeader icon={Video} label="Animate" />
 
-            <div className="space-y-4 p-4">
+            <div className={nodeCardBodyClass()}>
                 <div className="space-y-2 pointer-events-auto">
                     <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Frames</div>
                     <div className="flex items-center gap-2">
@@ -237,4 +214,6 @@ export const AnimateNode: React.FC<AnimateNodeProps> = ({ id, data, selected }) 
             </div>
         </div>
     );
-};
+});
+
+AnimateNode.displayName = 'AnimateNode';

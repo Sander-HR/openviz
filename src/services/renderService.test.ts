@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { comfyRenderService } from './renderService';
+import { comfyRenderService, downscaleImageApiDimensions, normalizeImageApiSize } from './renderService';
 
 // Mock the fetch call
 global.fetch = vi.fn();
 
 describe('renderService integration', () => {
+    it('downscales oversized output while preserving aspect ratio', () => {
+        expect(downscaleImageApiDimensions(1024, 704)).toEqual({ width: 512, height: 352 });
+    });
     beforeEach(() => {
         vi.clearAllMocks();
         // Setup default successful responses for upload and prompt
@@ -34,6 +37,9 @@ describe('renderService integration', () => {
                         'test_prompt_id': {
                             status: { status_str: 'success' },
                             outputs: {
+                                '9': {
+                                    images: [{ filename: 'out.png', subfolder: '', type: 'output' }],
+                                },
                                 '37': { // video_output node for animate_from_to
                                     videos: [{ filename: 'out.mp4', subfolder: '', type: 'output' }]
                                 }
@@ -44,6 +50,31 @@ describe('renderService integration', () => {
             }
             return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
         });
+    });
+
+    it('normalizes API dimensions to multiples of 16 without forcing a square ratio', () => {
+        expect(normalizeImageApiSize(1024, 682)).toBe('1024x688');
+        expect(normalizeImageApiSize(900, 1200)).toBe('896x1200');
+    });
+
+    it('injects the selected style prompt into the ComfyUI positive prompt', async () => {
+        await comfyRenderService.generate({
+            workflowId: 'cyberpunk',
+            prompt: 'A desk lamp',
+            stylePreset: 'Cyberpunk / Neon',
+            drawingInfluence: 0.65,
+            numImages: 1,
+            init_image: 'data:image/png;base64,input',
+            width: 1024,
+            height: 1024,
+        });
+
+        const promptCall = (global.fetch as any).mock.calls.find((call: any) => call[0].includes('/prompt'));
+        expect(promptCall).toBeDefined();
+        const payload = JSON.parse(promptCall[1].body);
+        expect(payload.prompt['6'].inputs.text).toContain('A desk lamp');
+        expect(payload.prompt['6'].inputs.text).toContain('Style direction:');
+        expect(payload.prompt['6'].inputs.text).toContain('cyberpunk/neon');
     });
 
     it('should correctly map nodes for animate_from_to workflow', async () => {

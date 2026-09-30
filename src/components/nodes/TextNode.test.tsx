@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@xyflow/react', () => ({
@@ -73,5 +73,97 @@ describe('TextNode editing (C-3.1)', () => {
         );
         expect(container.querySelector('textarea')).toBeNull();
         expect(container.textContent).toContain('Updated');
+    });
+});
+
+describe('TextNode formatting toolbar', () => {
+    it('is hidden when the node is not selected', () => {
+        const { queryByTitle } = render(<TextNode id="text-1" data={makeData()} selected={false} />);
+        expect(queryByTitle('Bold')).toBeNull();
+        expect(queryByTitle('More')).toBeNull();
+    });
+
+    it('shows color, font, size, bold, underline, align and more controls when selected', () => {
+        const { getByTitle, getByLabelText } = render(<TextNode id="text-1" data={makeData()} selected={true} />);
+        expect(getByLabelText('Text color')).toBeTruthy();
+        expect(getByTitle('Font')).toBeTruthy();
+        expect(getByTitle('Size')).toBeTruthy();
+        expect(getByTitle('Bold')).toBeTruthy();
+        expect(getByTitle('Underline')).toBeTruthy();
+        expect(getByTitle('Align')).toBeTruthy();
+        expect(getByTitle('More')).toBeTruthy();
+    });
+
+    it('toggles bold through onDataChange', () => {
+        const onDataChange = vi.fn();
+        const { getByTitle } = render(<TextNode id="text-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        fireEvent.click(getByTitle('Bold'));
+        expect(onDataChange).toHaveBeenCalledWith('text-1', { fontWeight: 700 });
+    });
+
+    it('toggles underline through onDataChange', () => {
+        const onDataChange = vi.fn();
+        const { getByTitle } = render(<TextNode id="text-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        fireEvent.click(getByTitle('Underline'));
+        expect(onDataChange).toHaveBeenCalledWith('text-1', { underline: true });
+    });
+
+    it('opens a popover with 12 preset swatches from the color button', () => {
+        const { getByLabelText } = render(<TextNode id="text-1" data={makeData()} selected={true} />);
+        expect(screen.queryByLabelText('Color #ef4444')).toBeNull();
+
+        fireEvent.click(getByLabelText('Text color'));
+        expect(screen.getByLabelText('Color #ef4444')).toBeTruthy();
+        expect(screen.getAllByLabelText(/^Color #/)).toHaveLength(12);
+    });
+
+    it('picks a preset swatch through onDataChange', () => {
+        const onDataChange = vi.fn();
+        const { getByLabelText } = render(<TextNode id="text-1" data={makeData('', onDataChange)} selected={true} />);
+
+        fireEvent.click(getByLabelText('Text color'));
+        fireEvent.click(screen.getByLabelText('Color #3b82f6'));
+        expect(onDataChange).toHaveBeenCalledWith('text-1', { color: '#3b82f6' });
+    });
+
+    it('picks a font size from the size menu', () => {
+        const onDataChange = vi.fn();
+        render(<TextNode id="text-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        // Radix DropdownMenu.Trigger opens on pointerdown (button 0).
+        fireEvent.pointerDown(screen.getByTitle('Size'), { button: 0 });
+        fireEvent.click(screen.getByText('32px'));
+        expect(onDataChange).toHaveBeenCalledWith('text-1', { fontSize: 32 });
+    });
+
+    it('picks a font family from the font menu', () => {
+        const onDataChange = vi.fn();
+        render(<TextNode id="text-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        fireEvent.pointerDown(screen.getByTitle('Font'), { button: 0 });
+        fireEvent.click(screen.getByText('Mono'));
+        expect(onDataChange).toHaveBeenCalledWith('text-1', {
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        });
+    });
+
+    it('picks an alignment from the align menu', () => {
+        const onDataChange = vi.fn();
+        render(<TextNode id="text-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        fireEvent.pointerDown(screen.getByTitle('Align'), { button: 0 });
+        fireEvent.click(screen.getByText('Align center'));
+        expect(onDataChange).toHaveBeenCalledWith('text-1', { align: 'center' });
+    });
+
+    it('toggles italic from the more menu', () => {
+        const onDataChange = vi.fn();
+        render(<TextNode id="text-1" data={makeData('Hi', onDataChange)} selected={true} />);
+
+        fireEvent.pointerDown(screen.getByTitle('More'), { button: 0 });
+        fireEvent.click(screen.getByText('Italic'));
+        expect(onDataChange).toHaveBeenCalledWith('text-1', { fontStyle: 'italic' });
     });
 });

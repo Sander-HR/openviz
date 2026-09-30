@@ -21,7 +21,7 @@ interface WorkspaceContextType {
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
-    const { data: session } = useSession();
+    const { data: session, status: sessionStatus } = useSession();
     const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
     const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -54,6 +54,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
+        // SessionProvider starts in a loading state. Do not briefly expose the
+        // empty-workspace state before Auth.js has restored the session.
+        if (sessionStatus === "loading") {
+            setIsLoading(true);
+            return;
+        }
+
         if (session?.user?.id) {
             fetchWorkspaces();
         } else {
@@ -61,7 +68,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
             setCurrentWorkspace(null);
             setIsLoading(false);
         }
-    }, [session?.user?.id]);
+    }, [session?.user?.id, sessionStatus]);
 
     return (
         <WorkspaceContext.Provider value={{ workspaces, currentWorkspace, setCurrentWorkspace, isLoading, refreshWorkspaces: fetchWorkspaces }}>

@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { NodeResizer } from '@xyflow/react';
+import { NodeResizer, useStore } from '@xyflow/react';
 import { Play, Pause, Maximize2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VideoNode as VideoNodeType } from '../../types';
+import { mediaNodeFrameClass, resizeHandleClassName } from './nodeUi';
 
 interface VideoNodeData extends VideoNodeType {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -18,7 +19,9 @@ interface VideoNodeProps {
     height?: number;
 }
 
-export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width, height }) => {
+export const VideoNode = React.memo(({ id, data, selected, width, height }: VideoNodeProps) => {
+    const internalSelected = useStore((state) => state.nodeLookup.get(id)?.selected === true);
+    const isSelected = selected || internalSelected;
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -49,8 +52,7 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width,
     return (
         <div style={{ width: nodeSize.width, height: nodeSize.height }}>
             <div
-                className={`relative bg-black rounded-lg shadow-lg transition-all duration-200 border-2 overflow-hidden ${selected ? 'border-[#6366f1]' : 'border-transparent hover:border-[#6366f1]'}`}
-                style={{ width: '100%', height: '100%' }}
+                className={mediaNodeFrameClass(isSelected)}
             >
                 {data.status === 'rendering' ? (
                     <div className="w-full h-full bg-gray-900 flex flex-col items-center justify-center animate-pulse">
@@ -109,16 +111,15 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width,
                 )}
             </div>
             <NodeResizer
-                isVisible={selected && data.status !== 'rendering'}
+                isVisible={isSelected && data.status !== 'rendering'}
                 minWidth={100}
                 minHeight={100}
                 keepAspectRatio={true}
-                color="#6366f1"
+                color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
                     borderWidth: '2px',
                     borderRadius: 3,
                     transform: `scale(1)`,
@@ -198,4 +199,6 @@ export const VideoNode: React.FC<VideoNodeProps> = ({ id, data, selected, width,
             )}
         </div>
     );
-};
+});
+
+VideoNode.displayName = 'VideoNode';

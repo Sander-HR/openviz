@@ -1,13 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Edge, Node } from "@xyflow/react";
 import { Connection, NodeLockState, WorkbenchNode } from "@/types";
+import { getGenerationRetry } from "@/services/workbench/generationRetryRegistry";
 
 type WorkbenchGraphOptions = {
     workbenchNodes: WorkbenchNode[];
     connections: Connection[];
-    selectedNodeIds: string[];
     /** Remote soft locks (nodeId → holder). Locked nodes are inert for this session. */
     nodeLocks: Record<string, NodeLockState>;
+    isTransitioningToStudio?: boolean;
     handleSourceClick: (nodeId: string) => void;
     handleResize: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
     handleResizeEnd: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -22,21 +23,33 @@ type WorkbenchFlowNodeType =
     | "videoNode"
     | "animateNode"
     | "renderNode"
+    | "modifyNode"
     | "freehandNode"
     | "arrowNode"
     | "textNode"
     | "noteNode"
-    | "mediaNode";
+    | "mediaNode"
+    | "variateNode"
+    | "newViewNode"
+    | "extractNode"
+    | "sectionNode";
 
 function mapNodeType(node: WorkbenchNode): WorkbenchFlowNodeType {
     if (node.type === "image") return "imageNode";
     if (node.type === "video") return "videoNode";
     if (node.type === "animate") return "animateNode";
+    if (node.type === "modify") return "modifyNode";
     if (node.type === "freehand") return "freehandNode";
     if (node.type === "arrow") return "arrowNode";
     if (node.type === "text") return "textNode";
     if (node.type === "note") return "noteNode";
     if (node.type === "media") return "mediaNode";
+    // US3 (T036): the new generation/section shells map to their own types
+    // instead of falling through to the renderNode fallback.
+    if (node.type === "variate") return "variateNode";
+    if (node.type === "new-view") return "newViewNode";
+    if (node.type === "extract") return "extractNode";
+    if (node.type === "section") return "sectionNode";
     return "renderNode";
 }
 
@@ -46,6 +59,14 @@ function getNodeSize(node: WorkbenchNode) {
 
     let width = fallbackWidth;
     let height = fallbackHeight;
+
+    // Render controls use a compact fixed shell sized to their controls rather
+    // than inheriting the historical 500px placeholder height. Keep the React
+    // Flow hitbox tight so empty space below Generate cannot block nodes.
+    if (node.type === "render") {
+        width = 320;
+        height = 390;
+    }
 
     if (
         (node.type === "image" || node.type === "video") &&
@@ -70,8 +91,8 @@ function getNodeSize(node: WorkbenchNode) {
 export function useWorkbenchGraph({
     workbenchNodes,
     connections,
-    selectedNodeIds,
     nodeLocks,
+    isTransitioningToStudio = false,
     handleSourceClick,
     handleResize,
     handleResizeEnd,
@@ -80,19 +101,50 @@ export function useWorkbenchGraph({
     handleGestureEnd,
     handleDataChange,
 }: WorkbenchGraphOptions) {
+    const flowNodeCacheRef = useRef(new Map<string, {
+        sourceNode: WorkbenchNode;
+        remotelyLocked: boolean;
+        node: Node<Record<string, unknown>, WorkbenchFlowNodeType>;
+    }>());
+
     const nodes = useMemo<Array<Node<Record<string, unknown>, WorkbenchFlowNodeType>>>(() => {
-        return workbenchNodes.map((node) => {
+        const nextCache = new Map(flowNodeCacheRef.current);
+        const nextNodes = workbenchNodes
+            .filter((node) => !(node.type === 'arrow' && node.data.temporary))
+            .map((node) => {
+            const remotelyLocked = Boolean(nodeLocks[node.id]);
+            const position = { x: node.x, y: node.y };
+            const cached = nextCache.get(node.id);
+
+            if (cached?.sourceNode === node && cached.remotelyLocked === remotelyLocked) {
+                if (cached.node.data.isTransitioningToStudio === isTransitioningToStudio && cached.node.position.x === position.x && cached.node.position.y === position.y) {
+                    return cached.node;
+                }
+
+                const selectedNode = {
+                    ...cached.node,
+                    position,
+                    data: {
+                        ...cached.node.data,
+                        isTransitioningToStudio,
+                    },
+                };
+                nextCache.set(node.id, { ...cached, node: selectedNode });
+                return selectedNode;
+            }
+
             const { width, height } = getNodeSize(node);
 
-            return {
+            const flowNode: Node<Record<string, unknown>, WorkbenchFlowNodeType> = {
                 id: node.id,
                 type: mapNodeType(node),
-                position: { x: node.x, y: node.y },
+                position,
                 width,
                 height,
                 style: { width, height },
                 data: {
                     ...node,
+                    isTransitioningToStudio,
                     width,
                     height,
                     onSourceClick: handleSourceClick,
@@ -102,19 +154,31 @@ export function useWorkbenchGraph({
                     onGestureStart: handleGestureStart,
                     onGestureEnd: handleGestureEnd,
                     onDataChange: handleDataChange,
+                    onRetry: getGenerationRetry(node.id),
                 } as Record<string, unknown>,
-                selected: selectedNodeIds.includes(node.id),
+                // React Flow owns interactive selection; do not control the
+                // `selected` flag from this render path.
                 // Remote soft locks (spec FR-015): a node another collaborator
                 // holds cannot be selected or dragged from this session.
-                selectable: !nodeLocks[node.id],
-                draggable: !nodeLocks[node.id],
+                selectable: !remotelyLocked,
+                draggable: !remotelyLocked,
             };
+
+            nextCache.set(node.id, { sourceNode: node, remotelyLocked, node: flowNode });
+            return flowNode;
         });
-    }, [workbenchNodes, selectedNodeIds, nodeLocks, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
+
+        const activeIds = new Set(nextNodes.map((node) => node.id));
+        for (const id of nextCache.keys()) {
+            if (!activeIds.has(id)) nextCache.delete(id);
+        }
+        flowNodeCacheRef.current = nextCache;
+        return nextNodes;
+    }, [workbenchNodes, nodeLocks, isTransitioningToStudio, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
 
     const edges = useMemo<Array<Edge>>(() => {
         const nodeById = new Map(workbenchNodes.map((node) => [node.id, node]));
-        return connections.flatMap((conn) => {
+        const regularEdges = connections.flatMap((conn) => {
             const sourceNode = nodeById.get(conn.from);
             const targetNode = nodeById.get(conn.to);
 
@@ -133,6 +197,7 @@ export function useWorkbenchGraph({
                 animated: false,
             }];
         });
+        return regularEdges;
     }, [connections, workbenchNodes]);
 
     return { nodes, edges };

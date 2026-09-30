@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hexToRgb, rgbToHex, rgbToHsv, hsvToRgb } from './colorUtils';
+import { extractPaletteFromImageData, hexToRgb, normalizeHex, rgbToHex, rgbToHsv, hsvToRgb } from './colorUtils';
 
 describe('colorUtils', () => {
     describe('hexToRgb', () => {
@@ -42,5 +42,21 @@ describe('colorUtils', () => {
             const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
             expect(hsvToRgb(hsv.h, hsv.s, hsv.v)).toEqual(rgb);
         });
+    });
+
+    it('normalizes valid hex values and rejects invalid values', () => {
+        expect(normalizeHex(' #AABBCC ')).toBe('#aabbcc');
+        expect(normalizeHex('nope')).toBeNull();
+    });
+
+    it('extracts the most frequent opaque palette buckets deterministically', () => {
+        const data = new Uint8ClampedArray([
+            250, 10, 10, 255,
+            245, 12, 12, 255,
+            20, 30, 40, 255,
+            20, 30, 40, 255,
+            0, 0, 0, 0,
+        ]);
+        expect(extractPaletteFromImageData({ data, width: 5, height: 1 } as ImageData, 2)).toEqual(['#102030', '#f01010']);
     });
 });

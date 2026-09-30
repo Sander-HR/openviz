@@ -4,6 +4,7 @@ import { TOOL_SHORTCUT_MAP } from "@/store/workbenchTools";
 import type { WorkbenchToolType } from "@/types";
 
 type UseWorkbenchKeyboardShortcutsOptions = {
+    enabled?: boolean;
     copyToClipboard: () => void;
     pasteFromClipboard: (pos: { x: number; y: number }) => void;
     duplicateWorkbenchNode: () => void;
@@ -23,9 +24,14 @@ type UseWorkbenchKeyboardShortcutsOptions = {
     resetView: () => void;
     zoomTo100: () => void;
     clearSelection: () => void;
+    /** US3 (ui-translation §6): `I` starts the image upload flow directly. */
+    onUploadImage: () => void;
+    /** US3 (ui-translation §6): `/` opens the phone-upload flow. */
+    onUploadFromPhone: () => void;
 };
 
 export function useWorkbenchKeyboardShortcuts({
+    enabled = true,
     copyToClipboard,
     pasteFromClipboard,
     duplicateWorkbenchNode,
@@ -45,8 +51,11 @@ export function useWorkbenchKeyboardShortcuts({
     resetView,
     zoomTo100,
     clearSelection,
+    onUploadImage,
+    onUploadFromPhone,
 }: UseWorkbenchKeyboardShortcutsOptions) {
     useEffect(() => {
+        if (!enabled) return;
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
             if (e.target instanceof HTMLElement && e.target.isContentEditable) return;
@@ -101,6 +110,14 @@ export function useWorkbenchKeyboardShortcuts({
                 if (activeNodeId) reorderWorkbenchNode(activeNodeId, "back");
             } else if (e.key === "]") {
                 if (activeNodeId) reorderWorkbenchNode(activeNodeId, "front");
+            } else if (!isMod && e.key.toLowerCase() === "i") {
+                // US3: `I` starts the image upload flow directly (§6).
+                e.preventDefault();
+                onUploadImage();
+            } else if (!isMod && e.key === "/") {
+                // US3: `/` opens the phone-upload flow (§6).
+                e.preventDefault();
+                onUploadFromPhone();
             } else if (!isMod) {
                 // Single source of truth for tool keys — see workbenchTools.ts (T007).
                 const tool = TOOL_SHORTCUT_MAP[e.key.toLowerCase()];
@@ -133,5 +150,8 @@ export function useWorkbenchKeyboardShortcuts({
         resetView,
         zoomTo100,
         clearSelection,
+        onUploadImage,
+        onUploadFromPhone,
+        enabled,
     ]);
 }

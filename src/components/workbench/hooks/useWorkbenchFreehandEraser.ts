@@ -14,8 +14,7 @@ interface UseWorkbenchFreehandEraserOptions {
     freehandStrokeWidth: number;
     removeWorkbenchNode: (id: string) => void;
     addWorkbenchNode: (node: WorkbenchNode) => void;
-    setActiveNodeId: (id: string | null) => void;
-    setSelectedNodeIds: (ids: string[]) => void;
+    setSelection: (ids: string[]) => void;
 }
 
 /**
@@ -30,8 +29,7 @@ export function useWorkbenchFreehandEraser({
     freehandStrokeWidth,
     removeWorkbenchNode,
     addWorkbenchNode,
-    setActiveNodeId,
-    setSelectedNodeIds,
+    setSelection,
 }: UseWorkbenchFreehandEraserOptions) {
     const handleEraseAtPoint = useCallback(
         (point: Point) => {
@@ -98,12 +96,11 @@ export function useWorkbenchFreehandEraser({
 
             addWorkbenchNode(freehandNode);
             if (activeWorkbenchTool === 'draw') {
-                setActiveNodeId(freehandNode.id);
-                setSelectedNodeIds([freehandNode.id]);
+                setSelection([freehandNode.id]);
             }
             requestImmediateSceneSave();
         },
-        [activeWorkbenchTool, addWorkbenchNode, freehandColor, freehandStrokeWidth, setActiveNodeId, setSelectedNodeIds]
+        [activeWorkbenchTool, addWorkbenchNode, freehandColor, freehandStrokeWidth, setSelection]
     );
 
     return { handleEraseAtPoint, onStrokeFinished, ERASER_SIZE };

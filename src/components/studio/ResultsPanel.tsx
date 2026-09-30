@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { ChevronDown, MoreHorizontal, RotateCcw, Eye, Download, ArrowLeft, ArrowRight, Archive, PlusSquare } from 'lucide-react';
+import type { ImageNode, RenderGroup, RenderNode } from '../../types';
+import { ChevronDown, MoreHorizontal, RotateCcw, Eye, Download, ArrowLeft, ArrowRight, Archive, PlusSquare, Check, LoaderCircle, TriangleAlert } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,9 +17,62 @@ interface ResultsPanelProps {
     height: number;
 }
 
+function getLegacyRenderGroups(
+    activeNodeId: string | null,
+    workbenchNodes: ReturnType<typeof useStore.getState>['workbenchNodes'],
+    connections: ReturnType<typeof useStore.getState>['connections']
+): RenderGroup[] {
+    if (!activeNodeId) return [];
+
+    const renderNodes = workbenchNodes.filter((node): node is RenderNode =>
+        node.type === 'render' && connections.some((connection) =>
+            connection.from === activeNodeId && connection.to === node.id
+        )
+    );
+
+    return renderNodes.flatMap((renderNode) => {
+        const prompt = renderNode.data.prompt.trim();
+        if (!prompt) return [];
+
+        const promptPrefix = prompt.toLowerCase().slice(0, 20);
+        const source = workbenchNodes.find((node) => node.id === activeNodeId);
+        const outputNodes = workbenchNodes
+            .filter((node): node is ImageNode =>
+                node.type === 'image' &&
+                node.id !== activeNodeId &&
+                Boolean(node.project.thumbnail) &&
+                node.name.toLowerCase().startsWith(promptPrefix)
+            )
+            .sort((left, right) => {
+                const leftDistance = Math.hypot(left.x - renderNode.x, left.y - renderNode.y);
+                const rightDistance = Math.hypot(right.x - renderNode.x, right.y - renderNode.y);
+                return leftDistance - rightDistance;
+            })
+            .slice(0, renderNode.data.numImages || 1);
+
+        const images = outputNodes
+            .map((node) => node.project.thumbnail)
+            .filter((thumbnail): thumbnail is string => Boolean(thumbnail));
+        if (images.length === 0) return [];
+
+        return [{
+            id: `legacy-${renderNode.id}`,
+            prompt,
+            style: renderNode.data.stylePreset,
+            settings: { ...renderNode.data },
+            images,
+            timestamp: 0,
+            width: source?.type === 'image' || source?.type === 'video' ? source.project.canvas.width : 1024,
+            height: source?.type === 'image' || source?.type === 'video' ? source.project.canvas.height : 1024,
+            sourceNodeId: activeNodeId,
+        } satisfies RenderGroup];
+    });
+}
+
 export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
     const {
         renderResults,
+        project,
         activeNodeId,
         resultsPanelOpen,
         setResultsPanelOpen,
@@ -30,19 +84,49 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
         loadRenderSettings,
         addGroupToWorkbench,
         addImageToWorkbench,
-        isRendering
+        productJobs,
+        isRendering,
+        workbenchNodes = [],
+        connections = [],
     } = useStore();
+
+    // A direct /studio load can restore the source project without restoring
+    // the workbench selection. The project id is also the image-node id for
+    // persisted image nodes, so use it as the source fallback.
+    const effectiveActiveNodeId = activeNodeId ?? project?.id ?? null;
 
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
     const [isExporting, setIsExporting] = React.useState<string | null>(null);
     const [lastPreviewedImage, setLastPreviewedImage] = useState<string | null>(null);
     const [showFooterInCollapsed, setShowFooterInCollapsed] = useState(false);
 
-    // Filter render results to show only those for the current active node
-    const filteredRenderResults = renderResults.filter(group =>
-        group.sourceNodeId === activeNodeId ||
-        (!group.sourceNodeId && activeNodeId === 'default')
+    // Results are persisted on the source image node so reopening a node can
+    // restore its history. Keep the global list as a compatibility fallback,
+    // then filter by the active source node. This also handles older scenes
+    // where the node-owned result groups were saved before sourceNodeId was
+    // added to the global render group.
+    const activeSourceNode = workbenchNodes.find((node): node is ImageNode =>
+        node.id === effectiveActiveNodeId && node.type === 'image'
     );
+    const activeVideoNode = workbenchNodes.find((node) =>
+        node.id === effectiveActiveNodeId && node.type === 'video'
+    );
+    const activeSourceResults = activeSourceNode?.renderResults ??
+        (activeVideoNode?.type === 'video' ? activeVideoNode.renderResults : undefined) ?? [];
+    const legacyRenderResults = useMemo(
+        () => getLegacyRenderGroups(effectiveActiveNodeId, workbenchNodes, connections),
+        [effectiveActiveNodeId, workbenchNodes, connections]
+    );
+    const resultGroups: RenderGroup[] = [...activeSourceResults, ...renderResults, ...legacyRenderResults];
+    const seenResultIds = new Set<string>();
+    const filteredRenderResults = resultGroups.filter((group) => {
+        if (seenResultIds.has(group.id)) return false;
+        seenResultIds.add(group.id);
+        return activeSourceResults.includes(group) ||
+            group.sourceNodeId === effectiveActiveNodeId ||
+            (!group.sourceNodeId && effectiveActiveNodeId === 'default');
+    });
+    const colorJobs = Object.values(productJobs ?? {}).filter((job) => job.workflowId === 'material_study' && job.parameters.variableType === 'color');
 
     // Flatten all images for navigation
     const allImages = filteredRenderResults.flatMap(g => g.images);
@@ -122,28 +206,28 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
     return (
         <div 
             className={cn(
-                "w-full flex flex-col bg-panel border border-panel-border rounded-panel shadow-2xl overflow-hidden backdrop-blur-md bg-opacity-95 text-white transition-all duration-300 pointer-events-auto flex-1",
-                !resultsPanelOpen && "h-10"
+                "w-full flex flex-col bg-viz-panel border border-viz-border rounded-xl2 shadow-viz overflow-hidden text-white transition-all duration-300 pointer-events-auto",
+                resultsPanelOpen ? "flex-none" : "h-10 flex-none mt-auto"
             )}
             style={resultsPanelOpen ? { height } : undefined}
         >
             {/* Header */}
             <div
-                className="flex items-center justify-between px-[5px] py-[5px] cursor-pointer hover:bg-white/5 transition-colors border-b border-panel-border"
+                className="flex h-10 items-center justify-between px-3 cursor-pointer hover:bg-white/5 transition-colors"
                 onClick={() => setResultsPanelOpen(!resultsPanelOpen)}
             >
                 <div className="flex items-center gap-2">
-                    <ChevronDown size={14} className={cn("transition-transform opacity-60", !resultsPanelOpen && "-rotate-90")} />
-                    <span className="text-xs font-bold tracking-tight">Results</span>
+                    <ChevronDown size={14} strokeWidth={2} className={cn("text-viz-muted transition-transform", !resultsPanelOpen && "-rotate-90")} />
+                    <span className="text-xs font-semibold tracking-tight">Results</span>
                 </div>
-                <button className="p-1 hover:bg-white/10 rounded transition-colors opacity-60">
-                    <MoreHorizontal size={14} />
+                <button type="button" aria-label="Results menu" onClick={(event) => event.stopPropagation()} className="flex h-8 w-8 items-center justify-center rounded-lg text-viz-muted hover:bg-white/10 hover:text-white transition-colors">
+                    <MoreHorizontal size={16} />
                 </button>
             </div>
 
             {/* Collapsed Content - Thumbnail Grid Only */}
             {!resultsPanelOpen && (
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="hidden">
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-[5px]">
                         {isRendering && (
                             <div className="grid grid-cols-4 gap-1">
@@ -265,11 +349,24 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
 
                         {/* Date Grouping */}
                         <div className="space-y-3">
+                            {colorJobs.length > 0 && <section className="space-y-2" aria-labelledby="color-variation-results-title">
+                                <div className="flex items-center justify-between"><h3 id="color-variation-results-title" className="text-xs font-bold opacity-90">Color Variations</h3><span className="text-[9px] text-white/40">{colorJobs.length} batch{colorJobs.length === 1 ? '' : 'es'}</span></div>
+                                {colorJobs.map((job) => {
+                                    const statusIcon = job.status === 'running' || job.status === 'queued' ? <LoaderCircle size={11} className="animate-spin" aria-hidden="true" /> : job.status === 'failed' ? <TriangleAlert size={11} aria-hidden="true" /> : <Check size={11} aria-hidden="true" />;
+                                    return <article key={job.id} className="space-y-2 rounded-lg border border-white/5 bg-black/10 p-2">
+                                        <div className="flex items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-1.5 text-[9px] text-white/60">{statusIcon}<span className="truncate">{job.status === 'completed' ? 'Ready' : job.status === 'partial' ? 'Partial batch' : job.status === 'failed' ? 'Needs attention' : job.status === 'running' ? 'Generating' : 'Queued'}</span></div><span className="text-[9px] text-white/35">{job.progress}%</span></div>
+                                        {job.error && <p className="text-[9px] text-red-300/80">{job.error.message}</p>}
+                                        {job.outputs.length > 0 && <div className="grid grid-cols-4 gap-1">{job.outputs.map((output) => <button key={`${job.id}-${output.index}`} type="button" onClick={() => { setLastPreviewedImage(output.url); setIsPreviewVisible(true); setPreviewingRender(output.url); }} className="group relative aspect-square overflow-hidden rounded-md border border-white/5 hover:border-white/40"><img src={output.url} alt={`Color variation ${output.index + 1}`} className="h-full w-full object-cover" /><span className="absolute inset-x-0 bottom-0 hidden bg-black/70 px-1 py-1 text-[8px] text-white group-hover:block">Preview</span></button>)}</div>}
+                                        {job.outputs.length > 0 && <div className="flex justify-end"><button type="button" onClick={() => job.outputs.forEach((output) => addImageToWorkbench(output.url))} className="flex items-center gap-1 rounded-md px-2 py-1 text-[9px] text-white/60 hover:bg-white/10 hover:text-white"><PlusSquare size={11} /> Add to Workbench</button></div>}
+                                    </article>;
+                                })}
+                            </section>}
                             {filteredRenderResults.length > 0 && <h3 className="text-xs font-bold opacity-90">Latest Renders</h3>}
 
                             {filteredRenderResults.length === 0 && !isRendering && (
-                                <div className="flex items-center justify-center h-32 text-sm opacity-50 text-center px-4">
-                                    nothing here yet! once you generate something it will appear here
+                                <div className="flex h-32 flex-col items-center justify-center gap-1.5 px-4 text-center">
+                                    <p className="text-xs font-semibold text-white">Nothing here - yet!</p>
+                                    <p className="text-[11px] leading-4 text-viz-muted">Once you generate something, it will appear here.</p>
                                 </div>
                             )}
 
@@ -314,27 +411,27 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({ height }) => {
                                                             initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                                             animate={{ opacity: 1, scale: 1, y: 0 }}
                                                             exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                                            className="absolute right-0 top-full mt-1 w-40 bg-neutral-900 border border-panel-border rounded-xl shadow-2xl z-[70] overflow-hidden py-1"
+                                                            className="absolute right-0 top-full mt-1 w-44 bg-viz-surface border border-viz-border rounded-lg shadow-viz z-[70] overflow-hidden p-1"
                                                         >
                                                             <button
                                                                 onClick={() => {
                                                                     addGroupToWorkbench(group);
                                                                     setOpenMenuId(null);
                                                                 }}
-                                                                className="w-full px-2.5 py-1.5 text-left text-[10px] hover:bg-primary/20 flex items-center gap-2 transition-colors"
+                                                                className="w-full px-4 py-2.5 text-left text-xs text-white hover:bg-white/10 flex items-center gap-2 transition-colors"
                                                             >
-                                                                <PlusSquare size={12} className="text-primary" />
+                                                                <PlusSquare size={14} className="text-viz-muted" />
                                                                 Add all to Workbench
                                                             </button>
                                                             <button
                                                                 onClick={() => handleExportZip(group)}
                                                                 disabled={isExporting === group.id}
-                                                                className="w-full px-2.5 py-1.5 text-left text-[10px] hover:bg-primary/20 flex items-center gap-2 transition-colors disabled:opacity-50"
+                                                                className="w-full px-4 py-2.5 text-left text-xs text-white hover:bg-white/10 flex items-center gap-2 transition-colors disabled:opacity-50"
                                                             >
                                                                 {isExporting === group.id ? (
                                                                     <div className="animate-spin rounded-full h-3 w-3 border border-white/20 border-t-white" />
                                                                 ) : (
-                                                                    <Archive size={12} className="text-primary" />
+                                                                    <Archive size={14} className="text-viz-muted" />
                                                                 )}
                                                                 Export as ZIP
                                                             </button>

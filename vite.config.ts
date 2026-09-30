@@ -13,8 +13,10 @@ const getWindowsHostIp = () => {
 }
 
 getWindowsHostIp();
-const targetUrl = `http://localhost:9191`;
-const targetUrlSecondary = `http://localhost:9191`;
+// ComfyUI uses port 8188 by default. Override this for a remote/WSL instance
+// with COMFYUI_URL, for example http://localhost:9191.
+const targetUrl = process.env.COMFYUI_URL || 'http://localhost:8188';
+const targetUrlSecondary = process.env.COMFYUI_URL || 'http://localhost:8188';
 
 console.log(`📡 WSL Proxy: Targeting Windows host at ${targetUrl} and ${targetUrlSecondary}`);
 

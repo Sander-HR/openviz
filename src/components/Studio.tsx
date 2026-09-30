@@ -1,13 +1,19 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Toolbar } from './studio/Toolbar';
-import { RenderPanel } from './studio/RenderPanel';
-import { LayerPanel } from './studio/LayerPanel';
 import { CanvasViewport } from './studio/CanvasViewport';
 import { CanvasControls } from './studio/CanvasControls';
 import { BottomLeftControls } from './studio/BottomLeftControls';
 import { ResultsPanel } from './studio/ResultsPanel';
 import { PreviewStatus } from './studio/PreviewStatus';
+import { ModifyPanel } from './studio/ModifyPanel';
+import { RenderPanel } from './studio/RenderPanel';
+import type { StudioWorkflowTab } from './studio/WorkflowTabs';
+import { AdjustPanel } from './studio/AdjustPanel';
+import { VariationPanel } from './studio/VariationPanel';
+import { StudioToolRail, type StudioUtilityTab } from './studio/StudioToolRail';
+import { StudioUtilityPanel } from './studio/StudioUtilityPanel';
+import { Make3DPanel } from './studio/Make3DPanel';
 import { ProjectHeader } from './common/ProjectHeader';
 import { useStore } from '../store/useStore';
 import { useStudioPanels } from './studio/hooks/useStudioPanels';
@@ -15,7 +21,15 @@ import { useStudioShortcuts } from './studio/hooks/useStudioShortcuts';
 import { studioPanelVariants } from './studio/hooks/useStudioTransitions';
 import { useShallow } from 'zustand/react/shallow';
 
-export const Studio: React.FC = () => {
+export const Studio: React.FC<{ active?: boolean }> = ({ active = true }) => {
+    const rasterizeActiveLayerRef = useRef<(() => boolean) | null>(null);
+    const [activeWorkflow, setActiveWorkflow] = useState<StudioWorkflowTab>('generate');
+    const [activeUtility, setActiveUtility] = useState<StudioUtilityTab>('layers');
+    const [collapsedWorkflows, setCollapsedWorkflows] = useState<Partial<Record<StudioWorkflowTab, boolean>>>({});
+    const createPanelCollapsed = collapsedWorkflows[activeWorkflow] ?? false;
+    const setCreatePanelCollapsed = (collapsed: boolean) => {
+        setCollapsedWorkflows((current) => ({ ...current, [activeWorkflow]: collapsed }));
+    };
     const { setActiveTool, isExitingStudio, undo, redo, resultsPanelOpen } = useStore(
         useShallow((state) => ({
             setActiveTool: state.setActiveTool,
@@ -27,14 +41,15 @@ export const Studio: React.FC = () => {
     );
     const { containerRef, renderPanelHeight, resultsPanelHeight, handleResizeStart } = useStudioPanels({
         resultsPanelOpen,
+        createPanelCollapsed,
     });
-    useStudioShortcuts({ setActiveTool, undo, redo });
+    useStudioShortcuts({ enabled: active && !isExitingStudio, setActiveTool, undo, redo });
 
     return (
         <div className="relative w-screen h-screen overflow-hidden bg-neutral-100 flex flex-col antialiased selection:bg-primary/30">
             {/* Canvas Layer - Background */}
             <div className="absolute inset-0 overflow-hidden">
-                <CanvasViewport />
+                <CanvasViewport onRasterizeReady={(rasterize) => { rasterizeActiveLayerRef.current = rasterize; }} />
             </div>
 
             {/* UI Overlay Layers */}
@@ -51,7 +66,7 @@ export const Studio: React.FC = () => {
 
                 {/* Top Toolbar */}
                 <motion.div
-                    className="flex justify-center p-4 pointer-events-auto"
+                    className="flex justify-center px-4 pb-4 pt-2 pointer-events-auto"
                     initial="visible"
                     animate={isExitingStudio ? "hiddenTop" : "visible"}
                     variants={studioPanelVariants}
@@ -67,22 +82,30 @@ export const Studio: React.FC = () => {
                         animate={isExitingStudio ? "hiddenLeft" : "visible"}
                         variants={studioPanelVariants}
                     >
-                        <LayerPanel />
+                        <StudioUtilityPanel activeUtility={activeUtility} />
                     </motion.div>
                     <motion.div
                         ref={containerRef}
-                        className="pointer-events-none flex flex-col fixed top-4 right-4 bottom-4 z-50 w-60"
+                        className="pointer-events-auto fixed inset-y-0 right-0 z-50 flex w-[min(100vw,18.6rem)] justify-end gap-2 overflow-visible"
                         initial="visible"
                         animate={isExitingStudio ? "hiddenRight" : "visible"}
                         variants={studioPanelVariants}
                     >
-                        <RenderPanel height={renderPanelHeight} />
-                        <div
-                            className="h-[5px] cursor-row-resize hover:bg-primary/30 transition-colors flex-shrink-0 pointer-events-auto"
-                            onMouseDown={handleResizeStart}
-                            title="Drag to resize panels"
-                        />
-                        <ResultsPanel height={resultsPanelHeight} />
+                        <div className="relative flex min-w-0 flex-1 flex-col gap-[1.6px] overflow-visible py-2 pl-0">
+                            <div className="h-full min-h-0 w-full flex-shrink-0" style={{ height: renderPanelHeight }}>
+                                {activeWorkflow === 'generate' ? <Make3DPanel collapsed={createPanelCollapsed} onCollapsedChange={setCreatePanelCollapsed} /> : activeWorkflow === 'modify' ? <ModifyPanel height={renderPanelHeight} collapsed={createPanelCollapsed} onCollapsedChange={setCreatePanelCollapsed} /> : activeWorkflow === 'adjust' ? <AdjustPanel collapsed={createPanelCollapsed} onCollapsedChange={setCreatePanelCollapsed} onRasterize={() => rasterizeActiveLayerRef.current?.() ?? false} /> : activeWorkflow === 'variation' ? <VariationPanel collapsed={createPanelCollapsed} onCollapsedChange={setCreatePanelCollapsed} /> : <RenderPanel height={renderPanelHeight} collapsed={createPanelCollapsed} onCollapsedChange={setCreatePanelCollapsed} />}
+                            </div>
+                            {resultsPanelOpen && !createPanelCollapsed && <div
+                                className="hidden h-[5px] !cursor-row-resize touch-none select-none bg-primary/10 hover:bg-primary/40 transition-colors flex-shrink-0 pointer-events-auto sm:block"
+                                onPointerDown={handleResizeStart}
+                                role="separator"
+                                aria-label="Resize Create and Results panels"
+                                aria-orientation="horizontal"
+                                title="Drag to resize panels"
+                            />}
+                            <ResultsPanel height={resultsPanelHeight} />
+                        </div>
+                        <StudioToolRail active={activeWorkflow} onChange={setActiveWorkflow} activeUtility={activeUtility} onUtilityChange={setActiveUtility} />
                     </motion.div>
                 </div>
 

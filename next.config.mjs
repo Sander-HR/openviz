@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+const comfyUiUrl = process.env.COMFYUI_URL || 'http://localhost:8188';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -27,11 +28,11 @@ const nextConfig = {
         return [
             {
                 source: '/comfy-api/:path*',
-                destination: 'http://localhost:9191/:path*',
+                destination: `${comfyUiUrl}/:path*`,
             },
             {
                 source: '/comfy-api-secondary/:path*',
-                destination: 'http://localhost:9191/:path*',
+                destination: `${comfyUiUrl}/:path*`,
             },
         ];
     },

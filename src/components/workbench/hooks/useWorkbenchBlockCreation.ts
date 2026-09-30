@@ -5,6 +5,7 @@ import { generateUUID } from '@/utils/uuid';
 
 import {
     createAnimateNodeFromSource,
+    createModifyNodeFromSource,
     createRenderNodeFromSource,
 } from './workbenchBlockCreationLogic';
 
@@ -34,7 +35,7 @@ export function useWorkbenchBlockCreation({
     const [basicBlocksMenu, setBasicBlocksMenu] = useState<BasicBlocksMenuState>(null);
 
     const handleBlockSelect = useCallback((type: 'modify' | 'animate' | 'variate' | 'render') => {
-        if (!basicBlocksMenu || (type !== 'animate' && type !== 'render')) {
+        if (!basicBlocksMenu) {
             setBasicBlocksMenu(null);
             return;
         }
@@ -51,6 +52,23 @@ export function useWorkbenchBlockCreation({
             const newNode = createRenderNodeFromSource(sourceNode, newNodeId);
             addWorkbenchNode(newNode);
             addConnection(basicBlocksMenu.sourceNodeId, newNodeId, 'image-source', 'render-target-visible');
+            setBasicBlocksMenu(null);
+            return;
+        }
+
+        if (type === 'modify') {
+            const newNode = createModifyNodeFromSource(sourceNode, newNodeId);
+            addWorkbenchNode(newNode);
+            addConnection(basicBlocksMenu.sourceNodeId, newNodeId, 'image-source', 'modify-target-visible');
+            setBasicBlocksMenu(null);
+            return;
+        }
+
+        if (type === 'variate') {
+            const newNode = createModifyNodeFromSource(sourceNode, newNodeId);
+            newNode.data.workflowId = 'material_study';
+            addWorkbenchNode(newNode);
+            addConnection(basicBlocksMenu.sourceNodeId, newNodeId, 'image-source', 'modify-target-visible');
             setBasicBlocksMenu(null);
             return;
         }

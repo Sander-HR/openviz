@@ -1,4 +1,4 @@
-import { AnimateNode, RenderNode, WorkbenchNode } from '@/types';
+import { AnimateNode, ModifyNode, RenderNode, WorkbenchNode } from '@/types';
 
 export function getWorkbenchSourceSize(sourceNode: WorkbenchNode) {
     const sourceWidth = sourceNode.width ??
@@ -21,6 +21,29 @@ export function getWorkbenchSourceSize(sourceNode: WorkbenchNode) {
     };
 }
 
+export function createModifyNodeFromSource(sourceNode: WorkbenchNode, id: string): ModifyNode {
+    const { sourceWidth } = getWorkbenchSourceSize(sourceNode);
+
+    return {
+        id,
+        type: 'modify',
+        x: sourceNode.x + sourceWidth + 100,
+        y: sourceNode.y,
+        width: 320,
+        height: 560,
+        data: {
+            workflowId: 'product_edit',
+            prompt: '',
+            aspectRatio: 'square',
+            preservation: 0.78,
+            structureStrength: 0.72,
+            references: [{ assetId: sourceNode.id, role: 'primary', token: '@1' }],
+            numImages: 1,
+            status: 'idle',
+        },
+    };
+}
+
 export function createRenderNodeFromSource(sourceNode: WorkbenchNode, id: string): RenderNode {
     const { sourceWidth } = getWorkbenchSourceSize(sourceNode);
 
@@ -30,7 +53,7 @@ export function createRenderNodeFromSource(sourceNode: WorkbenchNode, id: string
         x: sourceNode.x + sourceWidth + 100,
         y: sourceNode.y,
         width: 320,
-        height: 500,
+        height: 390,
         data: {
             prompt: '',
             stylePreset: 'Photorealistic',

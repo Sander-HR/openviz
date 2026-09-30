@@ -7,7 +7,8 @@ import {
     LayoutGrid, 
     Users, 
     Users2, 
-    Palette, 
+    Palette,
+    Cpu,
     CreditCard, 
     FileText, 
     User, 
@@ -19,8 +20,9 @@ import { useWorkspace } from "@/context/WorkspaceContext";
 // View Components
 import { GeneralSettings } from "./GeneralSettings";
 import { ProfileSettings } from "./ProfileSettings";
+import { AIComputeSettings } from "@/components/settings/AIComputeSettings";
 
-type View = "general" | "members" | "teams" | "styles" | "billing" | "recovered" | "profile" | "changelog";
+type View = "general" | "ai-compute" | "members" | "teams" | "styles" | "billing" | "recovered" | "profile" | "changelog";
 
 export default function SettingsPage() {
     const { data: session } = useSession();
@@ -33,6 +35,7 @@ export default function SettingsPage() {
             category: "Workspace",
             items: [
                 { id: "general", label: "General", icon: LayoutGrid, disabled: false },
+                { id: "ai-compute", label: "AI & Compute", icon: Cpu, disabled: false },
                 { id: "members", label: "Members", icon: Users, disabled: true },
                 { id: "teams", label: "Teams", icon: Users2, disabled: true },
                 { id: "styles", label: "Styles", icon: Palette, disabled: true },
@@ -106,6 +109,7 @@ export default function SettingsPage() {
             <div className="flex-1 overflow-y-auto bg-[#0A0A0A]">
                 <div className="py-12 px-12">
                     {activeView === "general" && <GeneralSettings workspace={currentWorkspace} />}
+                    {activeView === "ai-compute" && <AIComputeSettings />}
                     {activeView === "profile" && <ProfileSettings user={session?.user} />}
                 </div>
             </div>

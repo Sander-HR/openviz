@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ImageOff } from 'lucide-react';
-import { NodeResizer } from '@xyflow/react';
+import { Image as ImageIcon, ImageOff } from 'lucide-react';
+import { NodeResizer, useStore } from '@xyflow/react';
 
 import { MediaWorkbenchNode } from '@/types';
+import { nodeCardClass, NodeCardHeader, resizeHandleClassName } from './nodeUi';
 
 interface MediaNodeData extends MediaWorkbenchNode {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -17,7 +18,9 @@ interface MediaNodeProps {
     height?: number;
 }
 
-export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width, height }) => {
+export const MediaNode = React.memo(({ id, data, selected, width, height }: MediaNodeProps) => {
+    const internalSelected = useStore((state) => state.nodeLookup.get(id)?.selected === true);
+    const isSelected = selected || internalSelected;
     const [nodeSize, setNodeSize] = useState({ width: width || 260, height: height || 180 });
     const [loadError, setLoadError] = useState(false);
     const src = data.data?.src;
@@ -30,8 +33,10 @@ export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width,
     }, [width, height]);
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`relative rounded-lg border bg-white shadow-md ${selected ? 'border-blue-400' : 'border-slate-200'}`}>
-            <div className="h-full w-full overflow-hidden rounded-lg">
+        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`${nodeCardClass(isSelected, 'rounded')} flex flex-col`}>
+            <NodeCardHeader icon={ImageIcon} label="Media" />
+
+            <div className="relative min-h-0 flex-1 bg-white">
             {src && !loadError ? (
                 <img
                     src={src}
@@ -51,15 +56,14 @@ export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width,
             </div>
 
             <NodeResizer
-                isVisible={selected}
+                isVisible={isSelected}
                 minWidth={120}
                 minHeight={80}
-                color="#ffffff"
+                color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}
@@ -88,4 +92,6 @@ export const MediaNode: React.FC<MediaNodeProps> = ({ id, data, selected, width,
             />
         </div>
     );
-};
+});
+
+MediaNode.displayName = 'MediaNode';

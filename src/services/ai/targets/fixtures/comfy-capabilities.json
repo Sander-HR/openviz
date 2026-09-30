@@ -1,0 +1,28 @@
+{
+  "systemStatsCuda": {
+    "system": { "os": "posix", "embedded_python": false },
+    "devices": [
+      {
+        "name": "NVIDIA GeForce RTX 4090",
+        "type": "cuda",
+        "index": 0,
+        "vram_total": 25757220864,
+        "vram_free": 23800000000,
+        "torch_vram_total": 25757220864,
+        "torch_vram_free": 23100000000
+      }
+    ]
+  },
+  "systemStatsCpu": {
+    "system": { "os": "posix", "embedded_python": true },
+    "devices": []
+  },
+  "objectInfo": {
+    "CheckpointLoaderSimple": {
+      "input": { "required": { "ckpt_name": [["qwen_image_2.1_fp8.safetensors"]] } }
+    },
+    "VAELoader": {
+      "input": { "required": { "vae_name": [["qwen_image_vae.safetensors"]] } }
+    }
+  }
+}

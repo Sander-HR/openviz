@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NodeResizer } from '@xyflow/react';
 
 import { FreehandNode as FreehandNodeType } from '@/types';
+import { resizeHandleClassName } from './nodeUi';
 
 interface FreehandNodeData extends FreehandNodeType {
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -16,7 +17,7 @@ interface FreehandNodeProps {
     height?: number;
 }
 
-export const FreehandNode: React.FC<FreehandNodeProps> = ({ id, data, selected, width, height }) => {
+export const FreehandNode = React.memo(({ id, data, selected, width, height }: FreehandNodeProps) => {
     const [nodeSize, setNodeSize] = useState({ width: width || 1, height: height || 1 });
     const path = data.data?.path ?? '';
     const strokeColor = data.data?.color ?? '#2563eb';
@@ -52,12 +53,11 @@ export const FreehandNode: React.FC<FreehandNodeProps> = ({ id, data, selected, 
                 isVisible={selected}
                 minWidth={10}
                 minHeight={10}
-                color="#ffffff"
+                color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
                 handleStyle={{
                     width: 12,
                     height: 12,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#6366f1',
                     borderWidth: '2px',
                     borderRadius: 3,
                 }}
@@ -86,4 +86,6 @@ export const FreehandNode: React.FC<FreehandNodeProps> = ({ id, data, selected, 
             />
         </div>
     );
-};
+});
+
+FreehandNode.displayName = 'FreehandNode';

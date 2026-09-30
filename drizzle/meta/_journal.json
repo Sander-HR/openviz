@@ -15,6 +15,27 @@
       "when": 1790015102546,
       "tag": "0001_flimsy_silver_fox",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790230210107,
+      "tag": "0002_milky_ogun",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790230834916,
+      "tag": "0003_broken_smasher",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790720272767,
+      "tag": "0004_easy_boomer",
+      "breakpoints": true
     }
   ]
 }
