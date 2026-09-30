@@ -64,12 +64,21 @@ export function useWorkbenchNodeHandlers({
                 const movedNode = currentNodes.find((node) => node.id === change.id);
                 const movedPosition = change.position;
                 if (!movedPosition) return;
-                const nextNodes = currentNodes.map((node) => {
-                    if (node.type !== 'arrow' || !node.data.temporary) return node;
+                updateWorkbenchNodeTransient(change.id, {
+                    x: movedPosition.x,
+                    y: movedPosition.y,
+                });
+
+                // Temporary attached arrows are uncommon during a normal node
+                // drag. Walk only those arrows and update them directly instead
+                // of rebuilding the complete node array and an id map per
+                // pointer event.
+                for (const node of currentNodes) {
+                    if (node.type !== 'arrow' || !node.data.temporary || !movedNode) continue;
                     const updates: { start?: { x: number; y: number }; end?: { x: number; y: number } } = {};
                     (['start', 'end'] as const).forEach((point) => {
                         const attachment = node.data[point === 'start' ? 'startAttachment' : 'endAttachment'];
-                        if (!attachment || attachment.nodeId !== change.id || !movedNode) return;
+                        if (!attachment || attachment.nodeId !== change.id) return;
                         const width = movedNode.width ?? 0;
                         const height = movedNode.height ?? 0;
                         const local = attachment.side === 'left'
@@ -81,19 +90,10 @@ export function useWorkbenchNodeHandlers({
                                     : { x: attachment.offset * width, y: height };
                         updates[point] = { x: movedPosition.x - node.x + local.x, y: movedPosition.y - node.y + local.y };
                     });
-                    return Object.keys(updates).length > 0 ? { ...node, data: { ...node.data, ...updates } } : node;
-                });
-                const currentNodeById = new Map(currentNodes.map((node) => [node.id, node]));
-                const attachedArrows = nextNodes.filter((node) =>
-                    node.type === 'arrow' && node !== currentNodeById.get(node.id)
-                );
-                updateWorkbenchNodeTransient(change.id, {
-                    x: movedPosition.x,
-                    y: movedPosition.y,
-                });
-                attachedArrows.forEach((node) => {
-                    if (node.type === 'arrow') updateWorkbenchNodeTransient(node.id, { data: node.data });
-                });
+                    if (Object.keys(updates).length > 0) {
+                        updateWorkbenchNodeTransient(node.id, { data: { ...node.data, ...updates } });
+                    }
+                }
             }
             // Dimension changes are handled by onResizeEnd in nodes - not here
             // This prevents flooding Zustand during drag operations
