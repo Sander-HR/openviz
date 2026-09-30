@@ -21,8 +21,8 @@ export function cn(...inputs: ClassValue[]) {
 /** Card frame: consistent padding/radius/border from the shared token set. */
 export function nodeCardClass(selected: boolean, radiusClass = 'rounded-xl2'): string {
     return cn(
-        `relative w-[280px] ${radiusClass} bg-viz-panel border shadow-viz overflow-visible`,
-        selected ? 'border-2 border-viz-accent ring-2 ring-viz-accent' : 'border border-viz-border',
+        `relative w-[280px] ${radiusClass} bg-viz-panel border-2 shadow-viz overflow-visible hover:border-viz-accent`,
+        selected ? 'border-viz-accent ring-2 ring-viz-accent' : 'border-viz-border',
     );
 }
 
@@ -97,8 +97,8 @@ export function NodeTargetHandle({ id, selected }: { id: string; selected: boole
 /** Headerless card frame for media nodes (fills its sized wrapper). */
 export function mediaNodeFrameClass(selected: boolean): string {
     return cn(
-        'h-full w-full rounded bg-viz-panel shadow-viz overflow-hidden box-border',
-        selected ? 'border-2 border-viz-accent ring-2 ring-viz-accent' : 'border border-white',
+        'h-full w-full rounded bg-viz-panel shadow-viz overflow-hidden box-border border-2 hover:border-viz-accent',
+        selected ? 'border-viz-accent ring-2 ring-viz-accent' : 'border-white',
     );
 }
 

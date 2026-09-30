@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useStore } from "@/store/useStore";
 import { useQuery } from "@tanstack/react-query";
@@ -8,8 +8,10 @@ import { Loader2 } from "lucide-react";
 import { SceneData, WorkbenchNode, Connection } from "@/types";
 import { useShallow } from "zustand/react/shallow";
 
-const Workbench = dynamic(() => import("@/components/workbench/workbench").then(mod => mod.Workbench), { ssr: false });
-const Studio = dynamic(() => import("@/components/Studio").then(mod => mod.Studio), { ssr: false });
+const workbenchImport = import("@/components/workbench/workbench");
+const studioImport = import("@/components/Studio");
+const Workbench = dynamic(() => workbenchImport.then(mod => mod.Workbench), { ssr: false });
+const Studio = dynamic(() => studioImport.then(mod => mod.Studio), { ssr: false });
 
 type ProjectApiResponse = {
     scene: SceneData | null;
@@ -22,8 +24,11 @@ type ProjectApiResponse = {
  * active view; the zustand viewMode is kept in sync so components that read
  * it (e.g. useWorkbenchCenterOnReturn) keep working unchanged.
  */
-export function ProjectWorkspace({ id, mode }: { id: string; mode: "STUDIO" | "WORKBENCH" }) {
-    const [isHydrated, setIsHydrated] = useState(false);
+export function ProjectWorkspace({ id, activeView }: { id: string; activeView: "STUDIO" | "WORKBENCH" }) {
+    const [isProjectReady, setIsProjectReady] = useState(() => {
+        const state = useStore.getState();
+        return state.currentProjectId === id && state.sceneHydrated;
+    });
     const {
         setNodes,
         setConnections,
@@ -43,6 +48,7 @@ export function ProjectWorkspace({ id, mode }: { id: string; mode: "STUDIO" | "W
             setViewMode: state.setViewMode,
         }))
     );
+    const sceneHydrated = useStore((state) => state.sceneHydrated);
 
     const { data: projectData, isLoading, error } = useQuery<ProjectApiResponse>({
         queryKey: ["projects", id],
@@ -53,15 +59,21 @@ export function ProjectWorkspace({ id, mode }: { id: string; mode: "STUDIO" | "W
         },
     });
 
+    useEffect(() => {
+        void studioImport;
+        void workbenchImport;
+    }, []);
+
     // Keep the store's viewMode aligned with the URL segment. Runs after child
     // effects on mount, so hooks that detect the STUDIO -> WORKBENCH transition
     // (e.g. center-on-return) still observe the switch.
     useEffect(() => {
-        setViewMode(mode);
-    }, [mode, setViewMode]);
+        setViewMode(activeView);
+    }, [activeView, setViewMode]);
 
     useEffect(() => {
-        // Set the current project ID in the store
+        // Set the current project ID in the store. This effect belongs to the
+        // project-scoped layout and therefore does not run on view switches.
         setCurrentProjectId(id);
 
         return () => {
@@ -114,11 +126,11 @@ export function ProjectWorkspace({ id, mode }: { id: string; mode: "STUDIO" | "W
             // Signals useAutoSaveScene that local state now reflects this fetch, so any
             // interrupted save restored from IndexedDB can be applied on top of it.
             setSceneHydrated(true);
-            setIsHydrated(true);
+            setIsProjectReady(true);
         }
     }, [projectData, setNodes, setConnections, setCurrentSceneVersion, setSceneHydrated, id]);
 
-    if (isLoading || !isHydrated) {
+    if ((isLoading && !sceneHydrated) || !isProjectReady) {
         return (
             <div className="h-screen w-screen bg-[#0F0F0F] flex items-center justify-center text-white">
                 <div className="flex flex-col items-center gap-4">
@@ -146,5 +158,20 @@ export function ProjectWorkspace({ id, mode }: { id: string; mode: "STUDIO" | "W
         );
     }
 
-    return <React.Fragment>{mode === "WORKBENCH" ? <Workbench /> : <Studio />}</React.Fragment>;
+    return (
+        <div className="relative h-screen w-screen overflow-hidden">
+            <div
+                className={activeView === "WORKBENCH" ? "absolute inset-0 z-10" : "pointer-events-none invisible absolute inset-0 z-0"}
+                aria-hidden={activeView !== "WORKBENCH"}
+            >
+                <Workbench active={activeView === "WORKBENCH"} />
+            </div>
+            <div
+                className={activeView === "STUDIO" ? "absolute inset-0 z-10" : "pointer-events-none invisible absolute inset-0 z-0"}
+                aria-hidden={activeView !== "STUDIO"}
+            >
+                <Studio active={activeView === "STUDIO"} />
+            </div>
+        </div>
+    );
 }

@@ -25,7 +25,7 @@ describe('workbench viewport persistence', () => {
 
         window.localStorage.setItem(
             'openviz:workbench-viewport:v1:project-b',
-            JSON.stringify({ x: 0, y: 0, zoom: 4 }),
+            JSON.stringify({ x: 0, y: 0, zoom: 21 }),
         );
         expect(getWorkbenchViewport('project-b')).toBeNull();
     });

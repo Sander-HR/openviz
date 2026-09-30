@@ -2,13 +2,15 @@ import { useEffect } from "react";
 import { ToolType } from "@/types";
 
 type StudioShortcutsOptions = {
+    enabled?: boolean;
     setActiveTool: (tool: ToolType) => void;
     undo: () => void;
     redo: () => void;
 };
 
-export function useStudioShortcuts({ setActiveTool, undo, redo }: StudioShortcutsOptions) {
+export function useStudioShortcuts({ enabled = true, setActiveTool, undo, redo }: StudioShortcutsOptions) {
     useEffect(() => {
+    if (!enabled) return;
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
@@ -58,5 +60,5 @@ export function useStudioShortcuts({ setActiveTool, undo, redo }: StudioShortcut
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [setActiveTool, undo, redo]);
+    }, [enabled, setActiveTool, undo, redo]);
 }

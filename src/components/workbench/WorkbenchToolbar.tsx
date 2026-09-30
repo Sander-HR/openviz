@@ -137,15 +137,15 @@ export const WorkbenchToolbar: React.FC<WorkbenchToolbarProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => onSelectTool(tool.id)}
-                                        className={`group relative rounded-full p-1.5 transition-all duration-200 ${
+                                        className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150 ${
                                             isActive
-                                                ? 'bg-viz-accent text-white shadow-lg'
+                                                ? 'bg-viz-accent text-white'
                                                 : 'text-viz-muted hover:bg-white/10 hover:text-white'
                                         }`}
                                         title={`${tool.label} (${tool.shortcut})`}
                                         aria-pressed={isActive}
                                     >
-                                        <Icon size={16} strokeWidth={2.3} />
+                                        <Icon size={16} strokeWidth={2} />
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
@@ -203,40 +203,40 @@ export const WorkbenchToolbar: React.FC<WorkbenchToolbarProps> = ({
                                         setShowColorMenu(false);
                                     }
                                 }}
-                                className={`group relative rounded-full p-1.5 transition-all duration-200 ${
+                                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150 ${
                                     isActive
-                                        ? 'bg-viz-accent text-white shadow-lg'
+                                        ? 'bg-viz-accent text-white'
                                         : 'text-viz-muted hover:bg-white/10 hover:text-white'
                                 }`}
                                 title={`${tool.label} (${tool.shortcut})`}
                                 aria-pressed={isActive}
                             >
-                                <Icon size={16} strokeWidth={2.3} />
+                                <Icon size={16} strokeWidth={2} />
                             </button>
                         </div>
                     );
                 })}
 
-                <div className="mx-0.5 h-5 w-px bg-viz-border" />
+                <div className="mx-0.5 h-5 w-px bg-panel-border" />
                 <button
                     type="button"
                     onClick={onUndo}
                     disabled={!canUndo}
                     aria-label="Undo"
-                    className="rounded-full p-1.5 text-viz-muted transition-all hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-viz-muted"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-viz-muted transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-viz-muted"
                     title="Undo (Ctrl+Z)"
                 >
-                    <Undo2 size={16} />
+                    <Undo2 size={16} strokeWidth={2} />
                 </button>
                 <button
                     type="button"
                     onClick={onRedo}
                     disabled={!canRedo}
                     aria-label="Redo"
-                    className="rounded-full p-1.5 text-viz-muted transition-all hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-viz-muted"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-viz-muted transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-viz-muted"
                     title="Redo (Ctrl+Y)"
                 >
-                    <Redo2 size={16} />
+                    <Redo2 size={16} strokeWidth={2} />
                 </button>
             </div>
 

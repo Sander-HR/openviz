@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ChangeEvent, RefObject } from 'react';
+import { motion } from 'framer-motion';
 
 
 import { ProjectHeader } from '../common/ProjectHeader';
@@ -42,6 +43,7 @@ interface WorkbenchChromeProps {
     onBlockSelect: (type: 'modify' | 'animate' | 'variate' | 'render') => void;
     /** Add-node menu (US3): routes a chosen type to its creation flow. */
     onCreateNode: (kind: AddNodeKind) => void;
+    isTransitioningToStudio?: boolean;
 }
 
 /**
@@ -79,8 +81,17 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
     basicBlocksMenu,
     onBlockSelect,
     onCreateNode,
+    isTransitioningToStudio = false,
 }) => (
-    <>
+    <motion.div
+        className="absolute inset-0 pointer-events-none"
+        initial={false}
+        animate={isTransitioningToStudio ? { opacity: 0, y: -24 } : { opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: 'easeInOut' }}
+        aria-hidden={isTransitioningToStudio}
+        style={{ pointerEvents: 'none' }}
+    >
+        <>
         <input
             ref={mediaUploadInputRef}
             type="file"
@@ -95,11 +106,11 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
             onUploadComplete={onPhoneUploadComplete}
         />
 
-        <div className="absolute top-4 left-4 z-20">
+        <div className="pointer-events-auto absolute top-4 left-4 z-20">
             <ProjectHeader mode="workbench" />
         </div>
 
-        <div className="absolute top-4 left-1/2 z-20 -translate-x-1/2">
+        <div className="pointer-events-auto absolute top-4 left-1/2 z-20 -translate-x-1/2">
             <div ref={dropdownRef}>
                 <WorkbenchToolbar
                     activeTool={activeTool}
@@ -121,7 +132,7 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
             </div>
         </div>
 
-        <div className="absolute bottom-4 right-4 z-20">
+        <div className="pointer-events-auto absolute bottom-4 right-4 z-20">
             <CanvasControls
                 zoomLevel={zoomLevel}
                 onZoomIn={onZoomIn}
@@ -133,7 +144,7 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
 
         {basicBlocksMenu?.visible && (
             <div
-                className="fixed z-50"
+                className="pointer-events-auto fixed z-50"
                 style={{
                     left: basicBlocksMenu.x,
                     top: basicBlocksMenu.y,
@@ -143,5 +154,6 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
                 <BasicBlocksMenu onSelect={onBlockSelect} onClose={() => {}} />
             </div>
         )}
-    </>
+        </>
+    </motion.div>
 );

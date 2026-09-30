@@ -1,3 +1,5 @@
+import { Node } from '@xyflow/react';
+
 import { WorkbenchNode } from '@/types';
 
 export function getWorkbenchNodeSize(node: WorkbenchNode) {
@@ -25,4 +27,28 @@ export function getWorkbenchNodeSize(node: WorkbenchNode) {
         width: Number.isFinite(width) && width > 0 ? width : 256,
         height: Number.isFinite(height) && height > 0 ? height : 256,
     };
+}
+
+/**
+ * Creates the lightweight React Flow representation needed when applying
+ * controlled node changes. The graph hook adds node-specific callbacks and
+ * component types; change application only needs geometry and selection.
+ */
+export function buildFlowNodes(
+    workbenchNodes: WorkbenchNode[],
+    selectedNodeIds: string[],
+): Node<Record<string, unknown>>[] {
+    return workbenchNodes.map((node) => {
+        const { width, height } = getWorkbenchNodeSize(node);
+
+        return {
+            id: node.id,
+            position: { x: node.x, y: node.y },
+            width,
+            height,
+            style: { width, height },
+            data: { ...node },
+            selected: selectedNodeIds.includes(node.id),
+        };
+    });
 }

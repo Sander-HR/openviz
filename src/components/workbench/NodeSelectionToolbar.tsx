@@ -14,9 +14,8 @@ import type { NodeMoreMenuAction } from './hooks/useNodeMoreMenuActions';
 /**
  * Floating node selection toolbar (ui-translation §3.2): Edit button,
  * aspect-ratio chip, quick actions and the "more" trigger. The overlay layer
- * positions it centered above the anchor node with an 8px gap; the component
- * owns its own `translate(-50%, -100%)` so the anchor point is the node's
- * top-center.
+ * positions it centered above the anchor node with enough clearance for the
+ * media title; the component owns its own `translate(-50%, -100%)`.
  */
 
 export interface NodeSelectionToolbarProps {
@@ -57,7 +56,7 @@ export const NodeSelectionToolbar: React.FC<NodeSelectionToolbarProps> = ({
             className="nodrag nopan pointer-events-auto absolute z-30 flex items-center gap-1 rounded-xl2 border border-viz-border bg-viz-panel px-1.5 py-1 shadow-viz"
             style={{
                 left: `${anchor.screenX}px`,
-                top: `${anchor.screenY - 8}px`,
+                top: `${anchor.screenY - 24}px`,
                 transform: 'translate(-50%, -100%)',
             }}
         >

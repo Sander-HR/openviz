@@ -7,6 +7,7 @@ import { ToolContextMenu } from './ToolContextMenu';
 import { useCanvasViewport } from '../hooks/useCanvasViewport';
 import type { Layer } from '../../types';
 import { createAdjustmentsFilter, hasAdjustments } from '../../types/adjustments';
+import { completeImageCanvasTransition } from '@/services/workbench/imageCanvasTransition';
 
 interface URLImageProps {
     src: string;
@@ -130,10 +131,14 @@ const LayerGroup = ({ layer, activeLayerId, activeTool, previewShape, updateLaye
             scaleX={layer.scaleX}
             scaleY={layer.scaleY}
             draggable={activeTool === 'select' && activeLayerId === layer.id}
-            onDragEnd={(event) => updateLayer(layer.id, { x: event.target.x(), y: event.target.y() })}
+            onDragEnd={(event) => {
+                updateLayer(layer.id, { x: event.target.x(), y: event.target.y() });
+                setTimeout(() => (window as unknown as { updateLayerThumbnail?: (id: string) => void }).updateLayerThumbnail?.(layer.id), 100);
+            }}
             onTransformEnd={(event) => {
                 const node = event.target;
                 updateLayer(layer.id, { x: node.x(), y: node.y(), rotation: node.rotation(), scaleX: node.scaleX(), scaleY: node.scaleY() });
+                setTimeout(() => (window as unknown as { updateLayerThumbnail?: (id: string) => void }).updateLayerThumbnail?.(layer.id), 100);
             }}
         >
             {layer.image && <URLImage src={layer.image} x={0} y={0} width={width} height={height} />}
@@ -174,6 +179,11 @@ export const CanvasViewport = ({ onRasterizeReady }: CanvasViewportProps) => {
         rasterizeActiveLayer,
         fitToScreen
     } = useCanvasViewport();
+
+    useEffect(() => {
+        const revealTimer = window.setTimeout(completeImageCanvasTransition, 220);
+        return () => window.clearTimeout(revealTimer);
+    }, []);
 
     useEffect(() => {
         onRasterizeReady?.(rasterizeActiveLayer);

@@ -21,7 +21,7 @@ import { useStudioShortcuts } from './studio/hooks/useStudioShortcuts';
 import { studioPanelVariants } from './studio/hooks/useStudioTransitions';
 import { useShallow } from 'zustand/react/shallow';
 
-export const Studio: React.FC = () => {
+export const Studio: React.FC<{ active?: boolean }> = ({ active = true }) => {
     const rasterizeActiveLayerRef = useRef<(() => boolean) | null>(null);
     const [activeWorkflow, setActiveWorkflow] = useState<StudioWorkflowTab>('generate');
     const [activeUtility, setActiveUtility] = useState<StudioUtilityTab>('layers');
@@ -43,7 +43,7 @@ export const Studio: React.FC = () => {
         resultsPanelOpen,
         createPanelCollapsed,
     });
-    useStudioShortcuts({ setActiveTool, undo, redo });
+    useStudioShortcuts({ enabled: active && !isExitingStudio, setActiveTool, undo, redo });
 
     return (
         <div className="relative w-screen h-screen overflow-hidden bg-neutral-100 flex flex-col antialiased selection:bg-primary/30">

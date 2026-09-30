@@ -9,7 +9,7 @@ type SceneSnapshotEvent = {
     data: SceneData;
 };
 
-export function useSceneStream(projectId: string | null) {
+export function useSceneStream(projectId: string | null, enabled = true) {
     const {
         currentSceneVersion,
         setCurrentSceneVersion,
@@ -35,7 +35,7 @@ export function useSceneStream(projectId: string | null) {
     );
 
     useEffect(() => {
-        if (!projectId) return;
+        if (!enabled || !projectId) return;
         if (!projectId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
             return;
         }
@@ -111,6 +111,7 @@ export function useSceneStream(projectId: string | null) {
             source.close();
         };
     }, [
+        enabled,
         projectId,
         currentSceneVersion,
         setCurrentSceneVersion,

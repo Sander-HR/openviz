@@ -68,9 +68,9 @@ export const AddNodeMenu: React.FC<AddNodeMenuProps> = ({ onUploadImage, onUploa
                     type="button"
                     title="Add node"
                     aria-label="Add node"
-                    className="rounded-full p-1.5 text-viz-muted transition-all hover:bg-white/10 hover:text-white"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-viz-muted transition-colors hover:bg-white/10 hover:text-white"
                 >
-                    <Plus size={16} strokeWidth={2.3} />
+                    <Plus size={16} strokeWidth={2} />
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent

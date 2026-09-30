@@ -110,7 +110,7 @@ function ModeSwitchSection({
         <button
             onClick={onToggleViewMode}
             className={cn(
-                "flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors duration-150",
+                "flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150",
                 viewMode === "WORKBENCH"
                     ? "bg-viz-surface text-white"
                     : "text-viz-muted hover:bg-white/10 hover:text-white"
@@ -118,7 +118,6 @@ function ModeSwitchSection({
             title={viewMode === "STUDIO" ? "Switch to Workbench" : "Back to Studio"}
         >
             <LayoutDashboard size={15} strokeWidth={2} />
-            <span>Workbench</span>
         </button>
     );
 }

@@ -2,7 +2,7 @@ import type { Viewport } from '@xyflow/react';
 
 export const WORKBENCH_DEFAULT_ZOOM = 0.5;
 const WORKBENCH_MIN_ZOOM = 0.1;
-const WORKBENCH_MAX_ZOOM = 2;
+const WORKBENCH_MAX_ZOOM = 20;
 const STORAGE_PREFIX = 'openviz:workbench-viewport:v1:';
 
 type PositionedNode = {

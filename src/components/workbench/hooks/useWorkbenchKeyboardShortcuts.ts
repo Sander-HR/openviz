@@ -4,6 +4,7 @@ import { TOOL_SHORTCUT_MAP } from "@/store/workbenchTools";
 import type { WorkbenchToolType } from "@/types";
 
 type UseWorkbenchKeyboardShortcutsOptions = {
+    enabled?: boolean;
     copyToClipboard: () => void;
     pasteFromClipboard: (pos: { x: number; y: number }) => void;
     duplicateWorkbenchNode: () => void;
@@ -30,6 +31,7 @@ type UseWorkbenchKeyboardShortcutsOptions = {
 };
 
 export function useWorkbenchKeyboardShortcuts({
+    enabled = true,
     copyToClipboard,
     pasteFromClipboard,
     duplicateWorkbenchNode,
@@ -53,6 +55,7 @@ export function useWorkbenchKeyboardShortcuts({
     onUploadFromPhone,
 }: UseWorkbenchKeyboardShortcutsOptions) {
     useEffect(() => {
+        if (!enabled) return;
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
             if (e.target instanceof HTMLElement && e.target.isContentEditable) return;
@@ -149,5 +152,6 @@ export function useWorkbenchKeyboardShortcuts({
         clearSelection,
         onUploadImage,
         onUploadFromPhone,
+        enabled,
     ]);
 }

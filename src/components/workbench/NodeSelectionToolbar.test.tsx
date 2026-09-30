@@ -115,12 +115,12 @@ describe('NodeSelectionToolbar — contents (ui-translation §3.2)', () => {
 });
 
 describe('NodeSelectionToolbar — anchoring (§5)', () => {
-    it('positions itself centered above the node with an 8px gap', () => {
+    it('positions itself above the node title with a 24px gap', () => {
         const { container } = renderToolbar({ anchor: { screenX: 400, screenY: 200 } });
         const toolbar = container.firstElementChild as HTMLElement;
 
         expect(toolbar.style.left).toBe('400px');
-        expect(toolbar.style.top).toBe('192px'); // 200 − 8px gap
+        expect(toolbar.style.top).toBe('176px'); // 200 − 24px gap
         expect(toolbar.style.transform).toContain('translate(-50%, -100%)');
     });
 
@@ -141,6 +141,6 @@ describe('NodeSelectionToolbar — anchoring (§5)', () => {
 
         const moved = container.firstElementChild as HTMLElement;
         expect(moved.style.left).toBe('650px');
-        expect(moved.style.top).toBe('332px'); // 340 − 8px gap
+        expect(moved.style.top).toBe('316px'); // 340 − 24px gap
     });
 });

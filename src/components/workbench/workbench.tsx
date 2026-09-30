@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     ReactFlow,
     NodeTypes,
@@ -9,9 +10,6 @@ import {
     SelectionMode,
     OnNodeDrag,
     type Viewport,
-    type ReactFlowState,
-    useStore as useReactFlowStore,
-    useStoreApi,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -66,15 +64,7 @@ import {
     saveWorkbenchViewport,
 } from './hooks/workbenchViewportPersistence';
 import { readClipboardImage } from '@/services/clipboardImage';
-import { useWorkbenchSelectionSync, type SelectionSyncSetNodes } from './hooks/useWorkbenchSelectionSync';
-
-function selectFlowSelectedNodeIds(state: ReactFlowState): string[] {
-    return state.nodes.filter((node) => node.selected).map((node) => node.id);
-}
-
-function areStringArraysEqual(left: string[], right: string[]): boolean {
-    return left.length === right.length && left.every((id, index) => id === right[index]);
-}
+import { startImageCanvasTransition } from '@/services/workbench/imageCanvasTransition';
 
 const nodeTypes: NodeTypes = {
     imageNode: ImageNode,
@@ -97,22 +87,13 @@ const edgeTypes: EdgeTypes = {
     customEdge: CustomEdge,
 };
 
-const WorkbenchContent: React.FC = () => {
+const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     const flowWrapperRef = useRef<HTMLDivElement>(null);
     const viewportInitializedForProjectRef = useRef<string | null>(null);
-    const { setCenter, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
-    const reactFlowStore = useStoreApi();
-    const flowSelectedNodeIds = useReactFlowStore(selectFlowSelectedNodeIds, areStringArraysEqual);
-    const setFlowNodes = useCallback<SelectionSyncSetNodes>((payload) => {
-        const flowState = reactFlowStore.getState();
-        const nextNodes = typeof payload === 'function' ? payload(flowState.nodes) : payload;
-        flowState.setNodes(nextNodes);
-    }, [reactFlowStore]);
-    const getFlowNodes = useCallback(() => reactFlowStore.getState().nodes, [reactFlowStore]);
-    const { onSelectionChange, setSelection } = useWorkbenchSelectionSync({
-        setNodes: setFlowNodes,
-        getNodes: getFlowNodes,
-    });
+    const { setCenter, getNode, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
+    const router = useRouter();
+    const studioTransitionActiveRef = useRef(false);
+    const [isTransitioningToStudio, setIsTransitioningToStudio] = useState(false);
     const viewport = useViewport();
     const latestViewportRef = useRef<Viewport>(viewport);
     const {
@@ -129,9 +110,73 @@ const WorkbenchContent: React.FC = () => {
         }))
     );
     const sceneHydrated = useStore((state) => state.sceneHydrated);
+
+    useEffect(() => {
+        if (currentProjectId) {
+            router.prefetch(`/projects/${currentProjectId}/studio`);
+        }
+    }, [currentProjectId, router]);
+
+    const openNodeInStudioWithTransition = useCallback(async (nodeId: string) => {
+        if (studioTransitionActiveRef.current) return;
+
+        const node = getNode(nodeId);
+        const container = flowWrapperRef.current;
+        if (!node || !currentProjectId) {
+            if (currentProjectId) router.push(`/projects/${currentProjectId}/studio`);
+            return;
+        }
+
+        // The route and Studio project can switch immediately even if React
+        // Flow has not measured the node yet. Measurement is only needed for
+        // the optional zoom handoff.
+        if (!container) {
+            useStore.getState().openNodeInStudio(nodeId);
+            router.push(`/projects/${currentProjectId}/studio`);
+            return;
+        }
+
+        const width = node.measured?.width ?? node.width ?? 0;
+        const height = node.measured?.height ?? node.height ?? 0;
+        if (width <= 0 || height <= 0) {
+            useStore.getState().openNodeInStudio(nodeId);
+            router.push(`/projects/${currentProjectId}/studio`);
+            return;
+        }
+
+        studioTransitionActiveRef.current = true;
+        setIsTransitioningToStudio(true);
+        const targetZoom = Math.max(
+            0.1,
+            Math.min(20, Math.min(container.clientWidth / width, container.clientHeight / height))
+        );
+
+        useStore.getState().openNodeInStudio(nodeId);
+        const workbenchNode = useStore.getState().workbenchNodes.find((candidate) => candidate.id === nodeId);
+        if (workbenchNode?.type === 'image' || workbenchNode?.type === 'video') {
+            const drawable = document.querySelector(`[data-workbench-drawable="${nodeId}"]`);
+            if (drawable instanceof HTMLElement) {
+                startImageCanvasTransition(drawable, workbenchNode.project);
+            }
+        }
+
+        try {
+            void setCenter(
+                node.position.x + width / 2,
+                node.position.y + height / 2,
+                { zoom: targetZoom, duration: 350 }
+            );
+        } finally {
+            window.setTimeout(() => router.push(`/projects/${currentProjectId}/studio`), 40);
+            window.setTimeout(() => {
+                studioTransitionActiveRef.current = false;
+                setIsTransitioningToStudio(false);
+            }, 400);
+        }
+    }, [currentProjectId, getNode, router, setCenter]);
     
     useAutoSaveScene(currentProjectId);
-    useSceneStream(currentProjectId);
+    useSceneStream(currentProjectId, active);
     const collabSession = useWorkbenchCollabSession();
 
     // US3 (T035): media upload flows are declared before useWorkbench so the
@@ -217,6 +262,8 @@ const WorkbenchContent: React.FC = () => {
             pasteFromClipboard,
             removeWorkbenchNode,
             setActiveWorkbenchTool,
+            setActiveNodeId,
+            setSelectedNodeIds,
             addWorkbenchNode,
             setFreehandColor,
             setFreehandStrokeWidth,
@@ -224,6 +271,7 @@ const WorkbenchContent: React.FC = () => {
             redoWorkbench,
         },
     } = useWorkbench({
+        enabled: active,
         ...(collabSession.active
             ? { undoAction: collabSession.undo, redoAction: collabSession.redo }
             : {}),
@@ -231,6 +279,7 @@ const WorkbenchContent: React.FC = () => {
         // existing media upload flows.
         onUploadImage: handleMediaUpload,
         onUploadFromPhone: handleMediaUploadFromPhone,
+        onOpenNodeInStudio: openNodeInStudioWithTransition,
     });
 
     // US3 (T035): add-node menu routing — canvas-center creation for every
@@ -254,8 +303,9 @@ const WorkbenchContent: React.FC = () => {
     const { nodes, edges } = useWorkbenchGraph({
         workbenchNodes,
         connections,
-        flowSelectedNodeIds,
+        selectedNodeIds,
         nodeLocks,
+        isTransitioningToStudio,
         handleSourceClick,
         handleResize,
         handleResizeEnd,
@@ -350,7 +400,7 @@ const WorkbenchContent: React.FC = () => {
             activeWorkbenchTool,
             screenToFlowPosition,
             createOneShotNode,
-            setSelection,
+            setSelection: setSelectedNodeIds,
             handlePaneClick,
         });
 
@@ -361,7 +411,7 @@ const WorkbenchContent: React.FC = () => {
         freehandStrokeWidth,
         removeWorkbenchNode,
         addWorkbenchNode,
-        setSelection,
+        setSelection: setSelectedNodeIds,
     });
 
     const handleNodeDragStart = useCallback<OnNodeDrag>(
@@ -392,7 +442,11 @@ const WorkbenchContent: React.FC = () => {
     return (
         <div
             ref={flowWrapperRef}
-            className={cn('relative w-full h-screen', canvasTheme === 'dark' ? 'bg-viz-bg' : 'bg-white')}
+            className={cn(
+                'relative w-full h-screen',
+                canvasTheme === 'dark' ? 'bg-viz-bg' : 'bg-white',
+                isTransitioningToStudio && 'pointer-events-none'
+            )}
             onMouseDown={handleCanvasMouseDownForArrow}
             onMouseUp={handleCanvasMouseUpForArrow}
         >
@@ -402,7 +456,6 @@ const WorkbenchContent: React.FC = () => {
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 onNodesChange={handleNodesChange}
-                onSelectionChange={onSelectionChange}
                 onNodeDragStart={handleNodeDragStart}
                 onNodeDragStop={handleNodeDragStop}
                 onConnect={handleConnect}
@@ -427,7 +480,7 @@ const WorkbenchContent: React.FC = () => {
                 snapToGrid={true}
                 snapGrid={[5, 5]}
                 minZoom={0.1}
-                maxZoom={2}
+                maxZoom={20}
                 onMoveEnd={handleViewportMoveEnd}
                 connectionRadius={60}
                 connectionLineComponent={WorkbenchConnectionLine}
@@ -444,7 +497,8 @@ const WorkbenchContent: React.FC = () => {
                 onGestureStart={handleGestureStart}
                 onGestureEnd={handleGestureEnd}
                 onSelect={(nodeId) => {
-                    setSelection([nodeId]);
+                    setActiveNodeId(nodeId);
+                    setSelectedNodeIds([nodeId]);
                 }}
             />
             {/* Awareness overlays (US2): remote cursors + soft-lock badges. */}
@@ -510,15 +564,16 @@ const WorkbenchContent: React.FC = () => {
                 onFitToScreen={() => fitView({ duration: 300 })}
                 basicBlocksMenu={basicBlocksMenu}
                 onBlockSelect={handleBlockSelect}
+                isTransitioningToStudio={isTransitioningToStudio || !active}
             />
         </div>
     );
 };
 
-export const Workbench: React.FC = () => {
+export const Workbench: React.FC<{ active?: boolean }> = ({ active = true }) => {
     return (
         <ReactFlowProvider>
-            <WorkbenchContent />
+            <WorkbenchContent active={active} />
         </ReactFlowProvider>
     );
 };

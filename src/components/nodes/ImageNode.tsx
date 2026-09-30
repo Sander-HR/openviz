@@ -9,6 +9,7 @@ interface ImageNodeData extends ImageNodeType {
     onSourceClick?: (nodeId: string) => void;
     onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
     onResizeEnd?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
+    isTransitioningToStudio?: boolean;
 }
 
 interface ImageNodeProps {
@@ -21,6 +22,8 @@ interface ImageNodeProps {
 }
 
 export const ImageNode = React.memo(({ id, data, selected, isConnectable = true, width, height }: ImageNodeProps) => {
+    const isTransitioningToStudio = data.isTransitioningToStudio === true;
+    const showSelectionChrome = selected && !isTransitioningToStudio;
     const connection = useConnection();
     const [isHovered, setIsHovered] = useState(false);
     const [nodeSize, setNodeSize] = useState({ width: width || 256, height: height || 256 });
@@ -44,15 +47,16 @@ export const ImageNode = React.memo(({ id, data, selected, isConnectable = true,
             className="relative"
             style={{ width: nodeSize.width, height: nodeSize.height }}
         >
-            {selected && (
+            {showSelectionChrome && (
                 <div className={mediaNodeTitleClass()}>
                     {data.name}
                 </div>
             )}
             <div
+                data-workbench-drawable={id}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className={cn(mediaNodeFrameClass(selected), isHoverConnectable && 'border-viz-accent')}
+                className={cn(mediaNodeFrameClass(showSelectionChrome), isHoverConnectable && 'border-viz-accent')}
             >
                 {data.status === 'rendering' ? (
                     <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center animate-pulse">
@@ -102,8 +106,8 @@ export const ImageNode = React.memo(({ id, data, selected, isConnectable = true,
                     right: '0px',
                     top: '50%',
                     zIndex: 1000,
-                    opacity: selected || isHovered ? 1 : 0,
-                    pointerEvents: 'auto',
+                    opacity: showSelectionChrome || isHoverConnectable ? 1 : 0,
+                    pointerEvents: showSelectionChrome || isHoverConnectable ? 'auto' : 'none',
                 }}
                 isConnectable={isConnectable}
                 onClick={handleSourceClick}
@@ -111,7 +115,7 @@ export const ImageNode = React.memo(({ id, data, selected, isConnectable = true,
                 <Plus size={16} color="white" strokeWidth={3} className="pointer-events-none" />
             </Handle>
             <NodeResizer
-                isVisible={selected && data.status !== 'rendering'}
+                isVisible={showSelectionChrome && data.status !== 'rendering'}
                 minWidth={100}
                 minHeight={100}
                 keepAspectRatio={true}

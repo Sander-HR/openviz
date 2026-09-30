@@ -6,10 +6,13 @@ import { getGenerationRetry } from "@/services/workbench/generationRetryRegistry
 type WorkbenchGraphOptions = {
     workbenchNodes: WorkbenchNode[];
     connections: Connection[];
-    /** React Flow's internal selection mirror; never read from Zustand. */
-    flowSelectedNodeIds: string[];
+    /** Zustand selection mirror used to render controlled node props. */
+    selectedNodeIds?: string[];
+    /** Legacy/performance-test alias for React Flow-owned selection. */
+    flowSelectedNodeIds?: string[];
     /** Remote soft locks (nodeId → holder). Locked nodes are inert for this session. */
     nodeLocks: Record<string, NodeLockState>;
+    isTransitioningToStudio?: boolean;
     handleSourceClick: (nodeId: string) => void;
     handleResize: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
     handleResizeEnd: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
@@ -92,8 +95,10 @@ function getNodeSize(node: WorkbenchNode) {
 export function useWorkbenchGraph({
     workbenchNodes,
     connections,
+    selectedNodeIds,
     flowSelectedNodeIds,
     nodeLocks,
+    isTransitioningToStudio = false,
     handleSourceClick,
     handleResize,
     handleResizeEnd,
@@ -109,16 +114,17 @@ export function useWorkbenchGraph({
     }>());
 
     const nodes = useMemo<Array<Node<Record<string, unknown>, WorkbenchFlowNodeType>>>(() => {
+        const selectionIds = selectedNodeIds ?? flowSelectedNodeIds ?? [];
         const nextCache = new Map(flowNodeCacheRef.current);
         const nextNodes = workbenchNodes
             .filter((node) => !(node.type === 'arrow' && node.data.temporary))
             .map((node) => {
             const remotelyLocked = Boolean(nodeLocks[node.id]);
-            const selected = flowSelectedNodeIds.includes(node.id);
+            const selected = selectionIds.includes(node.id);
             const cached = nextCache.get(node.id);
 
             if (cached?.sourceNode === node && cached.remotelyLocked === remotelyLocked) {
-                if (cached.node.selected === selected) {
+                if (cached.node.selected === selected && cached.node.data.isTransitioningToStudio === isTransitioningToStudio) {
                     return cached.node;
                 }
 
@@ -138,6 +144,7 @@ export function useWorkbenchGraph({
                 style: { width, height },
                 data: {
                     ...node,
+                    isTransitioningToStudio,
                     width,
                     height,
                     onSourceClick: handleSourceClick,
@@ -166,7 +173,7 @@ export function useWorkbenchGraph({
         }
         flowNodeCacheRef.current = nextCache;
         return nextNodes;
-    }, [workbenchNodes, flowSelectedNodeIds, nodeLocks, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
+    }, [workbenchNodes, selectedNodeIds, flowSelectedNodeIds, nodeLocks, isTransitioningToStudio, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
 
     const edges = useMemo<Array<Edge>>(() => {
         const nodeById = new Map(workbenchNodes.map((node) => [node.id, node]));
