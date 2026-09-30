@@ -102,7 +102,7 @@ describe('useWorkbenchNodeHandlers gesture updates', () => {
             ]);
         });
 
-        expect(onTransientPositionChange).toHaveBeenCalledWith('note-1', { x: 50, y: 60 });
+        expect(onTransientPositionChange).not.toHaveBeenCalled();
         expect(updateWorkbenchNodeTransient).not.toHaveBeenCalled();
         expect(updateWorkbenchNode).not.toHaveBeenCalled();
     });

@@ -9,6 +9,8 @@ import {
     useViewport,
     SelectionMode,
     OnNodeDrag,
+    applyNodeChanges,
+    type NodeChange,
     type Viewport,
     useStoreApi,
 } from '@xyflow/react';
@@ -231,7 +233,6 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     const {
         state: {
             workbenchNodes,
-            transientPositions,
             connections,
             canUndoWorkbench,
             canRedoWorkbench,
@@ -271,7 +272,6 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
         gesture: {
             beginWorkbenchGesture,
             commitWorkbenchGesture,
-            commitTransientPositions,
         },
         actions: {
             pasteFromClipboard,
@@ -282,6 +282,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
             setFreehandStrokeWidth,
             undoWorkbench,
             redoWorkbench,
+            commitNodePositions,
         },
     } = useWorkbench({
         enabled: active,
@@ -315,7 +316,6 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     useWorkbenchCenterOnReturn({ viewMode, activeNodeId, workbenchNodes, projectId: currentProjectId, setCenter });
     const { nodes, edges } = useWorkbenchGraph({
         workbenchNodes,
-        transientPositions,
         connections,
         nodeLocks,
         isTransitioningToStudio,
@@ -427,6 +427,12 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
         setSelection,
     });
 
+    const handleNodesChangeForFlow = useCallback((changes: NodeChange[]) => {
+        const flowState = reactFlowStore.getState();
+        flowState.setNodes(applyNodeChanges(changes, flowState.nodes));
+        handleNodesChange(changes);
+    }, [handleNodesChange, reactFlowStore]);
+
     const handleNodeDragStart = useCallback<OnNodeDrag>(
         (_event, _node, nodes) => {
             beginWorkbenchGesture('move', nodes.map((draggedNode) => draggedNode.id));
@@ -438,14 +444,14 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     // state and sync it immediately so a reload never shows stale state.
     const handleNodeDragStop = useCallback<OnNodeDrag>(
         (_event, _node, draggedNodes) => {
-            commitTransientPositions(draggedNodes.map((draggedNode) => ({
+            commitNodePositions(draggedNodes.map((draggedNode) => ({
                 id: draggedNode.id,
                 position: draggedNode.position,
             })));
             commitWorkbenchGesture();
             requestImmediateSceneSave();
         },
-        [commitTransientPositions, commitWorkbenchGesture]
+        [commitNodePositions, commitWorkbenchGesture]
     );
 
     // FR-015: canvas theme (light default / dark optional), restyled in place.
@@ -472,7 +478,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
                 edges={edges}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
-                onNodesChange={handleNodesChange}
+                onNodesChange={handleNodesChangeForFlow}
                 onSelectionChange={onSelectionChange}
                 onNodeDragStart={handleNodeDragStart}
                 onNodeDragStop={handleNodeDragStop}

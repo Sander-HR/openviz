@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useReactFlow } from '@xyflow/react';
 
@@ -66,13 +66,8 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         undoWorkbench,
         redoWorkbench,
     } = useWorkbenchStore();
-    const [transientPositions, setTransientPositions] = useState<Record<string, { x: number; y: number }>>({});
-    const setTransientPosition = useCallback((id: string, position: { x: number; y: number }) => {
-        setTransientPositions((current) => ({ ...current, [id]: position }));
-    }, []);
-    const commitTransientPositions = useCallback((positions: Array<{ id: string; position: { x: number; y: number } }>) => {
+    const commitNodePositions = useCallback((positions: Array<{ id: string; position: { x: number; y: number } }>) => {
         positions.forEach(({ id, position }) => updateWorkbenchNode(id, { x: position.x, y: position.y }));
-        setTransientPositions({});
     }, [updateWorkbenchNode]);
 
     const router = useRouter();
@@ -117,7 +112,6 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         workbenchNodes,
         updateWorkbenchNode,
         updateWorkbenchNodeTransient,
-        onTransientPositionChange: setTransientPosition,
         beginWorkbenchGesture,
         commitWorkbenchGesture,
         cancelWorkbenchGesture,
@@ -191,7 +185,6 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
     return {
         state: {
             workbenchNodes,
-            transientPositions,
             connections,
             canUndoWorkbench,
             canRedoWorkbench,
@@ -232,7 +225,6 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         },
         gesture: {
             updateWorkbenchNodeTransient,
-            commitTransientPositions,
             beginWorkbenchGesture,
             commitWorkbenchGesture,
             cancelWorkbenchGesture,
@@ -255,6 +247,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
             undoLastFreehandNode,
             undoWorkbench,
             redoWorkbench,
+            commitNodePositions,
         },
     };
 };

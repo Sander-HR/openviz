@@ -5,7 +5,6 @@ import { getGenerationRetry } from "@/services/workbench/generationRetryRegistry
 
 type WorkbenchGraphOptions = {
     workbenchNodes: WorkbenchNode[];
-    transientPositions?: Record<string, { x: number; y: number }>;
     connections: Connection[];
     /** Remote soft locks (nodeId → holder). Locked nodes are inert for this session. */
     nodeLocks: Record<string, NodeLockState>;
@@ -91,7 +90,6 @@ function getNodeSize(node: WorkbenchNode) {
 
 export function useWorkbenchGraph({
     workbenchNodes,
-    transientPositions = {},
     connections,
     nodeLocks,
     isTransitioningToStudio = false,
@@ -115,8 +113,7 @@ export function useWorkbenchGraph({
             .filter((node) => !(node.type === 'arrow' && node.data.temporary))
             .map((node) => {
             const remotelyLocked = Boolean(nodeLocks[node.id]);
-            const transientPosition = transientPositions[node.id];
-            const position = transientPosition ?? { x: node.x, y: node.y };
+            const position = { x: node.x, y: node.y };
             const cached = nextCache.get(node.id);
 
             if (cached?.sourceNode === node && cached.remotelyLocked === remotelyLocked) {
@@ -177,7 +174,7 @@ export function useWorkbenchGraph({
         }
         flowNodeCacheRef.current = nextCache;
         return nextNodes;
-    }, [workbenchNodes, transientPositions, nodeLocks, isTransitioningToStudio, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
+    }, [workbenchNodes, nodeLocks, isTransitioningToStudio, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
 
     const edges = useMemo<Array<Edge>>(() => {
         const nodeById = new Map(workbenchNodes.map((node) => [node.id, node]));
