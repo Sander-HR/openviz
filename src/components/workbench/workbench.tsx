@@ -102,14 +102,24 @@ const edgeTypes: EdgeTypes = {
 const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     const flowWrapperRef = useRef<HTMLDivElement>(null);
     const viewportInitializedForProjectRef = useRef<string | null>(null);
-    const { setCenter, getNode, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
+    const { setCenter, getNode, updateNode, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
     const reactFlowStore = useStoreApi();
     const flowSelectedNodeIds = useReactFlowStore(selectFlowSelectedNodeIds, areStringArraysEqual);
     const setFlowNodes = useCallback<SelectionSyncSetNodes>((payload) => {
         const flowState = reactFlowStore.getState();
-        const nextNodes = typeof payload === 'function' ? payload(flowState.nodes) : payload;
-        flowState.setNodes(nextNodes);
-    }, [reactFlowStore]);
+        const currentNodes = flowState.nodes;
+        const nextNodes = typeof payload === 'function' ? payload(currentNodes) : payload;
+
+        // Selection synchronization should update only changed node flags. A
+        // full setNodes call here would make marquee selection pay the same
+        // controlled-graph cost as a drag gesture.
+        nextNodes.forEach((nextNode) => {
+            const currentNode = currentNodes.find((node) => node.id === nextNode.id);
+            if (currentNode?.selected !== nextNode.selected) {
+                updateNode(nextNode.id, { selected: nextNode.selected });
+            }
+        });
+    }, [reactFlowStore, updateNode]);
     const getFlowNodes = useCallback(() => reactFlowStore.getState().nodes, [reactFlowStore]);
     const { onSelectionChange, setSelection } = useWorkbenchSelectionSync({
         setNodes: setFlowNodes,
