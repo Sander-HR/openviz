@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image as ImageIcon, ImageOff } from 'lucide-react';
-import { NodeResizer } from '@xyflow/react';
+import { NodeResizer, useInternalNode } from '@xyflow/react';
 
 import { MediaWorkbenchNode } from '@/types';
 import { nodeCardClass, NodeCardHeader, resizeHandleClassName } from './nodeUi';
@@ -19,6 +19,8 @@ interface MediaNodeProps {
 }
 
 export const MediaNode = React.memo(({ id, data, selected, width, height }: MediaNodeProps) => {
+    const internalNode = useInternalNode(id);
+    const isSelected = selected || internalNode?.selected === true;
     const [nodeSize, setNodeSize] = useState({ width: width || 260, height: height || 180 });
     const [loadError, setLoadError] = useState(false);
     const src = data.data?.src;
@@ -31,7 +33,7 @@ export const MediaNode = React.memo(({ id, data, selected, width, height }: Medi
     }, [width, height]);
 
     return (
-        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`${nodeCardClass(selected, 'rounded')} flex flex-col`}>
+        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`${nodeCardClass(isSelected, 'rounded')} flex flex-col`}>
             <NodeCardHeader icon={ImageIcon} label="Media" />
 
             <div className="relative min-h-0 flex-1 bg-white">
@@ -54,7 +56,7 @@ export const MediaNode = React.memo(({ id, data, selected, width, height }: Medi
             </div>
 
             <NodeResizer
-                isVisible={selected}
+                isVisible={isSelected}
                 minWidth={120}
                 minHeight={80}
                 color="#4C4CEF"

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { NodeResizer } from '@xyflow/react';
+import { NodeResizer, useInternalNode } from '@xyflow/react';
 import { Play, Pause, Maximize2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VideoNode as VideoNodeType } from '../../types';
@@ -20,6 +20,8 @@ interface VideoNodeProps {
 }
 
 export const VideoNode = React.memo(({ id, data, selected, width, height }: VideoNodeProps) => {
+    const internalNode = useInternalNode(id);
+    const isSelected = selected || internalNode?.selected === true;
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -50,7 +52,7 @@ export const VideoNode = React.memo(({ id, data, selected, width, height }: Vide
     return (
         <div style={{ width: nodeSize.width, height: nodeSize.height }}>
             <div
-                className={mediaNodeFrameClass(selected)}
+                className={mediaNodeFrameClass(isSelected)}
             >
                 {data.status === 'rendering' ? (
                     <div className="w-full h-full bg-gray-900 flex flex-col items-center justify-center animate-pulse">
@@ -109,7 +111,7 @@ export const VideoNode = React.memo(({ id, data, selected, width, height }: Vide
                 )}
             </div>
             <NodeResizer
-                isVisible={selected && data.status !== 'rendering'}
+                isVisible={isSelected && data.status !== 'rendering'}
                 minWidth={100}
                 minHeight={100}
                 keepAspectRatio={true}

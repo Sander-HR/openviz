@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@xyflow/react', () => ({
     NodeResizer: () => null,
+    useInternalNode: () => undefined,
 }));
 
 import { MediaNode } from './MediaNode';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Handle, NodeResizer, Position, useConnection } from '@xyflow/react';
+import { Handle, NodeResizer, Position, useConnection, useInternalNode } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { ImageNode as ImageNodeType } from '../../types';
 import { cn, imageLikeHandleStyle, mediaNodeFrameClass, mediaNodeTitleClass, resizeHandleClassName } from './nodeUi';
@@ -22,8 +22,10 @@ interface ImageNodeProps {
 }
 
 export const ImageNode = React.memo(({ id, data, selected, isConnectable = true, width, height }: ImageNodeProps) => {
+    const internalNode = useInternalNode(id);
+    const isSelected = selected || internalNode?.selected === true;
     const isTransitioningToStudio = data.isTransitioningToStudio === true;
-    const showSelectionChrome = selected && !isTransitioningToStudio;
+    const showSelectionChrome = isSelected && !isTransitioningToStudio;
     const connection = useConnection();
     const [isHovered, setIsHovered] = useState(false);
     const [nodeSize, setNodeSize] = useState({ width: width || 256, height: height || 256 });
