@@ -6,10 +6,8 @@ import { getGenerationRetry } from "@/services/workbench/generationRetryRegistry
 type WorkbenchGraphOptions = {
     workbenchNodes: WorkbenchNode[];
     connections: Connection[];
-    /** Zustand selection mirror used to render controlled node props. */
-    selectedNodeIds?: string[];
-    /** Legacy/performance-test alias for React Flow-owned selection. */
-    flowSelectedNodeIds?: string[];
+    /** React Flow's internal selection mirror; never read from Zustand. */
+    flowSelectedNodeIds: string[];
     /** Remote soft locks (nodeId → holder). Locked nodes are inert for this session. */
     nodeLocks: Record<string, NodeLockState>;
     isTransitioningToStudio?: boolean;
@@ -95,7 +93,6 @@ function getNodeSize(node: WorkbenchNode) {
 export function useWorkbenchGraph({
     workbenchNodes,
     connections,
-    selectedNodeIds,
     flowSelectedNodeIds,
     nodeLocks,
     isTransitioningToStudio = false,
@@ -114,7 +111,7 @@ export function useWorkbenchGraph({
     }>());
 
     const nodes = useMemo<Array<Node<Record<string, unknown>, WorkbenchFlowNodeType>>>(() => {
-        const selectionIds = selectedNodeIds ?? flowSelectedNodeIds ?? [];
+        const selectionIds = flowSelectedNodeIds;
         const nextCache = new Map(flowNodeCacheRef.current);
         const nextNodes = workbenchNodes
             .filter((node) => !(node.type === 'arrow' && node.data.temporary))
@@ -173,7 +170,7 @@ export function useWorkbenchGraph({
         }
         flowNodeCacheRef.current = nextCache;
         return nextNodes;
-    }, [workbenchNodes, selectedNodeIds, flowSelectedNodeIds, nodeLocks, isTransitioningToStudio, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
+    }, [workbenchNodes, flowSelectedNodeIds, nodeLocks, isTransitioningToStudio, handleSourceClick, handleResize, handleResizeEnd, handleTransientDataChange, handleGestureStart, handleGestureEnd, handleDataChange]);
 
     const edges = useMemo<Array<Edge>>(() => {
         const nodeById = new Map(workbenchNodes.map((node) => [node.id, node]));

@@ -10,6 +10,9 @@ import {
     SelectionMode,
     OnNodeDrag,
     type Viewport,
+    type ReactFlowState,
+    useStore as useReactFlowStore,
+    useStoreApi,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -65,6 +68,15 @@ import {
 } from './hooks/workbenchViewportPersistence';
 import { readClipboardImage } from '@/services/clipboardImage';
 import { startImageCanvasTransition } from '@/services/workbench/imageCanvasTransition';
+import { useWorkbenchSelectionSync, type SelectionSyncSetNodes } from './hooks/useWorkbenchSelectionSync';
+
+function selectFlowSelectedNodeIds(state: ReactFlowState): string[] {
+    return state.nodes.filter((node) => node.selected).map((node) => node.id);
+}
+
+function areStringArraysEqual(left: string[], right: string[]): boolean {
+    return left.length === right.length && left.every((id, index) => id === right[index]);
+}
 
 const nodeTypes: NodeTypes = {
     imageNode: ImageNode,
@@ -91,6 +103,18 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     const flowWrapperRef = useRef<HTMLDivElement>(null);
     const viewportInitializedForProjectRef = useRef<string | null>(null);
     const { setCenter, getNode, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
+    const reactFlowStore = useStoreApi();
+    const flowSelectedNodeIds = useReactFlowStore(selectFlowSelectedNodeIds, areStringArraysEqual);
+    const setFlowNodes = useCallback<SelectionSyncSetNodes>((payload) => {
+        const flowState = reactFlowStore.getState();
+        const nextNodes = typeof payload === 'function' ? payload(flowState.nodes) : payload;
+        flowState.setNodes(nextNodes);
+    }, [reactFlowStore]);
+    const getFlowNodes = useCallback(() => reactFlowStore.getState().nodes, [reactFlowStore]);
+    const { onSelectionChange, setSelection } = useWorkbenchSelectionSync({
+        setNodes: setFlowNodes,
+        getNodes: getFlowNodes,
+    });
     const router = useRouter();
     const studioTransitionActiveRef = useRef(false);
     const [isTransitioningToStudio, setIsTransitioningToStudio] = useState(false);
@@ -262,8 +286,6 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
             pasteFromClipboard,
             removeWorkbenchNode,
             setActiveWorkbenchTool,
-            setActiveNodeId,
-            setSelectedNodeIds,
             addWorkbenchNode,
             setFreehandColor,
             setFreehandStrokeWidth,
@@ -303,7 +325,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     const { nodes, edges } = useWorkbenchGraph({
         workbenchNodes,
         connections,
-        selectedNodeIds,
+        flowSelectedNodeIds,
         nodeLocks,
         isTransitioningToStudio,
         handleSourceClick,
@@ -400,7 +422,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
             activeWorkbenchTool,
             screenToFlowPosition,
             createOneShotNode,
-            setSelection: setSelectedNodeIds,
+            setSelection,
             handlePaneClick,
         });
 
@@ -411,7 +433,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
         freehandStrokeWidth,
         removeWorkbenchNode,
         addWorkbenchNode,
-        setSelection: setSelectedNodeIds,
+        setSelection,
     });
 
     const handleNodeDragStart = useCallback<OnNodeDrag>(
@@ -456,6 +478,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 onNodesChange={handleNodesChange}
+                onSelectionChange={onSelectionChange}
                 onNodeDragStart={handleNodeDragStart}
                 onNodeDragStop={handleNodeDragStop}
                 onConnect={handleConnect}
@@ -497,8 +520,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
                 onGestureStart={handleGestureStart}
                 onGestureEnd={handleGestureEnd}
                 onSelect={(nodeId) => {
-                    setActiveNodeId(nodeId);
-                    setSelectedNodeIds([nodeId]);
+                    setSelection([nodeId]);
                 }}
             />
             {/* Awareness overlays (US2): remote cursors + soft-lock badges. */}
