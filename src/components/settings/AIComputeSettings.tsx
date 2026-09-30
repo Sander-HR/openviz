@@ -29,6 +29,7 @@ export const AIComputeSettings: React.FC = () => {
         capabilities,
         refreshCapabilities,
         testConnection,
+        syncStatus,
     } = useAIComputeSettings();
 
     return (
@@ -40,6 +41,13 @@ export const AIComputeSettings: React.FC = () => {
                     Connect ComfyUI, inspect available hardware, and choose how OpenViz selects product-design models.
                 </p>
             </div>
+
+            <p className="text-xs text-zinc-500" role="status" aria-live="polite">
+                {syncStatus === 'loading' && 'Loading your saved AI settings…'}
+                {syncStatus === 'saving' && 'Saving settings…'}
+                {syncStatus === 'saved' && 'Settings saved to your account.'}
+                {syncStatus === 'error' && 'Settings could not be synchronized.'}
+            </p>
 
             <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-5 shadow-2xl shadow-black/20" aria-labelledby="connection-title">
                 <div className="mb-5 flex items-start justify-between gap-4">

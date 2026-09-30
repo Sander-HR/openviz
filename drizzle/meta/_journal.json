@@ -29,6 +29,13 @@
       "when": 1790230834916,
       "tag": "0003_broken_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790720272767,
+      "tag": "0004_easy_boomer",
+      "breakpoints": true
     }
   ]
 }

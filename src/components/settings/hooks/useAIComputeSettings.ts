@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { renderService } from '@/services/renderService';
-import type { TargetCapabilities } from '@/types/executionTarget.types';
+import type { ComputeSettings, TargetCapabilities } from '@/types/executionTarget.types';
 import { normalizeComfyCapabilities } from '@/services/ai/targets/comfyCapabilitiesService';
 import { createOpenAIImageTarget } from '@/services/ai/targets/openAIImageTarget';
 import { useStore } from '@/store/useStore';
@@ -20,6 +20,7 @@ export function useAIComputeSettings() {
     const setImageApiModel = useStore((state) => state.setImageApiModel);
     const setImageApiSize = useStore((state) => state.setImageApiSize);
     const setEndpointConcurrency = useStore((state) => state.setEndpointConcurrency);
+    const applyComputeSettings = useStore((state) => state.applyComputeSettings);
     const setPreference = useStore((state) => state.setComputePreference);
     // Persisted IndexedDB snapshots can predate the image API settings. Keep
     // hydration backward-compatible instead of passing undefined to controls.
@@ -35,6 +36,47 @@ export function useAIComputeSettings() {
     const setEndpoint = settings.targetKind === 'hosted' ? setHostedEndpoint : setLocalEndpoint;
     const [status, setStatus] = useState<ConnectionStatus>('idle');
     const [capabilities, setCapabilities] = useState<TargetCapabilities | null>(null);
+    const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('idle');
+    const hydratedFromServer = useRef(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        setSyncStatus('loading');
+        fetch('/api/ai/settings')
+            .then(async (response) => {
+                if (!response.ok) throw new Error('Unable to load AI settings.');
+                return response.json() as Promise<{ settings: { targetKind: ComputeSettings['targetKind']; protocol: ComputeSettings['protocol']; preference: ComputeSettings['preference']; localEndpoint: string; hostedEndpoint: string; imageApiEndpoint: string; imageApiKeyless: boolean; imageApiModel: string; imageApiSize: string; endpointConcurrency: number; hasImageApiKey: boolean } | null }>;
+            })
+            .then((payload) => {
+                if (cancelled) return;
+                if (payload.settings) {
+                    applyComputeSettings(payload.settings);
+                    if (!payload.settings.hasImageApiKey) setImageApiKey('');
+                }
+                hydratedFromServer.current = true;
+                setSyncStatus('saved');
+            })
+            .catch(() => {
+                if (!cancelled) setSyncStatus('error');
+            });
+        return () => { cancelled = true; };
+    }, [applyComputeSettings, setImageApiKey]);
+
+    useEffect(() => {
+        if (!hydratedFromServer.current) return;
+        const timer = window.setTimeout(() => {
+            setSyncStatus('saving');
+            fetch('/api/ai/settings', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetKind: settings.targetKind, protocol, preference: settings.preference, localEndpoint: settings.localEndpoint, hostedEndpoint: settings.hostedEndpoint, imageApiEndpoint, imageApiKey: imageApiKey || undefined, imageApiKeyless, imageApiModel, imageApiSize, endpointConcurrency }),
+            }).then((response) => {
+                if (!response.ok) throw new Error('Unable to save AI settings.');
+                setSyncStatus('saved');
+            }).catch(() => setSyncStatus('error'));
+        }, 700);
+        return () => window.clearTimeout(timer);
+    }, [endpointConcurrency, imageApiEndpoint, imageApiKey, imageApiKeyless, imageApiModel, imageApiSize, protocol, settings.hostedEndpoint, settings.localEndpoint, settings.preference, settings.targetKind]);
 
     const refreshCapabilities = useCallback(async () => {
         const [statsResponse, objectInfoResponse] = await Promise.all([
@@ -101,5 +143,6 @@ export function useAIComputeSettings() {
         capabilities,
         refreshCapabilities,
         testConnection,
+        syncStatus,
     };
 }

@@ -16,6 +16,7 @@ export interface AIComputeSlice {
     setImageApiModel: (model: string) => void;
     setImageApiSize: (size: string) => void;
     setEndpointConcurrency: (concurrency: number) => void;
+    applyComputeSettings: (settings: Partial<ComputeSettings>) => void;
 }
 
 export const createAIComputeSlice: StateCreator<AppState, [], [], AIComputeSlice> = (set) => ({
@@ -45,4 +46,5 @@ export const createAIComputeSlice: StateCreator<AppState, [], [], AIComputeSlice
     setImageApiModel: (imageApiModel) => set((state) => ({ computeSettings: { ...state.computeSettings, imageApiModel } })),
     setImageApiSize: (imageApiSize) => set((state) => ({ computeSettings: { ...state.computeSettings, imageApiSize } })),
     setEndpointConcurrency: (endpointConcurrency) => set((state) => ({ computeSettings: { ...state.computeSettings, endpointConcurrency: Math.max(1, Math.min(3, Math.floor(endpointConcurrency))) } })),
+        applyComputeSettings: (settings) => set((state) => ({ computeSettings: { ...state.computeSettings, ...settings, endpointConcurrency: Math.max(1, Math.min(3, Math.floor(settings.endpointConcurrency ?? state.computeSettings.endpointConcurrency))) } })),
 });

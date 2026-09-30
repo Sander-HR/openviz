@@ -135,6 +135,7 @@ export interface AppState {
     setImageApiModel: (model: string) => void;
     setImageApiSize: (size: string) => void;
     setEndpointConcurrency: (concurrency: number) => void;
+    applyComputeSettings: (settings: Partial<ComputeSettings>) => void;
     upsertProductJob: (job: GenerationJob) => void;
     updateProductJob: (jobId: string, updates: Partial<GenerationJob>) => void;
     removeProductJob: (jobId: string) => void;
