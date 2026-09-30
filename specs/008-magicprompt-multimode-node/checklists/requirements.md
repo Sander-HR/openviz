@@ -36,3 +36,4 @@
   - v1 implements Variation, New view, Extract modes; Instant Render and Change expression are disabled list entries (Assumptions).
   - Header info-control copy is unverified against the reference; FR-012 requires only a brief plain-language description (Assumptions).
   - Base-state prompt text's effect on the generation pipeline is out of scope (Assumptions).
+- Validation iteration 2 (2026-09-29): studio unification added as User Story 3 (P2) with FR-014/FR-015, SC-006/SC-007, and two edge cases. UI parity is enforced by requiring the existing per-panel behavior tests to pass unmodified (FR-015/SC-006); make-3d and adjust panels are explicitly out of scope (Assumptions).
