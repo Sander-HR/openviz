@@ -8,11 +8,42 @@ LOCK_DIR="$RUNTIME_DIR/openviz-dev.lock"
 
 mkdir -p "$RUNTIME_DIR"
 
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+is_live_launcher() {
+  local pid="$1"
+  local command cwd
+
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+  cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | awk '/^n/ { print substr($0, 2); exit }')"
+
+  [[ "$cwd" == "$PWD" ]] || return 1
+  [[ "$command" == *"scripts/dev.sh"* || "$command" == *"bash scripts/dev.sh"* ]]
+}
+
+acquire_lock() {
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    return 0
+  fi
+
+  local existing_pid=""
   if [[ -f "$PID_FILE" ]]; then
-    existing_pid="$(cat "$PID_FILE")"
+    existing_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+  fi
+
+  if [[ -n "$existing_pid" ]] && is_live_launcher "$existing_pid"; then
     echo "[dev] OpenViz development server is already running (launcher PID $existing_pid)." >&2
-  else
+    return 1
+  fi
+
+  echo "[dev] Removing stale OpenViz development launcher state." >&2
+  rm -f "$PID_FILE"
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+  mkdir "$LOCK_DIR" 2>/dev/null
+}
+
+if ! acquire_lock; then
+  if [[ ! -f "$PID_FILE" ]]; then
     echo "[dev] Another OpenViz development launcher is starting. Try again shortly." >&2
   fi
   exit 1

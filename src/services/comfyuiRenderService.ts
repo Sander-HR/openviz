@@ -1,7 +1,7 @@
 import { RenderOperation, RenderService, GenerateRequest, GenerateResponse, AnimateRequest, NewViewRequest } from './types';
 import { getWorkflow, mapStyleToId, WorkflowDefinition } from './ai/workflowRegistry';
 import { composeNewViewPrompt, composeStylePrompt } from './ai/stylePromptRegistry';
-import { client_id, fetchWithTimeout, getComfyUrl, setComfyProxy, uploadImage, waitForCompletion } from './comfyuiClient';
+import { client_id, fetchWithTimeout, getComfyUrl, uploadImage, waitForCompletion } from './comfyuiClient';
 
 /**
  * Executes a ComfyUI workflow by:
@@ -266,25 +266,7 @@ export const comfyRenderService: RenderService = {
                 return true;
             }
         } catch {
-            console.warn(`⚠️ Connection to ${getComfyUrl()} failed, trying secondary proxy...`);
-        }
-
-        // Try secondary proxy
-        const secondaryUrl = '/comfy-api-secondary';
-        try {
-            const response = await fetchWithTimeout(`${secondaryUrl}/system_stats`, { timeout: 2000 });
-            if (response.ok) {
-                const stats = await response.json();
-                console.log('✅ ComfyUI System Stats (Secondary):', stats);
-
-                // Update global URLs to use secondary proxy
-                setComfyProxy(secondaryUrl);
-                console.log('🔄 Switched to secondary proxy:', getComfyUrl());
-
-                return true;
-            }
-        } catch (e) {
-            console.error('❌ Secondary connection check failed:', e);
+            console.warn(`⚠️ Connection to ${getComfyUrl()} failed.`);
         }
 
         return false;
