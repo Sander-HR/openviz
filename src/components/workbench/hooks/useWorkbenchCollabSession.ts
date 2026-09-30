@@ -1,10 +1,11 @@
 import { useSession } from 'next-auth/react';
 
 import { useStore } from '@/store/useStore';
+import { resolveCollabServerUrl } from '@/services/collab/collabUrl';
 import { useCollabSession, type UseCollabSessionResult } from './useCollabSession';
 
 /** Collaboration server WebSocket URL (env-driven; local dev default). */
-const COLLAB_SERVER_URL = process.env.NEXT_PUBLIC_COLLAB_URL ?? 'ws://localhost:1234';
+const COLLAB_SERVER_URL = resolveCollabServerUrl(process.env.NEXT_PUBLIC_COLLAB_URL);
 
 export interface WorkbenchCollabSession extends UseCollabSessionResult {
     /** True once the shared document is synced and owns scene writes. */
