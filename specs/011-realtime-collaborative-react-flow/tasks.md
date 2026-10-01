@@ -1,208 +1,179 @@
+---
+description: "Task list for real-time collaborative React Flow editor"
+---
+
 # Tasks: Real-Time Collaborative React Flow Editor
 
-**Input**: Design documents from `/specs/011-realtime-collaborative-react-flow/`
+**Input**: Design documents in `/specs/011-realtime-collaborative-react-flow/`
 
-**Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/collaboration-contract.md, quickstart.md
+**Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
 
-**Tests**: Mandatory — the project constitution requires test-first, layered TDD: logic layers (services/hooks/store slices/utils) get a failing test named in the task BEFORE implementation; components get behavior tests derived from spec acceptance criteria.
+**TDD**: Required by Constitution II. Logic-layer test tasks precede the implementation task they make green; component behavior tests precede component implementation. Keep every changed source file below 300 lines and do not add `any` or `@ts-ignore`.
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing.
-
-## Format: `[ID] [P?] [Story] Description`
-
-- **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story requirement it belongs to (US1–US5)
-- Include file paths in descriptions
-
-**Conventions**:
-- Logic-layer tasks name their test file first (constitution II).
-- No `any`, no `@ts-ignore` (constitution I); absolute imports; named exports; files stay under 300 lines (constitution V).
-- Quality gates after every phase: `pnpm run lint`, `pnpm exec tsc --noEmit`, `pnpm run test:ci`.
-
-## Path Conventions
-
-- Next.js app runtime (mid-migration from Vite) — no second bundler entry point; the standalone `server/collab` process is retained (plan Complexity Tracking).
-- Client collaboration code: `src/services/collab/`, `src/components/workbench/hooks/`, `src/store/slices/`.
-- **Terminology**: spec/plan say "edges"; the Y.Doc schema and existing code use a `connections` Y.Map keyed by edge ID with `from`/`to` fields (also accepting `source`/`target`). "Edge" in task descriptions always means an entry in that `connections` map.
+**Y.Doc schema terminology**: Nodes use the `nodes` Y.Map; React Flow edges are persisted in the existing `connections` Y.Map. `metadata.name` is the shared scene name. Scene ownership/lifecycle fields remain server-managed. Local pointer motion stays transient; only the completed gesture is committed.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Verify collaboration server bootstrap and room limits (50 concurrent collaborators per document — FR-018) in `server/collab/index.ts`; add/adjust a test in `server/collab/index.test.ts` asserting the connection limit is configured
-- [ ] T002 [P] Confirm dependency versions satisfy the plan (Yjs 13.6, Hocuspocus provider/server 4.7, y-indexeddb 9) by checking `package.json` and running `pnpm exec tsc --noEmit` and `pnpm run test:ci`; record any version drift in this file
+**Purpose**: Verify existing toolchain and dependency assumptions before modifying collaboration code.
 
-## Phase 2: Foundational (Blocking Prerequisites — document & history contracts)
+- [ ] T001 [P] Verify installed versions in `package.json` against the plan (Yjs 13.6, Hocuspocus provider/server 4.7, y-indexeddb 9, React Flow 12.10) and confirm the existing Vitest, Next.js build, and collaboration-server scripts are available; report drift without changing unrelated dependencies.
 
-- [ ] T003 Write red tests for field-level document mutation, deterministic ID-sorted projection, dangling-edge pruning, and malformed-entry skipping in `src/services/collab/sceneDocMapping.test.ts`
-- [ ] T004 Extend `src/services/collab/sceneDocMapping.ts` with a field-level mutation API (update changed nested Y.Map/Y.Array paths inside an entity; never replace the whole entity value for ordinary edits) per data-model.md mutation rules; make T003 green
-- [ ] T005 Write red tests for same-field last-update-wins convergence across three simulated clients and one-gesture transaction capture in `src/services/collab/convergence.test.ts` (later write by Yjs update order wins; no conflict metadata stored in the document)
-- [ ] T006 Verify/adjust origin-tagged transaction helpers in `src/services/collab/collabProviderFactory.ts` so one completed gesture is exactly one origin-tagged transaction (`user:<id>:<clientID>`); make T005 green
+## Phase 2: Foundational (Blocking Prerequisites)
+
+**Purpose**: Establish bounded room admission, backward-compatible Y.Doc schema, and deterministic transaction conventions before story work.
+
+- [ ] T002 [P] Write unit tests for per-document capacity reservations in `server/collab/roomCapacity.test.ts`: admit 50 distinct authenticated socket IDs, reject the 51st, release on disconnect, allow a later reconnect, isolate counts by document, and release failed admissions.
+- [ ] T003 Implement typed room-capacity reservations in `server/collab/roomCapacity.ts` and wire `onAuthenticate`/`onDisconnect` in `server/collab/index.ts` so rejected or unauthorized sessions never hold a reservation; use explicit Hocuspocus context `{ userId: string }` and enforce a 50-connection cap per document (FR-017, FR-018).
+- [ ] T004 Write red schema/mapping tests in `src/services/collab/sceneDocMapping.test.ts` for nested field mutation without whole-entity replacement, deterministic ID-sorted projection, malformed-entry skipping, dangling-edge pruning, and `metadata.name` initialization/read/write while preserving `nodes` and `connections`.
+- [ ] T005 Extend `src/services/collab/sceneDocMapping.ts` with typed accessors and field-path updates for keyed nodes/connections plus `metadata.name`; preserve flat persisted node `x`/`y`, project deterministically, and make T004 green.
+- [ ] T006 Write red multi-client tests in `src/services/collab/convergence.test.ts` for same-field last-update-wins by Yjs update order, disjoint-field merge, three-client convergence, and a completed gesture producing one origin-tagged history unit; assert no conflict metadata is added.
+- [ ] T007 Adjust transaction/origin helpers in `src/services/collab/collabProviderFactory.ts` and `src/services/collab/undoOrigin.ts` as needed to make T006 green: use `user:<id>:<clientID>` origin, apply only completed commands under that origin, and expose an explicit capture boundary for gestures.
 
 ## Phase 3: User Story 1 - Edit a shared graph in real time (Priority: P1) 🎯 MVP
 
-**Goal**: Local edits are explicit document commands (FR-021); React Flow renders a one-way projection of the Y.Doc; no store-diff flush.
+**Goal**: Explicit Y.Doc commands and a one-way React Flow projection replace collaborative Zustand graph authority and synchronize scene name.
 
-**Independent Test**: Open one document in two authorized sessions; create, edit, move, and delete nodes/edges in both; every session converges to the same graph without a REST request per operation (FR-003).
+**Independent Test**: In two authorized sessions, create/edit/move/delete nodes and connections and rename the scene; verify both projections converge, a REST call is not made per graph operation, single-user behavior remains intact, and Zustand changes cannot write back to the shared document.
 
-### Tests for User Story 1 ⚠️
+### Tests for User Story 1
 
-- [ ] T007 [US1] Write red tests for explicit document commands (createNode, updateNodeField, moveNodes, deleteNode, createEdge, updateEdge, deleteEdge — field-level updates, one gesture = one origin-tagged transaction) in `src/services/collab/sceneDocCommands.test.ts`
-- [ ] T008 [US1] Write red behavior tests for the one-way projection (Y.Doc changes update React Flow nodes/edges; UI state changes do NOT mutate the shared document — FR-016) in `src/components/workbench/hooks/useWorkbenchGraphProjection.test.ts`
-- [ ] T009 [P] [US1] Write red behavior tests for connection status display: Connected, Reconnecting, and Offline states render correctly (FR-015) in `src/components/workbench/CollabStatusChip.test.tsx`
-
-### Implementation for User Story 1
-
-- [ ] T010 [US1] Implement typed document commands in `src/services/collab/sceneDocCommands.ts` (createNode, updateNodeField, moveNodes, deleteNode, createEdge, updateEdge, deleteEdge — each mutates the Y.Doc under the local origin per contracts/collaboration-contract.md); make T007 green
-- [ ] T011 [US1] Implement the Y.Doc → React Flow projection hook in `src/components/workbench/hooks/useWorkbenchGraphProjection.ts` (subscribes to doc updates, projects via `extractSceneFromDoc`, preserves local drag ownership so remote updates do not interrupt an active gesture); make T008 green
-- [ ] T012 [US1] Route workbench edit operations through the document commands: node create/edit/move/delete in `src/components/workbench/hooks/useWorkbenchNodeHandlers.ts`; edge create/update/delete via `src/components/workbench/hooks/workbenchConnectionLogic.ts` and the `removeConnection` action in `src/store/slices/workbenchSlice.ts` (remove collaborative graph authority from the slice; keep single-user mode working through the same adapter or an explicitly separate non-collaborative path with no duplicate authority)
-- [ ] T013 [US1] Remove the bidirectional store-diff bridge: delete `src/services/collab/collabStoreSync.ts` and `src/services/collab/collabStoreSync.test.ts`, update all imports (incl. `src/components/workbench/hooks/useCollabSession.ts`), and add a regression test in `src/services/collab/sceneDocCommands.test.ts` asserting no store-to-doc flush path remains
-- [ ] T014 [US1] Verify the status chip renders Connected/Reconnecting/Offline from the session status in `src/components/workbench/CollabStatusChip.tsx` (wired to `useCollabSession.ts` status); make T009 green
+- [ ] T008 [P] [US1] Write red command-service tests in `src/services/collab/sceneDocCommands.test.ts` for create/update/move/delete node, create/update/delete connection, scene rename, field-level updates, stable IDs, origin tagging, invalid/missing entities, and one transaction per completed operation.
+- [ ] T009 [P] [US1] Write hook behavior tests in `src/components/workbench/hooks/useWorkbenchGraphProjection.test.ts` proving Y.Doc updates project to React Flow node/edge shapes, `metadata.name` is exposed, updates unsubscribe on teardown, and local UI/store changes do not mutate the Y.Doc.
+- [ ] T010 [P] [US1] Write server persistence tests in `server/collab/persistence.test.ts` for mirroring `metadata.name` to `scenes.name` and hydrating legacy Y.Docs from the row name without replacing graph state.
+- [ ] T011 [P] [US1] Write behavior tests for accessible inline scene renaming in `src/components/workbench/WorkbenchSceneNameEditor.test.tsx`, including submit, cancel, blank-name rejection, remote name updates, and separation from the project-name editor.
+- [ ] T012 Implement typed explicit commands in `src/services/collab/sceneDocCommands.ts` for graph operations and scene rename, applying changes directly to the Y.Doc with the local origin and field-level mutation helpers; make T008 green.
+- [ ] T013 Implement `src/components/workbench/hooks/useWorkbenchGraphProjection.ts` as a Y.Doc observer producing deterministic React Flow projections and scene name; hold in-progress drag preview locally and reconcile remote changes without overwriting the active gesture; make T009 green.
+- [ ] T014 Update `server/collab/persistence.ts` to seed `metadata.name` from the authoritative row for legacy documents and mirror the converged document name back to `scenes.name` while preserving encoded Y.Doc and projected `scenes.data`; make T010 green without adding a migration.
+- [ ] T015 Implement `src/components/workbench/WorkbenchSceneNameEditor.tsx` and wire it through `src/components/workbench/WorkbenchChrome.tsx`/`src/components/workbench/workbench.tsx` to the projection and rename command; keep the existing project name control unchanged and make T011 green.
+- [ ] T016 [P] [US1] Add handler integration tests in `src/components/workbench/hooks/useWorkbenchNodeHandlers.test.ts` and `src/components/workbench/hooks/useWorkbench.connectionLogic.test.ts` proving all create/edit/move/delete/connect operations use document commands in collaboration mode and preserve the single-user path.
+- [ ] T017 [US1] Route node operations through `src/components/workbench/hooks/useWorkbenchNodeHandlers.ts` and connection operations through `src/components/workbench/hooks/workbenchConnectionLogic.ts` plus `src/store/slices/workbenchSlice.ts`; commit only completed gesture values, retain local preview state, and make T016 green.
+- [ ] T018 [US1] Remove `src/services/collab/collabStoreSync.ts` and `src/services/collab/collabStoreSync.test.ts`, remove its imports and lifecycle from `src/components/workbench/hooks/useCollabSession.ts`, and add a regression assertion in `src/services/collab/sceneDocCommands.test.ts` that collaborative graph state has no store-diff flush/write-back path (FR-016, FR-021).
 
 ## Phase 4: User Story 2 - Undo and redo my own collaborative work (Priority: P1)
 
-**Goal**: Per-user, origin-scoped, in-memory undo/redo that never reverts another user's operations.
+**Goal**: Per-user in-memory history undoes only local completed commands against the current shared document.
 
-**Independent Test**: Two sessions make interleaved edits; each session undoes/redoes only its own completed changes against the current shared document.
+**Independent Test**: Interleave edits from two clients, including offline edits; undo and redo in each and verify remote changes remain and each completed gesture is one history entry.
 
-### Tests for User Story 2 ⚠️
-
-- [ ] T015 [US2] Write red tests for per-origin undo/redo: undo-after-remote-same-node-edit, redo-after-conflict, offline history, gesture grouping (one stack item per completed gesture — FR-008), and no history persistence in `src/services/collab/undoOrigin.test.ts`
-- [ ] T016 [P] [US2] Write red tests asserting the undo stack is absent from server persistence and IndexedDB after offline edit/undo/redo cycles (FR-007) in `src/services/collab/offlineSync.test.ts`
-
-### Implementation for User Story 2
-
-- [ ] T017 [US2] Route toolbar and keyboard Undo/Redo to the origin-scoped manager in collaborative mode via `src/components/workbench/hooks/useCollabSession.ts` (expose undo/redo/canUndo/canRedo) and the workbench status/toolbar components in `src/components/workbench/`; make T015 green
+- [ ] T019 [P] [US2] Write red tests in `src/services/collab/undoOrigin.test.ts` for local-origin-only tracking, undo after a remote same-node edit, redo after a conflict, create/delete and field edits, one gesture per stack item, and no history after session teardown.
+- [ ] T020 [P] [US2] Extend `src/services/collab/offlineSync.test.ts` with tests proving offline undo/redo works locally and Y.UndoManager stack items are absent from encoded server document and IndexedDB after close/reopen (FR-007).
+- [ ] T021 [US2] Implement or adjust `src/services/collab/undoOrigin.ts` and command transaction boundaries to make T019 green; retain history only in the session’s in-memory UndoManager, never in Y.Doc data or persistence.
+- [ ] T022 [US2] Verify `src/components/workbench/hooks/useCollabSession.ts`, `src/components/workbench/workbench.tsx`, and toolbar/keyboard handlers route collaborative Undo/Redo through the origin-scoped manager and disable store-snapshot history in collaboration mode; make T019/T020 green.
 
 ## Phase 5: User Story 3 - See collaborators and their cursors (Priority: P1)
 
-**Goal**: Ephemeral presence/cursors with throttling, stale cleanup, and render isolation.
+**Goal**: Typed ephemeral awareness, bounded cursor publication, stale cleanup, and cursor rendering isolated from graph state.
 
-**Independent Test**: Open a document in multiple sessions; move cursors and pan/zoom; verify identity, color, world-space positions, stale removal, and no full graph rerender on cursor updates.
+**Independent Test**: In multiple sessions, verify identity/color/world coordinates under pan and zoom, 30–40 cursor updates/sec, immediate clean-disconnect cleanup, 30-second abnormal-drop expiry, and no graph rerender from cursor-only changes.
 
-### Tests for User Story 3 ⚠️
-
-- [ ] T018 [P] [US3] Write red tests for awareness payload typing, 30–40 updates/sec throttling (FR-013), and stale cleanup (immediate on clean disconnect; 30-second timeout for abnormal drops — FR-013) in `src/services/collab/awareness.test.ts`
-- [ ] T019 [P] [US3] Write red behavior tests for cursor overlay isolation (remote cursor updates do not trigger a full React Flow graph rerender; cursors transform correctly under pan/zoom — FR-014) in `src/components/workbench/CursorOverlay.test.tsx`
-- [ ] T020 [P] [US3] Write red tests asserting no cursor/presence record is present in persisted document state or document history after any run (FR-012, SC-009) in `server/collab/persistence.test.ts`
-
-### Implementation for User Story 3
-
-- [ ] T021 [US3] Extract awareness logic into `src/services/collab/awareness.ts` (typed payloads: user identity, color, cursor world position, connection presence; throttled publication; stale-cleanup timers) moving logic out of `src/services/collab/collabProviderFactory.ts` and `src/components/workbench/hooks/useCollabPresencePublisher.ts`; make T018 green
-- [ ] T022 [US3] Isolate cursor rendering in `src/components/workbench/CursorOverlay.tsx` (memoized, world-space transform independent of React Flow node state); make T019 green
+- [ ] T023 [P] [US3] Write unit tests in `src/services/collab/awareness.test.ts` for typed awareness payloads, cursor publication capped at 30–40 Hz, world-coordinate payloads, pointer-leave clearing, immediate clean-disconnect cleanup, 30-second abnormal-drop cleanup, timer refresh/cancellation, and peer reappearance.
+- [ ] T024 [P] [US3] Write render-isolation and coordinate behavior tests in `src/components/workbench/CursorOverlay.test.tsx` proving cursor updates do not rerender graph nodes and world-to-screen placement follows viewport pan/zoom.
+- [ ] T025 [US3] Implement `src/services/collab/awareness.ts` and update `src/components/workbench/hooks/useCollabPresencePublisher.ts`/`src/services/collab/collabProviderFactory.ts` to type identity, color, cursor, and active-node presence, throttle publication to 30–40 Hz, and clean stale peers; make T023 green.
+- [ ] T026 [US3] Memoize and isolate `src/components/workbench/CursorOverlay.tsx` from React Flow graph state while preserving the world-to-screen transform; make T024 green.
 
 ## Phase 6: User Story 4 - Continue working through network loss (Priority: P1)
 
-**Goal**: Offline edits survive refresh and converge after reconnection with zero lost confirmed edits.
+**Goal**: Local document updates survive supported offline periods/refresh and merge symmetrically after reauthorization.
 
-**Independent Test**: Disconnect a session, edit, refresh (IndexedDB restore), reconnect; the local and remote documents converge via symmetric state-vector merge with no lost confirmed edits and no pointer replay.
+**Independent Test**: Disconnect one session, complete graph edits, refresh with IndexedDB available, reconnect with valid authorization, and verify both local and server updates converge with zero lost completed edits and no pointer replay.
 
-### Tests for User Story 4 ⚠️
-
-- [ ] T023 [US4] Write red tests for offline persistence: y-indexeddb readiness awaited before treating the local doc as authoritative, refresh recovery, and symmetric state-vector reconnect merge (both sides' missing updates applied; neither replica discarded — FR-011) in `src/services/collab/offlineSync.test.ts`
-- [ ] T024 [P] [US4] Write red tests asserting historical pointer positions are never replayed on reconnect — only completed document operations synchronize (FR-009, US4/AC4) in `src/services/collab/offlineSync.test.ts`
-
-### Implementation for User Story 4
-
-- [ ] T025 [US4] Implement/verify IndexedDB readiness gating and reconnect merge in `src/services/collab/collabProviderFactory.ts` and `src/components/workbench/hooks/useCollabSession.ts`; make T023 green
+- [ ] T027 [US4] Write readiness/recovery tests in `src/services/collab/offlineSync.test.ts` proving IndexedDB `whenSynced` completes before the doc is treated as authoritative, including an empty local store and restored local updates.
+- [ ] T028 [US4] Write reconnect tests in `src/services/collab/offlineSync.test.ts` proving both replicas’ missing state-vector updates are applied after concurrent offline/online edits, and historical pointer positions are never persisted or replayed (FR-011, US4/AC4).
+- [ ] T029 [US4] Update `src/services/collab/collabProviderFactory.ts` and `src/components/workbench/hooks/useCollabSession.ts` to gate initial local projection on IndexedDB readiness, preserve local edits while disconnected, reauthorize on reconnect, and rely on symmetric Hocuspocus/Yjs reconciliation without discarding either replica; make T027/T028 green.
 
 ## Phase 7: User Story 5 - Join only authorized documents (Priority: P1)
 
-**Goal**: Authentication and document authorization before any data is transmitted.
+**Goal**: Authenticate and recheck document access before synchronization; give rejected joins a safe, generic recovery message.
 
-**Independent Test**: Attempt to join as authorized and unauthorized users, including token expiry and reconnect; unauthorized sessions receive no document, cursor, or presence data.
+**Independent Test**: Exercise authorized, unauthenticated, expired-token, lost-membership, and reconnect cases; rejected sessions receive no document or awareness and see the same generic access-unavailable recovery guidance.
 
-### Tests for User Story 5 ⚠️
-
-- [ ] T026 [US5] Write red tests for the authorization matrix in `server/collab/auth.test.ts`: authorized join admitted; unauthenticated/lacking-access join rejected with NO document, cursor, or presence data disclosed (SC-008); expired token rejected; reconnect with fresh token rejoins and republishes presence
-
-### Implementation for User Story 5
-
-- [ ] T027 [US5] Enforce/verify token authentication and project/document authorization before room admission and on reconnect in `server/collab/auth.ts` and `src/services/collab/roomTokenService.ts`; make T026 green
+- [ ] T030 [P] [US5] Extend `server/collab/auth.test.ts` and `src/app/api/projects/[id]/scenes/collab-token/route.test.ts` for valid and invalid tokens, expiry, wrong scene, membership revocation, missing secret, reconnect reauthorization, and denied sessions receiving no document/cursor/presence state.
+- [ ] T031 [P] [US5] Write UI behavior tests in `src/components/workbench/hooks/useCollabSession.test.ts` and `src/components/workbench/CollabStatusChip.test.tsx` proving reconnecting/offline/denied states and a generic access-unavailable message with sign-in/retry guidance that does not expose missing-scene or permission details.
+- [ ] T032 [US5] Keep `server/collab/auth.ts` and `src/services/collab/roomTokenService.ts` fail-closed; wire capacity admission after token/membership validation and guarantee reservation cleanup on denial/disconnect, making T002/T003/T030 green.
+- [ ] T033 [US5] Update `src/types/collab.types.ts`, `src/components/workbench/hooks/useCollabSession.ts`, and `src/components/workbench/CollabStatusChip.tsx` to expose Connected, Reconnecting, Offline, and denied states, refresh tokens on retry, and show one generic access-unavailable message with safe sign-in/retry action; make T031 green.
 
 ## Phase 8: Scale & Convergence Verification (FR-018, FR-019, SC-003–SC-007)
 
-**Goal**: Measured proof that the system meets the 50-collaborator target and the SC-007 degradation threshold.
+**Goal**: Validate convergence and all latency/frame-rate targets using the same repeatable 50-collaborator workload.
 
-- [ ] T028 Build a deterministic multi-client convergence harness (node/edge operations, same-field LWW conflicts, offline edits, per-user history; ≥3 simulated clients) in `src/services/collab/convergence.test.ts`
-- [ ] T029 [P] Implement performance telemetry for p95 document sync, p95 cursor latency, interaction latency (local edit → visible render), and sustained frame rate in `src/services/collab/performanceTelemetry.ts` with tests in `src/services/collab/performanceTelemetry.test.ts`
-- [ ] T030 Add a browser performance scenario for 50 collaborators at 30–40 cursor updates/sec/user measuring the SC-007 threshold (interaction latency p95 <100 ms, ≥30 fps sustained) and React Flow render churn in `scripts/perf/collab-bench.mjs` (following the existing `scripts/perf/workbench-bench.sh` + `e2e/scene-sync.e2e.mjs` harness pattern); document the run in `specs/011-realtime-collaborative-react-flow/quickstart.md`
-- [ ] T031 Optimize only measured bottlenecks from T030 in the modules they implicate (e.g. `src/services/collab/awareness.ts`, `src/components/workbench/CursorOverlay.tsx`, `src/components/workbench/hooks/useWorkbenchGraphProjection.ts`); do not move authoritative graph state back into Zustand; re-run until all target metrics pass
+- [ ] T034 [P] Add telemetry tests in `src/services/collab/performanceTelemetry.test.ts` for p95 document-sync, cursor, interaction latency, sustained FPS, cursor update frequency, and cursor-only React Flow render counts using the defined workload.
+- [ ] T035 Implement typed metric collection/aggregation in `src/services/collab/performanceTelemetry.ts` for remote document observer latency, awareness-to-overlay latency, local command-to-visible projection latency, and sustained FPS; make T034 green.
+- [ ] T036 Extend `src/services/collab/convergence.test.ts` with an integrated deterministic three-client run covering graph/name commands, field-level merge, LWW, isolated undo, disconnect/reconnect merge, and persistence projection; meet SC-001/002/006/009.
+- [ ] T037 Add `scripts/perf/collab-bench.mjs` using the existing browser/e2e harness to run 50 collaborators publishing 30–40 cursor updates/sec each while one editor submits one graph operation/sec for at least 60 seconds after warm-up; record document-sync p95 <200 ms, cursor p95 <150 ms, interaction p95 <100 ms, ≥30 FPS, and cursor-only render churn (SC-003–SC-007).
+- [ ] T038 Run the benchmark profile from T037 and optimize only measured bottlenecks in the implicated modules (for example `src/services/collab/awareness.ts`, `src/components/workbench/CursorOverlay.tsx`, or `src/components/workbench/hooks/useWorkbenchGraphProjection.ts`); repeat until every stated target passes and record environment/results in `specs/011-realtime-collaborative-react-flow/quickstart.md`.
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T032 Verify existing documents are adopted without data loss and current durable scene state remains available (plan Phase 5 rollout) in `server/collab/persistence.test.ts`
-- [ ] T033 Confirm server persistence stores current document state only — never awareness or undo history — in `server/collab/persistence.test.ts`
-- [ ] T034 Document rollback behavior if the collaboration provider or local persistence cannot initialize (UI reports connection state, does not claim offline durability when storage is unavailable) in `src/components/workbench/hooks/useCollabSession.ts` and the workbench status view in `src/components/workbench/`
-- [ ] T035 Run full quality gates via `package.json` scripts: `pnpm run lint`, `pnpm exec tsc --noEmit`, `pnpm run test:ci`, `pnpm run build`; confirm coverage floor not regressed
-- [ ] T036 Execute all quickstart.md scenarios end-to-end (convergence, offline recovery, awareness/authorization, performance) and record results
+- [ ] T039 [P] Add persistence rollout tests in `server/collab/persistence.test.ts` proving legacy scene JSON/Y.Docs load without graph loss, `metadata.name` hydrates from `scenes.name`, and subsequent saves preserve name, encoded document, and projected `scenes.data`.
+- [ ] T040 Update `server/collab/persistence.ts` as needed to pass the T039 migration/adoption cases while storing no awareness state or undo history in `scenes.data`/`ydoc`.
+- [ ] T041 Document provider/IndexedDB initialization and rollback behavior in `src/components/workbench/hooks/useCollabSession.ts`, `src/components/workbench/CollabStatusChip.tsx`, and `specs/011-realtime-collaborative-react-flow/quickstart.md`: report offline durability unavailable when local storage fails, retain safe single-user fallback where supported, and never claim unsaved offline persistence.
+- [ ] T042 Run `pnpm run lint`, `pnpm exec tsc --noEmit`, `pnpm run test:ci`, and `pnpm run build` from `package.json`; resolve feature-introduced issues and confirm the coverage floor does not regress.
+- [ ] T043 Execute the scenarios in `specs/011-realtime-collaborative-react-flow/quickstart.md` for collaboration, scene rename, undo/redo, offline recovery, awareness, authorization, and performance; record pass/fail evidence and any deferred environment-dependent checks in that guide.
 
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)**: No dependencies — can start immediately.
-- **Foundational (Phase 2)**: Depends on Setup completion — BLOCKS all user stories.
-- **User Stories (Phases 3–7)**: All depend on Foundational phase completion.
-- **Scale verification (Phase 8)**: Requires US1–US5 complete (measures the integrated system).
-- **Polish (Phase 9)**: Depends on Phase 8 metrics passing.
+- **Setup (Phase 1)**: T001 is independent; it confirms the repository baseline.
+- **Foundational (Phase 2)**: T002–T007 establish the room cap, schema, and transaction conventions; complete before user-story implementation.
+- **US1**: Depends on T004–T007; it establishes document commands/projection and removes dual graph authority.
+- **US2**: Depends on US1 commands and local origins (T012, T017–T018); history is bound to the completed-command path.
+- **US3**: Depends on foundational Y.Doc/awareness types; may proceed independently of US2 and US4 after Phase 2.
+- **US4**: Depends on US1 document commands/projection; may run in parallel with US2/US3 where files do not overlap.
+- **US5**: Depends on foundational capacity reservations; may run in parallel with US1–US4 except shared session/provider files.
+- **Scale verification (Phase 8)**: T036–T038 requires the integrated US1–US5 behavior.
+- **Polish (Phase 9)**: T039–T043 follows implementation and measured performance validation.
 
-### User Story Dependencies
+### User Story Completion Order
 
-- **User Story 1 (P1)**: Can start after Foundational — no dependencies on other stories.
-- **User Story 2 (P1)**: Can start after US1 — undo/redo routes through the document-command transaction origins introduced in Phase 3.
-- **User Stories 3, 4, 5 (P1)**: Independent of each other once Foundational is done; US4 benefits from US1's projection but can proceed in parallel with US2–US3.
-
-### Within Each User Story
-
-Tests are written first (red), then implementation makes them green (constitution II). Test tasks marked [P] touch different files and can run in parallel.
+- **US1 (P1)** is the MVP and unlocks the other client features.
+- **US2 (P1)** follows US1 because undo depends on command transaction origins.
+- **US3, US4, and US5 (P1)** are independently testable after the foundational phase; coordinate provider/session file changes to avoid conflicts.
 
 ### Parallel Opportunities
 
-- T001 ∥ T002 (Phase 1)
-- T003/T004 ∥ T005/T006 (Phase 2, different files)
-- T009 ∥ T007/T008 (Phase 3 test-writing tasks, different files)
-- T016 ∥ T015 (Phase 4, different files)
-- T018 ∥ T019 ∥ T020 (Phase 5 test-writing tasks)
-- T024 ∥ T023 (Phase 6, same file — run sequentially if conflicts arise)
-- T029 ∥ T028 (Phase 8, different files)
-- US3/US4/US5 phases can run as parallel tracks after Phase 2
+- T002 ∥ T004 ∥ T006: room-capacity, mapping, and convergence tests touch separate modules.
+- T008 ∥ T009 ∥ T010 ∥ T011: US1 red tests use independent service, hook, server persistence, and component files.
+- T019 ∥ T020: undo-manager and offline-persistence tests are separate.
+- T023 ∥ T024: awareness-service and cursor-component tests are independent.
+- T027 ∥ T028: offline readiness and state-vector/pointer-replay tests share one test file; coordinate edits or run sequentially.
+- T030 ∥ T031: server/API auth tests and client UI behavior tests are independent.
+- T034 ∥ T036: metric tests and integrated convergence tests use separate files.
+- After Phase 2, US3 and US5 can proceed in parallel with US1; US4 can proceed once the command/projection interfaces from US1 are agreed.
 
 ## Parallel Example: User Story 1
 
 ```bash
-# Launch all tests for User Story 1 together (test-first):
-pnpm exec vitest src/services/collab/sceneDocCommands.test.ts &
-pnpm exec vitest src/components/workbench/hooks/useWorkbenchGraphProjection.test.ts &
-pnpm exec vitest src/components/workbench/CollabStatusChip.test.tsx &
+# Write and run the independent red tests first:
+pnpm exec vitest src/services/collab/sceneDocCommands.test.ts
+pnpm exec vitest src/components/workbench/hooks/useWorkbenchGraphProjection.test.ts
+pnpm exec vitest server/collab/persistence.test.ts
+pnpm exec vitest src/components/workbench/WorkbenchSceneNameEditor.test.tsx
 
-# Then implement in dependency order:
-# T010 (commands) → T011 (projection) → T012 (routing) → T013 (bridge removal) → T014 (status chip)
+# Then implement the corresponding layers in order:
+# commands/mapping -> document projection -> persistence/name UI -> workbench routing -> bridge removal
 ```
 
 ## Implementation Strategy
 
-### MVP First (User Story 1 Only)
+### MVP First
 
-1. Complete Phase 1: Setup
-2. Complete Phase 2: Foundational (CRITICAL — blocks all stories)
-3. Complete Phase 3: User Story 1
+1. Complete Setup and Foundational phases (room limit, schema, origins, test baselines).
+2. Complete US1 end-to-end: explicit document commands, one-way projection, shared scene name, migration-safe persistence, routed handlers, and removal of `collabStoreSync`.
+3. Verify US1 with two authorized sessions and no per-operation REST mutation path before proceeding.
 
-**MVP = User Story 1** (Phases 1–3): explicit document commands + one-way projection + two-session convergence. This alone delivers the primary value and removes the dual-authority gate (FR-002/FR-016/FR-021).
+**MVP = US1**: this satisfies the primary graph-editing flow and closes the FR-002/FR-016/FR-021 dual-authority gate. Do not claim that gate complete while the store-diff bridge remains.
 
 ### Incremental Delivery
 
-1. **Increment 2**: US2 (per-user history) — makes collaborative editing safe.
-2. **Increment 3**: US3 + US4 + US5 in parallel tracks — presence, offline resilience, and authorization hardening.
-3. **Final**: Phase 8 scale verification against SC-007, then Phase 9 rollout polish.
-
-### Parallel Team Strategy
-
-- Developer A: Phase 2 → US1 (critical path)
-- Developer B: Phase 2 → US5 (server-side auth, independent files)
-- Developer C: Phase 2 → US3 (awareness extraction, independent files)
-- After US1 lands: Developer D joins US4 (offline merge touches provider factory — coordinate with B/C on `collabProviderFactory.ts`)
+1. Add US2 per-user Undo/Redo on the command transaction path.
+2. Add US3 awareness/presence, US4 offline recovery, and US5 authorization UX/hardening as independent tracks after shared interfaces stabilize.
+3. Complete the 50-client workload and latency/FPS benchmarks, then persistence rollout, rollback checks, and full quality gates.
 
 ## Notes
 
-- Every task names its file path(s); logic-layer tasks name the test file first.
-- "Edge" = entry in the Y.Doc `connections` map (see Path Conventions).
-- The plan gate condition applies: do not claim FR-002/FR-016/FR-021 complete until T013 (bridge removal) is done and its regression test passes.
+- Every task is a checkbox with a sequential ID; user-story tasks carry the matching story label and a concrete file path.
+- Logic test tasks precede implementations; component behavior tests precede components per Constitution II.
+- Existing persisted edges remain entries in `connections`; do not rename the root Y.Map as part of this feature.
+- Existing schema uses flat `x`/`y`; React Flow `position` is a derived projection.
+- T002 requires the per-document cap to count authenticated active connections; horizontal multi-process coordination is outside the current single-server deployment scope.
