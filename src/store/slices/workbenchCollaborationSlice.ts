@@ -5,6 +5,38 @@ import type { CollabPresencePeer, CollabRemoteAwarenessEntry, CollabRemoteCursor
 
 const PRESENCE_COLORS = ['#f97316', '#0ea5e9', '#22c55e', '#a855f7', '#ef4444', '#eab308'];
 
+function recordsHaveSameValues<T>(left: Record<string, T>, right: Record<string, T>): boolean {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    if (leftKeys.length !== rightKeys.length) return false;
+    return leftKeys.every((key) => Object.is(left[key], right[key]));
+}
+
+function presenceRecordsEqual(
+    left: Record<string, CollabPresencePeer>,
+    right: Record<string, CollabPresencePeer>,
+): boolean {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    if (leftKeys.length !== rightKeys.length) return false;
+    return leftKeys.every((key) => {
+        const a = left[key];
+        const b = right[key];
+        return Boolean(a && b && a.userId === b.userId && a.userName === b.userName && a.color === b.color);
+    });
+}
+
+function nodeLocksEqual(left: Record<string, NodeLockState>, right: Record<string, NodeLockState>): boolean {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    if (leftKeys.length !== rightKeys.length) return false;
+    return leftKeys.every((key) => {
+        const a = left[key];
+        const b = right[key];
+        return Boolean(a && b && a.nodeId === b.nodeId && a.userId === b.userId && a.userName === b.userName);
+    });
+}
+
 /** Deterministic per-user color so every replica renders the same palette. */
 export function presenceColorFor(userId: string): string {
     let hash = 0;
@@ -132,7 +164,15 @@ export const createWorkbenchCollaborationSlice: StateCreator<AppState, [], [], W
             };
         }
 
-        set({ presenceByUser, remoteCursors, nodeLocks });
+        set((state: AppState) => ({
+            presenceByUser: presenceRecordsEqual(state.presenceByUser, presenceByUser)
+                ? state.presenceByUser
+                : presenceByUser,
+            remoteCursors: recordsHaveSameValues(state.remoteCursors, remoteCursors)
+                ? state.remoteCursors
+                : remoteCursors,
+            nodeLocks: nodeLocksEqual(state.nodeLocks, nodeLocks) ? state.nodeLocks : nodeLocks,
+        }));
     },
     clearCollaborationState: () =>
         set({

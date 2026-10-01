@@ -53,6 +53,31 @@ describe('Workbench gesture transactions', () => {
         expect(useStore.getState().workbenchNodes[0]).toMatchObject({ x: 40, y: 50 });
     });
 
+    it('commits a selected group position in one store action', () => {
+        const first = makeNote(10, 20);
+        const second: NoteWorkbenchNode = { ...makeNote(30, 40), id: 'note-2' };
+        resetWorkbench(first);
+        useStore.setState({
+            workbenchNodes: [first, second],
+            selectedNodeIds: ['note-1', 'note-2'],
+            activeNodeId: 'note-1',
+        });
+
+        const store = useStore.getState();
+        store.beginWorkbenchGesture('move', ['note-1', 'note-2']);
+        store.commitWorkbenchNodePositions([
+            { id: 'note-1', x: 50, y: 60 },
+            { id: 'note-2', x: 70, y: 80 },
+        ]);
+        store.commitWorkbenchGesture();
+
+        expect(useStore.getState().workbenchNodes).toMatchObject([
+            { id: 'note-1', x: 50, y: 60 },
+            { id: 'note-2', x: 70, y: 80 },
+        ]);
+        expect(useStore.getState().workbenchHistory).toHaveLength(2);
+    });
+
     it('moves a selected group as one atomic history action', () => {
         const first = makeNote(10, 20);
         const second: NoteWorkbenchNode = { ...makeNote(30, 40), id: 'note-2' };

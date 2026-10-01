@@ -12,7 +12,6 @@ import {
     applyNodeChanges,
     type NodeChange,
     type Viewport,
-    useStoreApi,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -68,7 +67,7 @@ import {
 } from './hooks/workbenchViewportPersistence';
 import { readClipboardImage } from '@/services/clipboardImage';
 import { startImageCanvasTransition } from '@/services/workbench/imageCanvasTransition';
-import { useWorkbenchSelectionSync, type SelectionSyncSetNodes } from './hooks/useWorkbenchSelectionSync';
+import { useWorkbenchSelectionSync } from './hooks/useWorkbenchSelectionSync';
 
 const nodeTypes: NodeTypes = {
     imageNode: ImageNode,
@@ -94,18 +93,11 @@ const edgeTypes: EdgeTypes = {
 const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
     const flowWrapperRef = useRef<HTMLDivElement>(null);
     const viewportInitializedForProjectRef = useRef<string | null>(null);
+    // React Flow owns positions while a drag is in progress. Keeping these ids
+    // out of the store-to-flow reconciliation prevents a remote Yjs update from
+    // replacing a locally smooth frame with the pre-drag position.
+    const draggingNodeIdsRef = useRef<Set<string>>(new Set());
     const { setCenter, getNode, zoomIn, zoomOut, fitView, setViewport, screenToFlowPosition } = useReactFlow();
-    const reactFlowStore = useStoreApi();
-    const setFlowNodes = useCallback<SelectionSyncSetNodes>((payload) => {
-        const flowState = reactFlowStore.getState();
-        const nextNodes = typeof payload === 'function' ? payload(flowState.nodes) : payload;
-        flowState.setNodes(nextNodes);
-    }, [reactFlowStore]);
-    const getFlowNodes = useCallback(() => reactFlowStore.getState().nodes, [reactFlowStore]);
-    const { onSelectionChange, setSelection } = useWorkbenchSelectionSync({
-        setNodes: setFlowNodes,
-        getNodes: getFlowNodes,
-    });
     const router = useRouter();
     const studioTransitionActiveRef = useRef(false);
     const [isTransitioningToStudio, setIsTransitioningToStudio] = useState(false);
@@ -327,6 +319,58 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
         handleGestureEnd,
         handleDataChange,
     });
+    const [flowNodes, setFlowNodes] = useState(nodes);
+
+    useEffect(() => {
+        setFlowNodes((currentNodes) => {
+            const draggingNodeIds = draggingNodeIdsRef.current;
+            // Defer all external projections until the gesture ends. React
+            // Flow already has the authoritative frame for every selected
+            // node, and applying a full remote scene here would rerender the
+            // whole selection on every collaboration update.
+            if (draggingNodeIds.size > 0) return currentNodes;
+
+            const currentById = new Map(currentNodes.map((node) => [node.id, node]));
+            let changed = currentNodes.length !== nodes.length;
+
+            const nextNodes = nodes.map((node) => {
+                const currentNode = currentById.get(node.id);
+                if (!currentNode) {
+                    changed = true;
+                    return node;
+                }
+
+                const position = draggingNodeIds.has(node.id) ? currentNode.position : node.position;
+                const selected = currentNode.selected;
+                const positionChanged = currentNode.position.x !== position.x || currentNode.position.y !== position.y;
+                const selectionChanged = selected !== undefined && selected !== node.selected;
+                const externalNodeChanged = currentNode.type !== node.type
+                    || currentNode.data !== node.data
+                    || currentNode.style !== node.style
+                    || currentNode.width !== node.width
+                    || currentNode.height !== node.height
+                    || currentNode.selectable !== node.selectable
+                    || currentNode.draggable !== node.draggable;
+
+                if (!positionChanged && !selectionChanged && !externalNodeChanged) {
+                    return currentNode;
+                }
+
+                changed = true;
+                return {
+                    ...node,
+                    position,
+                    ...(selected !== undefined ? { selected } : {}),
+                };
+            });
+
+            return changed ? nextNodes : currentNodes;
+        });
+    }, [nodes]);
+
+    const { onSelectionChange, setSelection } = useWorkbenchSelectionSync({
+        setNodes: setFlowNodes,
+    });
 
     useEffect(() => {
         if (viewportInitializedForProjectRef.current !== currentProjectId) {
@@ -427,14 +471,18 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
         setSelection,
     });
 
+    type WorkbenchFlowNode = (typeof nodes)[number];
     const handleNodesChangeForFlow = useCallback((changes: NodeChange[]) => {
-        const flowState = reactFlowStore.getState();
-        flowState.setNodes(applyNodeChanges(changes, flowState.nodes));
+        setFlowNodes((currentNodes) => applyNodeChanges<WorkbenchFlowNode>(
+            changes as NodeChange<WorkbenchFlowNode>[],
+            currentNodes,
+        ));
         handleNodesChange(changes);
-    }, [handleNodesChange, reactFlowStore]);
+    }, [handleNodesChange]);
 
     const handleNodeDragStart = useCallback<OnNodeDrag>(
         (_event, _node, nodes) => {
+            draggingNodeIdsRef.current = new Set(nodes.map((draggedNode) => draggedNode.id));
             beginWorkbenchGesture('move', nodes.map((draggedNode) => draggedNode.id));
         },
         [beginWorkbenchGesture]
@@ -448,6 +496,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
                 id: draggedNode.id,
                 position: draggedNode.position,
             })));
+            draggingNodeIdsRef.current.clear();
             commitWorkbenchGesture();
             requestImmediateSceneSave();
         },
@@ -474,7 +523,7 @@ const WorkbenchContent: React.FC<{ active: boolean }> = ({ active }) => {
             onMouseUp={handleCanvasMouseUpForArrow}
         >
             <ReactFlow
-                nodes={nodes}
+                nodes={flowNodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}

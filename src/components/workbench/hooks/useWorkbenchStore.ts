@@ -12,6 +12,7 @@ export function useWorkbenchStore() {
             canRedoWorkbench: state.workbenchHistoryIndex < state.workbenchHistory.length - 1 && !state.activeWorkbenchGesture,
             updateWorkbenchNode: state.updateWorkbenchNode,
             updateWorkbenchNodeTransient: state.updateWorkbenchNodeTransient,
+            commitWorkbenchNodePositions: state.commitWorkbenchNodePositions,
             beginWorkbenchGesture: state.beginWorkbenchGesture,
             commitWorkbenchGesture: state.commitWorkbenchGesture,
             cancelWorkbenchGesture: state.cancelWorkbenchGesture,

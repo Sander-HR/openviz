@@ -91,6 +91,8 @@ export interface WorkbenchSlice {
     removeConnection: (id: string) => void;
     updateWorkbenchNode: (id: string, updates: Partial<WorkbenchNode>) => void;
     updateWorkbenchNodeTransient: (id: string, updates: Partial<WorkbenchNode>) => void;
+    /** Commits a group move in one Zustand notification and one collab flush. */
+    commitWorkbenchNodePositions: (positions: Array<{ id: string; x: number; y: number }>) => void;
     beginWorkbenchGesture: (kind: WorkbenchGestureKind, affectedNodeIds?: string[]) => void;
     commitWorkbenchGesture: () => void;
     cancelWorkbenchGesture: () => void;
@@ -288,6 +290,32 @@ export const createWorkbenchSlice: StateCreator<AppState, [], [], WorkbenchSlice
             };
         }
         return newState;
+    }),
+
+    commitWorkbenchNodePositions: (positions) => set((state: AppState) => {
+        if (positions.length === 0) return state;
+
+        const positionById = new Map(positions.map(({ id, x, y }) => [id, { x, y }]));
+        let changed = false;
+        const nodes = state.workbenchNodes.map((node) => {
+            const position = positionById.get(node.id);
+            if (!position || (node.x === position.x && node.y === position.y)) return node;
+            changed = true;
+            return { ...node, x: position.x, y: position.y } as WorkbenchNode;
+        });
+
+        if (!changed) return state;
+
+        const newState: Partial<AppState> = { workbenchNodes: nodes };
+        if (state.currentProjectId) {
+            newState.projectNodes = {
+                ...state.projectNodes,
+                [state.currentProjectId]: nodes,
+            };
+        }
+        // The gesture commit owns the history snapshot. Avoid cloning the
+        // whole scene here and again in commitWorkbenchGesture.
+        return state.activeWorkbenchGesture ? newState : commitWorkbenchHistory(state, newState);
     }),
 
     beginWorkbenchGesture: (kind: WorkbenchGestureKind, affectedNodeIds = []) => set((state: AppState) => {

@@ -36,6 +36,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         canRedoWorkbench,
         updateWorkbenchNode,
         updateWorkbenchNodeTransient,
+        commitWorkbenchNodePositions,
         beginWorkbenchGesture,
         commitWorkbenchGesture,
         cancelWorkbenchGesture,
@@ -67,8 +68,12 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         redoWorkbench,
     } = useWorkbenchStore();
     const commitNodePositions = useCallback((positions: Array<{ id: string; position: { x: number; y: number } }>) => {
-        positions.forEach(({ id, position }) => updateWorkbenchNode(id, { x: position.x, y: position.y }));
-    }, [updateWorkbenchNode]);
+        commitWorkbenchNodePositions(positions.map(({ id, position }) => ({
+            id,
+            x: position.x,
+            y: position.y,
+        })));
+    }, [commitWorkbenchNodePositions]);
 
     const router = useRouter();
 

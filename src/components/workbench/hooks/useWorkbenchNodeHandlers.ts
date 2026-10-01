@@ -49,6 +49,28 @@ export function useWorkbenchNodeHandlers({
 
     const handleNodesChange: OnNodesChange = useCallback((changes) => {
         const currentNodes = workbenchNodesRef.current;
+        const hasPositionChange = changes.some((change) => change.type === 'position');
+        const currentNodesById = hasPositionChange
+            ? new Map(currentNodes.map((node) => [node.id, node]))
+            : null;
+        const temporaryArrowsByNodeId = new Map<string, Set<WorkbenchNode>>();
+
+        // A multi-node drag emits one position change per selected node. Build
+        // the attachment index once instead of scanning every node for every
+        // change; temporary arrows are the only position side effect here.
+        if (hasPositionChange) {
+            for (const node of currentNodes) {
+                if (node.type !== 'arrow') continue;
+                if (!node.data.temporary) continue;
+                for (const point of ['start', 'end'] as const) {
+                    const attachment = node.data[point === 'start' ? 'startAttachment' : 'endAttachment'];
+                    if (!attachment) continue;
+                    const arrows = temporaryArrowsByNodeId.get(attachment.nodeId) ?? new Set<WorkbenchNode>();
+                    arrows.add(node);
+                    temporaryArrowsByNodeId.set(attachment.nodeId, arrows);
+                }
+            }
+        }
 
         changes.forEach((change) => {
             if (change.type === 'dimensions') {
@@ -61,15 +83,11 @@ export function useWorkbenchNodeHandlers({
                 if (resizingNodeIdsRef.current.has(change.id)) {
                     return;
                 }
-                const movedNode = currentNodes.find((node) => node.id === change.id);
+                const movedNode = currentNodesById?.get(change.id);
                 const movedPosition = change.position;
-                if (!movedPosition) return;
-                // Temporary attached arrows are uncommon during a normal node
-                // drag. Walk only those arrows and update them directly instead
-                // of rebuilding the complete node array and an id map per
-                // pointer event.
-                for (const node of currentNodes) {
-                    if (node.type !== 'arrow' || !node.data.temporary || !movedNode) continue;
+                if (!movedPosition || !movedNode) return;
+                for (const node of temporaryArrowsByNodeId.get(change.id) ?? []) {
+                    if (node.type !== 'arrow') continue;
                     const updates: { start?: { x: number; y: number }; end?: { x: number; y: number } } = {};
                     (['start', 'end'] as const).forEach((point) => {
                         const attachment = node.data[point === 'start' ? 'startAttachment' : 'endAttachment'];
@@ -85,7 +103,7 @@ export function useWorkbenchNodeHandlers({
                                     : { x: attachment.offset * width, y: height };
                         updates[point] = { x: movedPosition.x - node.x + local.x, y: movedPosition.y - node.y + local.y };
                     });
-                    if (Object.keys(updates).length > 0) {
+                    if (updates.start || updates.end) {
                         updateWorkbenchNodeTransient(node.id, { data: { ...node.data, ...updates } });
                     }
                 }

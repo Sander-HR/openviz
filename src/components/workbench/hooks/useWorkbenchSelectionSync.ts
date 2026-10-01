@@ -3,19 +3,19 @@ import type { Node, OnSelectionChangeParams } from '@xyflow/react';
 
 import { useStore } from '@/store/useStore';
 
-export type SelectionSyncSetNodes = (
-    payload: Node[] | ((nodes: Node[]) => Node[])
+export type SelectionSyncSetNodes<NodeType extends Node = Node> = (
+    payload: NodeType[] | ((nodes: NodeType[]) => NodeType[])
 ) => void;
 
-export interface UseWorkbenchSelectionSyncOptions {
+export interface UseWorkbenchSelectionSyncOptions<NodeType extends Node = Node> {
     /**
      * Updates React Flow's internal node store. In the workbench this is
      * backed by the provider store so programmatic selection does not enter
      * the controlled onNodesChange feedback path.
      */
-    setNodes?: SelectionSyncSetNodes;
+    setNodes?: SelectionSyncSetNodes<NodeType>;
     /** Used to defer the RF write when a newly-created node is not mounted yet. */
-    getNodes?: () => Node[];
+    getNodes?: () => NodeType[];
 }
 
 function selectionKey(ids: string[]): string {
@@ -29,7 +29,9 @@ function selectionKey(ids: string[]): string {
  * through the same bridge, without feeding RF's selection callback back into
  * itself during a marquee gesture.
  */
-export function useWorkbenchSelectionSync(options: UseWorkbenchSelectionSyncOptions = {}) {
+export function useWorkbenchSelectionSync<NodeType extends Node = Node>(
+    options: UseWorkbenchSelectionSyncOptions<NodeType> = {},
+) {
     const { setNodes, getNodes } = options;
     const selectedNodeIds = useStore((state) => state.selectedNodeIds);
     const lastReactFlowSelectionKeyRef = useRef<string | null>(selectionKey(selectedNodeIds));
@@ -39,7 +41,16 @@ export function useWorkbenchSelectionSync(options: UseWorkbenchSelectionSyncOpti
         (ids: string[]) => {
             if (!setNodes) return;
             const selected = new Set(ids);
-            setNodes((nodes) => nodes.map((node) => ({ ...node, selected: selected.has(node.id) })));
+            setNodes((nodes) => {
+                let changed = false;
+                const nextNodes = nodes.map((node) => {
+                    const nextSelected = selected.has(node.id);
+                    if (node.selected === nextSelected) return node;
+                    changed = true;
+                    return { ...node, selected: nextSelected };
+                });
+                return changed ? nextNodes : nodes;
+            });
         },
         [setNodes]
     );

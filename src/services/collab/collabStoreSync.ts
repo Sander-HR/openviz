@@ -67,6 +67,9 @@ export function createCollabStoreSync(deps: CollabStoreSyncDeps): CollabStoreSyn
     let flushing = false;
     /** Deep snapshot of the store after the last projection — the diff baseline. */
     let lastScene: SceneDataJson | null = null;
+    let lastSceneKey: string | null = null;
+    let lastNodeKeys = new Map<string, string>();
+    let lastConnectionKeys = new Map<string, string>();
     /** Gesture node ids seen while a gesture was active; flushed on commit. */
     let bufferedGestureIds: Set<string> | null = null;
     let unsubscribeStore: (() => void) | null = null;
@@ -80,6 +83,13 @@ export function createCollabStoreSync(deps: CollabStoreSyncDeps): CollabStoreSyn
         }) as unknown as SceneDataJson;
     };
 
+    const updateBaseline = (scene: SceneDataJson): void => {
+        lastScene = scene;
+        lastSceneKey = stableStringify(scene);
+        lastNodeKeys = new Map(scene.nodes.map((node) => [node.id, stableStringify(node)]));
+        lastConnectionKeys = new Map(scene.connections.map((connection) => [connection.id, stableStringify(connection)]));
+    };
+
     const handleDocUpdate = (_bytes: Uint8Array, _updateOrigin: unknown): void => {
         if (projecting || flushing) return;
         projecting = true;
@@ -90,53 +100,51 @@ export function createCollabStoreSync(deps: CollabStoreSyncDeps): CollabStoreSyn
         }
         // Baseline is the store's own (possibly normalized) view, never the
         // raw doc shape — otherwise every projection would look like a diff.
-        lastScene = snapshotStore();
+        updateBaseline(snapshotStore());
     };
 
-    const flushToDoc = (forcedNodeIds?: ReadonlySet<string>): void => {
+    const flushToDoc = (forcedNodeIds?: ReadonlySet<string>, snapshot?: SceneDataJson): void => {
         if (!lastScene) return;
-        const current = snapshotStore();
+        const current = snapshot ?? snapshotStore();
+        const docNodesById = forcedNodeIds
+            ? new Map(extractSceneFromDoc(doc).nodes.map((node) => [node.id, node]))
+            : null;
 
         // Per-entity plan against the baseline. Entities absent from the
         // baseline were never represented locally — leave them alone.
         // Forced ids (a gesture that just committed) are compared against the
         // DOC's current value instead: the baseline may hold the transient
         // position we preserved mid-gesture, which would hide a real change.
-        const docNodes = forcedNodeIds ? extractSceneFromDoc(doc).nodes : null;
         const nodeSets: SceneNodeJson[] = [];
+        const currentNodeIds = new Set<string>();
         for (const node of current.nodes) {
+            currentNodeIds.add(node.id);
+            const nodeKey = stableStringify(node);
             if (forcedNodeIds?.has(node.id)) {
-                const docNode = docNodes?.find((candidate) => candidate.id === node.id);
-                if (!docNode || stableStringify(docNode) !== stableStringify(node)) {
-                    nodeSets.push(node);
-                }
+                const docNode = docNodesById?.get(node.id);
+                if (!docNode || stableStringify(docNode) !== nodeKey) nodeSets.push(node);
                 continue;
             }
-            const base = lastScene.nodes.find((candidate) => candidate.id === node.id);
-            if (!base || stableStringify(base) !== stableStringify(node)) {
-                nodeSets.push(node);
-            }
+            if (lastNodeKeys.get(node.id) !== nodeKey) nodeSets.push(node);
         }
-        const nodeDeletes: string[] = [];
-        for (const base of lastScene.nodes) {
-            if (!current.nodes.some((node) => node.id === base.id)) nodeDeletes.push(base.id);
-        }
+        const nodeDeletes = lastScene.nodes
+            .filter((node) => !currentNodeIds.has(node.id))
+            .map((node) => node.id);
 
         const connectionSets: SceneConnectionJson[] = [];
+        const currentConnectionIds = new Set<string>();
         for (const connection of current.connections) {
-            const base = lastScene.connections.find((candidate) => candidate.id === connection.id);
-            if (!base || stableStringify(base) !== stableStringify(connection)) {
+            currentConnectionIds.add(connection.id);
+            if (lastConnectionKeys.get(connection.id) !== stableStringify(connection)) {
                 connectionSets.push(connection);
             }
         }
-        const connectionDeletes: string[] = [];
-        for (const base of lastScene.connections) {
-            if (!current.connections.some((connection) => connection.id === base.id)) {
-                connectionDeletes.push(base.id);
-            }
-        }
+        const connectionDeletes = lastScene.connections
+            .filter((connection) => !currentConnectionIds.has(connection.id))
+            .map((connection) => connection.id);
 
         if (nodeSets.length === 0 && nodeDeletes.length === 0 && connectionSets.length === 0 && connectionDeletes.length === 0) {
+            updateBaseline(current);
             return;
         }
 
@@ -159,7 +167,10 @@ export function createCollabStoreSync(deps: CollabStoreSyncDeps): CollabStoreSyn
             flushing = false;
         }
 
-        lastScene = snapshotStore();
+        // `current` is already a deep snapshot and the transaction cannot
+        // synchronously normalize the store, so avoid cloning the whole scene
+        // a second time on every gesture commit.
+        updateBaseline(current);
     };
 
     const handleStoreChange = (): void => {
@@ -185,8 +196,8 @@ export function createCollabStoreSync(deps: CollabStoreSyncDeps): CollabStoreSyn
         }
 
         const current = snapshotStore();
-        if (stableStringify(current) === stableStringify(lastScene)) return;
-        void flushToDoc();
+        if (stableStringify(current) === lastSceneKey) return;
+        void flushToDoc(undefined, current);
     };
 
     return {
@@ -199,7 +210,7 @@ export function createCollabStoreSync(deps: CollabStoreSyncDeps): CollabStoreSyn
             } finally {
                 projecting = false;
             }
-            lastScene = snapshotStore();
+            updateBaseline(snapshotStore());
             doc.on('update', handleDocUpdate);
             unsubscribeStore = deps.subscribeStore(handleStoreChange);
         },
@@ -208,6 +219,9 @@ export function createCollabStoreSync(deps: CollabStoreSyncDeps): CollabStoreSyn
             unsubscribeStore?.();
             unsubscribeStore = null;
             lastScene = null;
+            lastSceneKey = null;
+            lastNodeKeys = new Map();
+            lastConnectionKeys = new Map();
             bufferedGestureIds = null;
         },
     };

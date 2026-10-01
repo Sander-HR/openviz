@@ -166,6 +166,7 @@ export interface AppState {
     removeConnection: (id: string) => void;
     updateWorkbenchNode: (id: string, updates: Partial<WorkbenchNode>) => void;
     updateWorkbenchNodeTransient: (id: string, updates: Partial<WorkbenchNode>) => void;
+    commitWorkbenchNodePositions: (positions: Array<{ id: string; x: number; y: number }>) => void;
     beginWorkbenchGesture: (kind: WorkbenchGestureKind, affectedNodeIds?: string[]) => void;
     commitWorkbenchGesture: () => void;
     cancelWorkbenchGesture: () => void;
