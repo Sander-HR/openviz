@@ -8,23 +8,17 @@
 
 ## Summary
 
-Make the Y.Doc the sole authoritative source for collaborative nodes, edges, and shared metadata. Local edits are explicit document commands (FR-021): typed operations applied directly to the Y.Doc under the local origin — no store-diff flush. React Flow renders a one-way projection of the document; Zustand remains responsible for local UI, selection/interaction state, and connection status. Each client uses an origin-scoped Y.UndoManager for in-memory, per-user Undo/Redo. IndexedDB persists the local Y.Doc for offline work, while WebSocket synchronization exchanges Yjs updates via symmetric state-vector reconciliation after authentication and reconnection.
+Make the Y.Doc the sole authoritative source for collaborative nodes, edges, and the shared scene name. Local edits are explicit document commands (FR-021): typed operations applied directly to the Y.Doc under the local origin — no store-diff flush. React Flow renders a one-way projection of the document; Zustand remains responsible for local UI, selection/interaction state, and connection status. Each client uses an origin-scoped Y.UndoManager for in-memory, per-user Undo/Redo. IndexedDB persists the local Y.Doc for offline work, while WebSocket synchronization exchanges Yjs updates via symmetric state-vector reconciliation after authentication and reconnection.
 
 The existing collaboration stack already contains Yjs, Hocuspocus, y-indexeddb, awareness, room-token authorization, and an origin-scoped UndoManager. The main implementation work is removing the Y.Doc ↔ Zustand graph ownership loop (replacing `collabStoreSync.ts` with explicit commands + a projection adapter), applying field-level document mutations, preserving atomic gestures, and measuring the system against the 50-collaborator target and the SC-007 degradation threshold.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
 **Language/Version**: TypeScript strict mode, React 19, Next.js 16 app runtime, Node.js/tsx collaboration process
 
 **Primary Dependencies**: Yjs 13.6, Hocuspocus provider/server 4.7, y-indexeddb 9, React Flow 12.10, Zustand 4.5, TanStack Query, Drizzle/Postgres, Vitest, React Testing Library
 
-**Storage**: Current shared Y.Doc persisted server-side through the existing collaboration persistence path and locally through y-indexeddb; cursor/presence remain Awareness-only; no undo stack persistence
+**Storage**: Y.Doc root maps `nodes`, `connections` (the persisted edge collection), and `metadata` with shared `name`; server stores encoded Y.Doc plus projected `scenes.data` and mirrors `metadata.name` to `scenes.name`; y-indexeddb stores a per-scene local replica; awareness and undo stacks are never persisted
 
 **Testing**: Vitest, React Testing Library, in-memory multi-document convergence tests, fake IndexedDB/provider tests, authorization tests, browser performance harness, `pnpm run lint`, `pnpm exec tsc --noEmit`, `pnpm run test:ci`, and `pnpm run build`
 
@@ -32,9 +26,9 @@ The existing collaboration stack already contains Yjs, Hocuspocus, y-indexeddb, 
 
 **Project Type**: Next.js web application with a standalone Hocuspocus collaboration process
 
-**Performance Goals**: 50 collaborators per document; p95 document sync <200 ms; p95 cursor latency <150 ms; interaction latency (local edit → visible render) p95 <100 ms with ≥30 fps sustained during concurrent cursor traffic (the defined "unacceptable degradation" threshold, SC-007); cursor publication ~30–40 updates/sec/user; remote cursors must not cause full React Flow rerenders; offline editing remains responsive
+**Performance Goals**: Under one common benchmark profile (50 collaborators each publishing 30–40 cursor updates/sec, with one editor submitting one graph operation/sec): p95 document sync <200 ms, p95 cursor latency <150 ms, and interaction latency (local edit → visible render) p95 <100 ms with ≥30 fps sustained; cursor-only updates must not rerender the full React Flow graph. Offline editing remains responsive.
 
-**Constraints**: No `any` or `@ts-ignore`; Y.Doc is authoritative for graph state; local edits are explicit document commands — no store-diff flush back into the document (FR-021); no REST request per graph operation; effects/fetch in hooks/services; Tailwind-only UI; named exports; existing project authorization; generated database migrations only; undo history in memory; no cursor/presence persistence
+**Constraints**: No `any` or `@ts-ignore`; Y.Doc is authoritative for graph state and shared scene name; local edits are explicit document commands — no store-diff flush back into the document (FR-021); preserve the persisted `connections` key for React Flow edges; no REST request per graph operation; effects/fetch in hooks/services; Tailwind-only UI; named exports; existing project authorization; generated database migrations only; undo history in memory; no cursor/presence persistence; rejected joins use a generic access-unavailable message
 
 **Scale/Scope**: One project document per room, initial target 50 concurrent collaborators, existing Workbench node/edge types, temporary offline periods, no shared viewport, no long-term version history, no manual conflict-resolution UI
 
@@ -64,7 +58,10 @@ specs/011-realtime-collaborative-react-flow/
 ├── research.md          # Phase 0 output (/speckit.plan command)
 ├── data-model.md        # Phase 1 output (/speckit.plan command)
 ├── quickstart.md        # Phase 1 output (/speckit.plan command)
-├── contracts/           # Phase 1 output (/speckit.plan command)
+├── contracts/
+│   ├── collaboration-contract.md   # Y.Doc commands, history, reconnect, and performance invariants
+│   ├── room-token-api.md            # token issuance and secure room admission
+│   └── presence-awareness.md        # ephemeral payload, throttle, and stale cleanup
 └── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
 ```
 
@@ -72,14 +69,15 @@ specs/011-realtime-collaborative-react-flow/
 
 ```text
 server/collab/
-├── index.ts                         # Hocuspocus bootstrap and limits
+├── index.ts                         # Hocuspocus bootstrap and 50-peer room admission
+├── roomCapacity.ts                  # NEW: per-document authenticated connection reservations
 ├── auth.ts                          # token validation and room authorization
-└── persistence.ts                   # current Y.Doc persistence
+└── persistence.ts                   # Y.Doc persistence and scene-name mirroring
 
 src/types/collab.types.ts            # document, awareness, status, and contract types
 src/services/collab/
-├── sceneDocMapping.ts                # schema and Y.Map/Y.Array field mapping
-├── sceneDocCommands.ts               # NEW: explicit document commands (FR-021) — typed create/edit/move/delete operations on the Y.Doc
+├── sceneDocMapping.ts                # `nodes`, `connections` (edges), and `metadata.name` Y.Map/Y.Array schema/projection
+├── sceneDocCommands.ts               # NEW: explicit document commands (FR-021) — typed graph and scene-name operations on the Y.Doc
 ├── collabStoreSync.ts                # REMOVE: replaced by sceneDocCommands + projection adapter (no store-diff flush)
 ├── collabProviderFactory.ts          # Hocuspocus + y-indexeddb lifecycle
 ├── undoOrigin.ts                     # per-user Y.UndoManager adapter
@@ -89,7 +87,11 @@ src/services/collab/
 src/components/workbench/hooks/
 ├── useCollabSession.ts               # auth, lifecycle, status, doc subscription
 ├── useCollabPresencePublisher.ts     # local awareness publication
-└── useWorkbenchGraphProjection.ts   # NEW: Y.Doc → React Flow node/edge projection (one-way)
+└── useWorkbenchGraphProjection.ts   # NEW: Y.Doc → React Flow node/edge/name projection (one-way)
+
+src/components/workbench/
+├── WorkbenchSceneNameEditor.tsx      # NEW: accessible inline editor distinct from project-name control
+└── WorkbenchSceneNameEditor.test.tsx # behavior tests for shared scene-name editing
 
 src/store/slices/workbenchCollaborationSlice.ts  # UI status/awareness only
 src/store/slices/workbenchSlice.ts               # remove collaborative graph authority
@@ -103,7 +105,7 @@ specs/011-realtime-collaborative-react-flow/       # design and validation artif
 
 ### Phase 0: Establish document and history contracts
 
-- Define the Y.Doc schema for keyed nodes, keyed edges, and shared metadata.
+- Define the Y.Doc schema as keyed `nodes`, keyed `connections` (the existing persisted edge collection), and `metadata.name`; keep scene ID, project ownership, main-scene status, version, and audit fields server-managed.
 - Ensure nested node/edge fields are updated without replacing an entire entity for ordinary field edits.
 - Define transaction origins, gesture capture boundaries, same-field CRDT semantics (last-update-wins by Yjs update order — no extra metadata or clocks in the document), and local undo/redo behavior.
 - Add red tests for move-after-remote-move, undo/redo interleaving, field-level merge, no cursor persistence, and one-gesture capture.
@@ -112,10 +114,11 @@ specs/011-realtime-collaborative-react-flow/       # design and validation artif
 
 ### Phase 1: Make Y.Doc authoritative in the client
 
-- Replace the bidirectional graph bridge (`collabStoreSync.ts`) with explicit document commands (FR-021): every create/edit/move/delete is a typed operation applied directly to the Y.Doc under the local origin — no store-diff flush back into the document.
-- Add a one-way Y.Doc subscription/projection adapter (`useWorkbenchGraphProjection.ts`) that feeds React Flow nodes and edges from the current Y.Doc projection.
+- Replace the bidirectional graph bridge (`collabStoreSync.ts`) with explicit document commands (FR-021): every create/edit/move/delete and shared scene-name update is a typed operation applied directly to the Y.Doc under the local origin — no store-diff flush back into the document.
+- Add a one-way Y.Doc subscription/projection adapter (`useWorkbenchGraphProjection.ts`) that feeds React Flow nodes and edges from the current Y.Doc projection and exposes `metadata.name` to the workbench.
+- Add an accessible inline `WorkbenchSceneNameEditor` distinct from the existing project-name editor; its completed edits invoke the typed scene-name command and receive updates from the Y.Doc projection.
 - Keep Zustand only for tools, selection/interaction state, connection status, lock/presence/cursor projections, and other local UI state.
-- Preserve local drag ownership so external document updates do not interrupt an active gesture.
+- Preserve local drag ownership with transient local preview state; commit only the completed gesture's final values as one Y.Doc command/transaction, so pointer-motion events are neither replicated nor persisted.
 - Keep single-user behavior working through the same document adapter or an explicitly separate non-collaborative path with no duplicate authority.
 
 **Validation**: create/edit/move/delete nodes and edges in one client; projection and React Flow behavior remain correct without Zustand graph writes acting as the source of truth.
@@ -134,7 +137,7 @@ specs/011-realtime-collaborative-react-flow/       # design and validation artif
 - Define typed awareness payloads for user identity, color, cursor world position, and connection presence.
 - Throttle cursor publications to 30–40 updates/sec and isolate cursor rendering from graph state.
 - Add stale cursor/presence cleanup (immediate on clean disconnect; 30-second timeout for abnormal drops — FR-013) and correct viewport transformation.
-- Enforce token authentication and project/document authorization before room join and on reconnect.
+- Enforce token authentication and project/document authorization before room join and on reconnect; render one generic access-unavailable message with sign-in/retry guidance for rejected joins.
 - Expose Connected, Reconnecting, and Offline states without putting status into the shared document.
 
 **Validation**: authorized/unauthorized join matrix, reconnect token refresh, cursor pan/zoom tests, stale cleanup tests, and awareness-only persistence checks.
@@ -142,15 +145,16 @@ specs/011-realtime-collaborative-react-flow/       # design and validation artif
 ### Phase 4: Scale and convergence verification
 
 - Build a deterministic multi-client test harness for node/edge operations, same-field conflicts, offline edits, and per-user history.
-- Add browser performance scenarios for 50 collaborators, 30–40 cursor updates/sec/user, document p95 sync, cursor p95 latency, interaction latency (local edit → visible render) p95, sustained frame rate, and React Flow render churn.
-- Apply the measurable “unacceptable degradation” threshold defined in SC-007: interaction latency p95 <100 ms and ≥30 fps sustained during concurrent cursor traffic.
+- Add a repeatable browser profile with 50 collaborators each publishing 30–40 cursor updates/sec and one editor submitting one graph operation/sec; measure document p95 sync, cursor p95 latency, interaction latency (local edit → visible render) p95, sustained frame rate, and React Flow render churn under this same workload.
+- Apply the measurable “unacceptable degradation” threshold defined in SC-007: interaction latency p95 <100 ms and ≥30 fps sustained during this concurrent cursor and graph-edit workload.
 - Optimize only measured bottlenecks; do not move authoritative graph state back into Zustand.
 
 **Validation**: all target metrics and convergence criteria pass under the documented workload.
 
 ### Phase 5: Persistence rollout and convergence
 
-- Verify existing documents are adopted without data loss and current durable scene state remains available.
+- Verify existing documents are adopted without data loss and current durable scene state remains available; for legacy Y.Docs without `metadata.name`, hydrate the name from the existing `scenes.name` row without replacing document graph state.
+- Persist `metadata.name` to `scenes.name` together with the encoded Y.Doc and projected `scenes.data`; ownership, main-scene status, version, and audit fields remain server-managed.
 - Confirm server persistence stores current document state, not awareness or undo history.
 - Run full lint, typecheck, test/coverage, build, authorization, offline, and browser checks.
 - Document rollback behavior if the collaboration provider or local persistence cannot initialize.
@@ -169,12 +173,12 @@ specs/011-realtime-collaborative-react-flow/       # design and validation artif
 
 ## Testing Strategy
 
-- Document mapping: schema, nested field updates, deterministic ordering, malformed data, dangling edge pruning.
+- Document mapping: backward-compatible `nodes`/`connections` schema plus `metadata.name`, nested field updates, deterministic ordering, malformed data, dangling-edge pruning, and legacy Y.Doc name hydration.
 - History: per-origin undo/redo, gesture grouping, undo-after-remote-edit, redo-after-conflict, offline history, and no history persistence.
 - Sync: multi-client convergence, same-field last-update-wins determinism, reconnect symmetric state-vector merge (both sides' updates applied), local/remote interleavings, no REST-per-operation.
-- Client projection: Y.Doc changes update React Flow; UI state changes do not mutate shared graph unless an explicit document command is issued.
+- Client projection: Y.Doc changes update React Flow and the scene-name editor; scene-name editor behavior is tested before implementation; UI state changes do not mutate shared graph unless an explicit document command is issued.
 - Awareness: throttling, coordinate transforms, stale cleanup, 50-user fan-out, and render isolation.
-- Security: token authentication, project membership, expired token, reconnect authorization, and denied-room non-disclosure.
+- Security: token authentication, project membership, expired token, reconnect authorization, denied-room non-disclosure, and a UI test that collapses join failures to the generic access-unavailable message with sign-in/retry guidance.
 - Gates: `pnpm run lint`, `pnpm exec tsc --noEmit`, `pnpm run test:ci`, `pnpm run build`, plus documented browser performance runs.
 
 ## Complexity Tracking

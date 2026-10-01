@@ -16,6 +16,8 @@
 - Q: On reconnect after offline edits (including refresh + IndexedDB restore), which document takes precedence when merging? → A: Symmetric Yjs merge — exchange state vectors and apply both sides' missing updates; neither the local replica nor the server document is discarded.
 - Q: Should the p95 document-sync and cursor-latency targets be measured under the same 50-collaborator cursor-traffic workload defined for the interaction-latency and frame-rate target? → A: Measure all targets with 50 collaborators generating cursor traffic.
 - Q: When a collaboration join is rejected because authentication or document access fails, what should the editor tell the user? → A: Show a generic access-unavailable message with a safe sign-in/retry action; do not disclose document existence or permission details.
+- Q: Which shared document metadata should the first release synchronize alongside nodes and edges? → A: The scene name only; ownership, main-scene status, version, and audit timestamps remain server-managed.
+- Q: During the 50-collaborator performance test, how much graph-edit traffic should accompany each client’s 30–40 cursor updates per second? → A: One controlled editor sends one graph operation per second while all 50 clients publish cursors.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -33,6 +35,7 @@ As a designer, I can edit the same React Flow document with other authorized col
 2. **Given** users concurrently edit different graph entities, **when** their changes complete, **then** both changes are present in the converged document.
 3. **Given** users concurrently edit the same entity, **when** synchronization completes, **then** all sessions converge deterministically without manual conflict resolution.
 4. **Given** the document is open, **when** graph edits occur, **then** they do not require one REST request per operation.
+5. **Given** collaborators are connected to the same scene, **when** one collaborator changes the scene name, **then** the updated name is shared and persisted for all collaborators.
 
 ### User Story 2 - Undo and redo my own collaborative work (Priority: P1)
 
@@ -109,7 +112,7 @@ As a project member, I can join shared documents I am authorized to access, whil
 ### Functional Requirements
 
 - **FR-001**: The collaborative document MUST support creating, editing, moving, and deleting nodes and edges for multiple authorized users.
-- **FR-002**: The shared document MUST be the authoritative source of truth for collaborative nodes, edges, and shared document metadata.
+- **FR-002**: The shared document MUST be the authoritative source of truth for collaborative nodes, edges, and the shared scene name. Ownership, main-scene status, version, and audit timestamps remain server-managed.
 - **FR-003**: The editor MUST render the current shared document state without requiring a REST request for every graph operation.
 - **FR-004**: Concurrent document updates MUST merge deterministically and all connected sessions MUST converge to the same graph state.
 - **FR-005**: Each user MUST have an independent Undo/Redo history over their own completed document operations.
@@ -132,7 +135,7 @@ As a project member, I can join shared documents I am authorized to access, whil
 
 ### Key Entities *(include if feature involves data)*
 
-- **Shared document**: The collaborative graph containing nodes, edges, and shared metadata.
+- **Shared document**: The collaborative graph containing nodes, edges, and the shared scene name; ownership and lifecycle metadata remain server-managed.
 - **Document update**: A merged operation applied to the shared document and propagated to authorized peers.
 - **User history**: The current user’s in-memory undo/redo stack over their own document operations.
 - **Awareness state**: Ephemeral user identity, presence, cursor, color, and connection information.
@@ -145,11 +148,11 @@ As a project member, I can join shared documents I am authorized to access, whil
 
 - **SC-001**: Two or more authorized users can concurrently edit a document and 100% of convergence tests end with identical node and edge state in every session.
 - **SC-002**: In 100% of mixed local/remote history tests, a user’s Undo/Redo changes only that user’s operations and preserves other users’ completed edits.
-- **SC-003**: p95 document synchronization latency is below 200 ms with 50 collaborators generating cursor traffic.
-- **SC-004**: p95 cursor latency is below 150 ms with 50 collaborators generating cursor traffic.
+- **SC-003**: p95 document synchronization latency is below 200 ms while one editor submits one graph operation per second and all 50 collaborators publish 30–40 cursor updates per second.
+- **SC-004**: p95 cursor latency is below 150 ms under the same workload: one graph operation per second from one editor and 30–40 cursor updates per second from each of 50 collaborators.
 - **SC-005**: Cursor traffic is limited to approximately 30–40 updates per second per active user, and remote cursor updates do not cause full graph rerenders.
 - **SC-006**: In 100% of supported offline/reconnection tests, confirmed local edits survive and converge after reconnection with zero lost edits.
-- **SC-007**: The system supports 50 concurrent collaborators on one document with interaction latency (local edit → visible render) p95 <100 ms and ≥30 fps sustained during concurrent cursor traffic — the defined "unacceptable degradation" threshold.
+- **SC-007**: The system supports 50 concurrent collaborators on one document with interaction latency (local edit → visible render) p95 <100 ms and ≥30 fps sustained while one editor submits one graph operation per second and all 50 collaborators publish 30–40 cursor updates per second — the defined "unacceptable degradation" threshold.
 - **SC-008**: In 100% of authorization tests, users without valid authentication and document access receive no document, cursor, or presence data.
 - **SC-009**: No cursor or presence record is present in persisted document state or document history after any test run.
 

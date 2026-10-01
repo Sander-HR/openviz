@@ -77,6 +77,46 @@
 - User-id tie-break for same-field conflicts: rejected — timing-based LWW is simpler, native to Yjs, and deterministic once updates are exchanged.
 - Server-wins or local-wins reconnect merge: rejected — both discard one side's confirmed edits, violating SC-006 zero-loss.
 
-## Documentation lookup note
+## Decision 8: Preserve persisted collection names and share only the scene name
 
-Context7 lookup for Yjs, Hocuspocus, and y-indexeddb was attempted but the environment could not resolve the Context7 host. This plan therefore relies on the installed package versions, existing repository implementation, and existing tests; API changes must be verified against installed package typings before implementation.
+**Decision**: Keep Y.Doc root maps named `nodes` and `connections`; treat `connections` entries as React Flow edges. Add `metadata.name` as the one shared scene-level field. Mirror it to the existing `scenes.name` column and hydrate legacy Y.Docs that lack it from that row.
+
+**Rationale**: `sceneDocMapping.ts`, `SceneDataJson`, and server persistence already use `connections`, while the database already has a scene name. Keeping those shapes avoids renaming persisted data or adding a migration. Server ownership, main-scene status, version, and audit timestamps are not collaborative fields.
+
+**Alternatives considered**:
+
+- Rename the Y.Doc map to `edges`: rejected because it diverges from the persisted `connections` shape and adds conversion/migration risk.
+- Synchronize all scene-row metadata: rejected because authorization and lifecycle fields are server-managed, not collaborative user content.
+- Omit scene name: rejected by clarified FR-002 scope.
+
+## Decision 9: Enforce the 50-peer room cap in the application server
+
+**Decision**: Maintain an authenticated per-document reservation keyed by Hocuspocus `socketId` and `documentName`; reserve only after token and membership verification, reject a new admission once 50 peers are reserved, and release on `onDisconnect`. Add tests for cap, release, reconnect, and failed-admission cleanup. Use an explicit Hocuspocus server context type `{ userId: string }` rather than its default `any`.
+
+**Rationale**: Hocuspocus documents pre-authentication buffer limits, but its server configuration does not provide a per-document collaborator cap. Its authentication and disconnect payloads expose the document name, socket ID, and authenticated context, allowing the existing standalone process to enforce the product limit before synchronization. Admission remains fail-closed. An in-memory reservation is valid for the current single-process deployment; horizontal replicas would require shared coordination.
+
+**Alternatives considered**:
+
+- Treat 50 only as a benchmark target: rejected because FR-018 and T001 require bounded room admission.
+- Add an external coordination service: deferred; horizontal collaboration-server scaling is outside this feature's stated scope.
+
+## Decision 10: Use one repeatable 50-client performance profile
+
+**Decision**: Benchmark 50 peers publishing 30–40 cursor updates/sec each, while one editor submits one graph operation/sec. Measure document sync p95, cursor p95, local edit-to-visible-render p95, and sustained frame rate under that same profile.
+
+**Rationale**: The clarified SC-003/004/007 workload makes these measurements comparable and exercises cursor fan-out without inventing an unrequested 50-writes/sec product target.
+
+**Alternatives considered**:
+
+- Cursor-only benchmark: rejected because it cannot validate document-sync and local-edit latency.
+- One graph operation/sec from every peer: rejected as a substantially heavier workload than the clarified target.
+
+## Documentation and repository evidence
+
+- The current code uses Y.Doc maps `nodes` and `connections`, JSON node `x`/`y`, and persists the encoded document plus projected JSON in `server/collab/persistence.ts` and `src/services/collab/sceneDocMapping.ts`.
+- Yjs documents state-vector reconciliation as exchanging each side's state vector and applying each side's missing update; see [Document Updates](https://docs.yjs.dev/api/document-updates).
+- Yjs UndoManager supports tracked transaction origins and explicit capture boundaries; see [Y.UndoManager](https://docs.yjs.dev/api/undo-manager).
+- y-indexeddb emits `synced` after local content has loaded, including when the store is empty; see [y-indexeddb API](https://docs.yjs.dev/ecosystem/database-provider/y-indexeddb).
+- Hocuspocus supports rejecting access in `onAuthenticate` and provides a disconnect lifecycle hook; explicit generic context types avoid its default `any`; see [Server Hooks](https://tiptap.dev/docs/hocuspocus/server/hooks) and [Server Configuration](https://tiptap.dev/docs/hocuspocus/server/configuration).
+- Hocuspocus server configuration lists unauthenticated buffer limits but no per-document client cap; see [Server Configuration](https://tiptap.dev/docs/hocuspocus/server/configuration).
+- Installed versions are Yjs 13.6.32, Hocuspocus 4.7.0, y-indexeddb 9.0.12, and React Flow 12.10.0 in `package.json`. Verify any version-sensitive API against installed package typings during implementation.

@@ -27,8 +27,8 @@ pnpm exec vitest src/store/slices/workbenchCollaborationSlice.test.ts
 ## Convergence and history
 
 1. Open the same project in sessions A and B.
-2. Create, move, resize, edit, connect, and delete nodes/edges in both sessions.
-3. Confirm both sessions converge to identical keyed nodes and edges.
+2. Create, move, resize, edit, connect, and delete nodes/edges in both sessions; rename the shared scene from one session.
+3. Confirm both sessions converge to identical keyed nodes/connections and show the same scene name.
 4. In A, move a node; in B, move the same node afterward; undo in A.
 5. Confirm B’s newer move remains and both sessions converge.
 6. Redo in A and verify the defined current-document behavior without undoing an unrelated B operation.
@@ -46,17 +46,24 @@ pnpm exec vitest src/store/slices/workbenchCollaborationSlice.test.ts
 
 1. Move the pointer and pan/zoom in A; verify B sees the correct world-space cursor.
 2. Disconnect A cleanly; verify its presence and cursor are removed immediately. Simulate an abnormal drop (no clean close) and verify removal after the 30-second timeout.
-3. Attempt a join with the unauthorized account; verify no document or awareness data is received.
+3. Attempt a join with the unauthorized account; verify no document or awareness data is received and the editor shows the same generic access-unavailable message as other rejected joins.
 4. Reconnect an authorized session with a fresh token and verify state plus awareness recovery.
 
 ## Performance
 
-Run the documented 50-user workload and record:
+Run the same workload for all latency and frame-rate targets: 50 collaborators each publish 30–40 cursor updates/sec, while one editor submits one graph operation/sec. Run for at least 60 seconds after warm-up and record the tested browser, hardware, and network profile.
 
-- document update p95 latency (target <200 ms);
-- cursor p95 latency (target <150 ms);
-- interaction latency (local edit → visible render) p95 (target <100 ms, SC-007);
-- sustained frame rate during concurrent cursor traffic (target ≥30 fps, SC-007);
-- cursor updates/sec/user;
-- React Flow renders caused by cursor-only updates;
-- editor frame time and long tasks while editing offline and online.
+```bash
+node scripts/perf/collab-bench.mjs --clients 50 --cursor-hz 33 --edit-hz 1 --duration-seconds 60
+```
+
+Measure document synchronization from a local document transaction to its remote document observer, cursor latency from local awareness publication to the remote cursor overlay update, and interaction latency from a local command to its first visible React Flow projection. Use one benchmark clock (or calibrated clocks when peers run on separate hosts).
+
+Record and compare:
+
+- document synchronization p95 (<200 ms, SC-003);
+- cursor p95 latency (<150 ms, SC-004);
+- interaction latency (local edit → visible render) p95 (<100 ms, SC-007);
+- sustained frame rate (≥30 fps, SC-007);
+- actual cursor updates/sec/user and React Flow renders caused by cursor-only updates;
+- editor frame time and long tasks while editing online and offline.

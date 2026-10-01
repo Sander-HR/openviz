@@ -2,7 +2,7 @@
 
 ## Document ownership
 
-Y.Doc is the authoritative source for collaborative nodes, edges, and shared metadata. React Flow renders a projection of Y.Doc. Zustand is not an authoritative graph store.
+Y.Doc is the authoritative source for collaborative nodes, edges, and the shared scene name. Root collections are `nodes`, `connections` (edge records, preserving the persisted JSON key), and `metadata.name`. React Flow renders a projection of Y.Doc. Zustand is not an authoritative graph store. Scene ID, project ownership, main-scene status, version, and audit timestamps remain server-managed.
 
 ## Local operation contract
 
@@ -13,9 +13,9 @@ Every local graph command must:
 3. update React Flow through the document observer/projection;
 4. become one local UndoManager stack item when it is a completed gesture.
 
-Same-field concurrent edits resolve last-update-wins by Yjs update order; no conflict metadata is stored in the document.
+A scene-name change is a typed document command that updates `metadata.name`; server persistence mirrors the converged value to `scenes.name`. Same-field concurrent edits resolve last-update-wins by Yjs update order; no conflict metadata is stored in the document.
 
-Intermediate pointer positions may update the local Y.Doc during an active gesture only if the transaction capture policy groups them into one history item; historical pointer events must never be queued for reconnect replay.
+Intermediate pointer positions remain local transient UI state during an active gesture. On completion, one command commits the final graph values in one origin-tagged Y.Doc transaction and one undo item; pointer-motion events are never written to the document or queued for reconnect replay.
 
 ## Undo/Redo contract
 
@@ -27,8 +27,8 @@ Awareness carries ephemeral user identity, color, connection status, and cursor 
 
 ## Connection contract
 
-Connection states are Connected, Reconnecting, and Offline. Reconnection authenticates and authorizes before room admission, exchanges missing Yjs updates via symmetric state-vector reconciliation (both sides' missing updates applied; neither replica discarded — FR-011), merges local and remote state, and republishes current awareness. Unauthorized sessions receive no document or awareness data.
+Connection states are Connected, Reconnecting, and Offline. Reconnection authenticates and authorizes before room admission, exchanges missing Yjs updates via symmetric state-vector reconciliation (both sides' missing updates applied; neither replica discarded — FR-011), merges local and remote state, and republishes current awareness. Unauthorized sessions receive no document or awareness data; the UI reports a generic access-unavailable message with safe sign-in/retry guidance and does not disclose document existence or the specific permission failure.
 
 ## Performance contract
 
-Acceptance workload: 50 collaborators per document, 30–40 cursor updates/sec/user, p95 document synchronization below 200 ms, p95 cursor latency below 150 ms, interaction latency (local edit → visible render) p95 below 100 ms with ≥30 fps sustained during concurrent cursor traffic (the SC-007 "unacceptable degradation" threshold), and no full React Flow rerender for a cursor-only update.
+Acceptance workload: one editor submits one graph operation/sec while 50 collaborators each publish 30–40 cursor updates/sec. Under that same workload, p95 document synchronization is below 200 ms, p95 cursor latency below 150 ms, and interaction latency (local edit → visible render) p95 is below 100 ms with ≥30 fps sustained (the SC-007 "unacceptable degradation" threshold). Cursor-only updates do not cause a full React Flow graph rerender.
