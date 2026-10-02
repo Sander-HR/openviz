@@ -125,7 +125,7 @@ export const AIComputeSettings: React.FC = () => {
                 </div>
                 <div className="mt-3 min-h-5 text-xs" role="status" aria-live="polite">
                     {status === 'connected' && <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 size={14} /> Connected</span>}
-                    {status === 'unavailable' && <span className="flex items-center gap-1.5 text-rose-400"><XCircle size={14} /> Connection unavailable</span>}
+                    {status === 'unavailable' && <span className="flex items-center gap-1.5 text-rose-400"><XCircle size={14} /> Connection unavailable. Retrying every 10 seconds.</span>}
                 </div>
             </section>
 

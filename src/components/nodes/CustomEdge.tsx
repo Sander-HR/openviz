@@ -40,6 +40,7 @@ export const CustomEdge = ({
     selected,
     style = {},
     markerEnd,
+    data,
 }: EdgeProps) => {
     if (![sourceX, sourceY, targetX, targetY].every((value) => Number.isFinite(value))) {
         return null;
@@ -62,7 +63,9 @@ export const CustomEdge = ({
         return null;
     }
 
-    const removeConnection = useStore((state) => state.removeConnection);
+    const removeConnectionFromStore = useStore((state) => state.removeConnection);
+    const edgeData = data as { onDeleteConnection?: (connectionId: string) => void } | undefined;
+    const removeConnection = edgeData?.onDeleteConnection ?? removeConnectionFromStore;
     const activeNodeId = useStore((state) => state.activeNodeId);
 
     // FR-007: hover reveals the delete control and highlights the edge.

@@ -177,6 +177,23 @@ describe('useCollabPresencePublisher', () => {
         expect(provider.fields['cursor']).toBeNull();
     });
 
+    it('caps sustained cursor traffic to 30–40 updates per second', () => {
+        const provider = new FakePresenceProvider();
+        renderHook(() => useCollabPresencePublisher(optionsFor(provider, container)));
+
+        act(() => {
+            for (let frame = 0; frame < 60; frame += 1) {
+                pointerMove(container, frame, frame);
+                flushFrame();
+                vi.advanceTimersByTime(16);
+            }
+        });
+
+        const cursorCalls = provider.calls.filter((call) => call.key === 'cursor');
+        expect(cursorCalls.length).toBeGreaterThanOrEqual(30);
+        expect(cursorCalls.length).toBeLessThanOrEqual(40);
+    });
+
     it('releases the local selection of a node another client locks (lost conflict)', () => {
         const provider = new FakePresenceProvider();
         renderHook(() => useCollabPresencePublisher(optionsFor(provider, container)));

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { createLocalComfyTarget } from '@/services/ai/targets/localComfyTarget';
+import {
+    comfyConnectionManager,
+    type ComfyEndpointState,
+} from '@/services/ai/comfyConnectionManager';
 import { createOpenAIImageTarget } from '@/services/ai/targets/openAIImageTarget';
 import { imageApiQueue } from '@/services/renderService';
 import {
-    fetchComfyQueueInfo,
     resolveComputeEndpoint,
     type ComfyQueueInfo,
 } from '@/services/ai/computeStatusService';
@@ -43,7 +45,18 @@ export interface AIComputeStatus {
     isRefreshing: boolean;
 }
 
-const REFRESH_INTERVAL_MS = 30_000;
+/** Project a shared manager snapshot onto the popup view model. */
+function applyComfyState(prev: AIComputeStatus, state: ComfyEndpointState): AIComputeStatus {
+    if (prev.protocol !== 'comfyui') return prev;
+    return {
+        ...prev,
+        status: state.status === 'ready' ? 'ready' : 'unavailable',
+        message: state.status === 'ready' ? undefined : state.message,
+        devices: state.capabilities?.devices ?? [],
+        comfyQueue: state.queue,
+        lastCheckedAt: state.lastCheckedAt ?? prev.lastCheckedAt,
+    };
+}
 
 function initialStatus(protocol: ExecutionTargetProtocol, displayEndpoint: string): AIComputeStatus {
     return {
@@ -133,25 +146,23 @@ export function useAIComputeStatus(open: boolean) {
                     lastCheckedAt: Date.now(),
                 }));
             } else {
-                const target = createLocalComfyTarget({ id: 'local-comfy', endpoint: resolved.endpoint });
-                const [health, comfyQueue] = await Promise.all([
-                    target.health(),
-                    fetchComfyQueueInfo(resolved.endpoint),
-                ]);
+                // Shared manager: one probe, and /object_info + /queue only
+                // fire after a successful reachability check.
+                const state = await comfyConnectionManager.check(resolved.endpoint);
                 if (seq !== sequenceRef.current) return;
                 setStatus((prev) => ({
                     ...prev,
                     protocol: 'comfyui',
                     endpoint: resolved.endpoint,
                     displayEndpoint: resolved.displayEndpoint,
-                    status: health.status === 'ready' ? 'ready' : health.status,
-                    message: health.status === 'ready' ? undefined : health.message,
+                    status: state.status === 'ready' ? 'ready' : 'unavailable',
+                    message: state.status === 'ready' ? undefined : state.message,
                     selectedModel: '',
                     models: [],
-                    devices: health.capabilities?.devices ?? [],
-                    comfyQueue,
+                    devices: state.capabilities?.devices ?? [],
+                    comfyQueue: state.queue,
                     endpointProbe: null,
-                    lastCheckedAt: Date.now(),
+                    lastCheckedAt: state.lastCheckedAt ?? Date.now(),
                 }));
             }
         } catch {
@@ -178,13 +189,29 @@ export function useAIComputeStatus(open: boolean) {
         void runCheck();
     }, [resolved.protocol, resolved.endpoint, resolved.displayEndpoint, computeSettings.imageApiKey, computeSettings.imageApiKeyless, runCheck]);
 
-    // Refresh on open and on a conservative interval while the popup is open.
+    // Refresh on open; while the popup is open the shared manager's poll
+    // timer keeps the ComfyUI endpoint fresh (no per-popup interval needed).
     useEffect(() => {
         if (!open) return;
         void runCheck();
-        const timer = setInterval(() => void runCheck(), REFRESH_INTERVAL_MS);
-        return () => clearInterval(timer);
     }, [open, runCheck]);
+
+    // Watch the ComfyUI endpoint while the popup is open so the shared poll
+    // timer refreshes it, and listen for background probe results.
+    useEffect(() => {
+        if (resolved.protocol !== 'comfyui' || !resolved.endpoint) return;
+        const unsubscribe = comfyConnectionManager.subscribe((state) => {
+            if (state.endpoint !== resolved.endpoint) return;
+            setStatus((prev) => applyComfyState(prev, state));
+        });
+        if (open) {
+            comfyConnectionManager.watch(resolved.endpoint);
+        }
+        return () => {
+            unsubscribe();
+            if (open) comfyConnectionManager.unwatch(resolved.endpoint);
+        };
+    }, [open, resolved.protocol, resolved.endpoint]);
 
     // Track the client-side image API queue for the active endpoint.
     useEffect(() => {

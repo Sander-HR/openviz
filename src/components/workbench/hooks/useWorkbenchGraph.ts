@@ -6,6 +6,7 @@ import { getGenerationRetry } from "@/services/workbench/generationRetryRegistry
 type WorkbenchGraphOptions = {
     workbenchNodes: WorkbenchNode[];
     connections: Connection[];
+    removeConnection?: (id: string) => void;
     /** Remote soft locks (nodeId → holder). Locked nodes are inert for this session. */
     nodeLocks: Record<string, NodeLockState>;
     isTransitioningToStudio?: boolean;
@@ -91,6 +92,7 @@ function getNodeSize(node: WorkbenchNode) {
 export function useWorkbenchGraph({
     workbenchNodes,
     connections,
+    removeConnection,
     nodeLocks,
     isTransitioningToStudio = false,
     handleSourceClick,
@@ -193,12 +195,13 @@ export function useWorkbenchGraph({
                 sourceHandle: conn.sourceHandle ?? (sourceNode?.type === 'image' ? 'image-source' : null),
                 targetHandle: conn.targetHandle ?? null,
                 type: "customEdge",
+                data: removeConnection ? { onDeleteConnection: removeConnection } : {},
                 style: { stroke: "#2F8CFF", strokeWidth: 2 },
                 animated: false,
             }];
         });
         return regularEdges;
-    }, [connections, workbenchNodes]);
+    }, [connections, removeConnection, workbenchNodes]);
 
     return { nodes, edges };
 }

@@ -6,6 +6,8 @@ import { storeState, clearDocument } from 'y-indexeddb';
 import type { SceneDataJson, SceneJsonValue } from '@/types/collab.types';
 import { createSceneDoc, extractSceneFromDoc, getNodesMap, jsonToYValue, seedSceneFromJson } from './sceneDocMapping';
 import { bindSceneOfflineStore, sceneOfflineStoreName } from './collabProviderFactory';
+import { createCollabUndoManager } from './undoOrigin';
+import { createSceneDocCommands } from './sceneDocCommands';
 
 const SCENE_ID = '11111111-2222-4333-8444-555555555555';
 const OTHER_SCENE_ID = '99999999-8888-4777-8666-555555555555';
@@ -43,6 +45,27 @@ describe('per-scene offline store (US3 / SC-004)', () => {
         await second.close();
     });
 
+    it('persists document content but never persists the session-local undo stack', async () => {
+        const first = await openScene(SCENE_ID);
+        seedSceneFromJson(first.doc, sceneWithNode('n1', 'base'));
+        const undo = createCollabUndoManager(first.doc, 'user:a:1');
+        const node = getNodesMap(first.doc).get('n1') as Y.Map<unknown>;
+        first.doc.transact(() => (node.get('data') as Y.Map<unknown>).set('text', 'edited'), 'user:a:1');
+        expect(undo.canUndo()).toBe(true);
+        undo.undo();
+        await storeState(first.persistence, true);
+        undo.destroy();
+        await first.close();
+
+        const second = await openScene(SCENE_ID);
+        expect(extractSceneFromDoc(second.doc).nodes[0].data).toMatchObject({ text: 'base' });
+        expect(Object.keys(second.doc.toJSON())).not.toContain('undo');
+        const reopenedUndo = createCollabUndoManager(second.doc, 'user:a:1');
+        expect(reopenedUndo.canUndo()).toBe(false);
+        reopenedUndo.destroy();
+        await second.close();
+    });
+
     it('merges two offline sides after reconnect with zero lost edits', async () => {
         // Base state committed to the shared store.
         const base = await openScene(SCENE_ID);
@@ -77,6 +100,21 @@ describe('per-scene offline store (US3 / SC-004)', () => {
         }
         await peerA.close();
         await peerB.close();
+    });
+
+    it('persists only the completed offline move and never pointer history or awareness fields', async () => {
+        const session = await openScene(SCENE_ID);
+        seedSceneFromJson(session.doc, sceneWithNode('n1', 'move'));
+        const commands = createSceneDocCommands(session.doc, 'user:offline:1');
+        commands.moveNodes([{ id: 'n1', x: 120, y: 80 }]);
+        await storeState(session.persistence, true);
+        await session.close();
+
+        const restored = await openScene(SCENE_ID);
+        const saved = extractSceneFromDoc(restored.doc);
+        expect(saved.nodes[0]).toMatchObject({ x: 120, y: 80 });
+        expect(JSON.stringify(restored.doc.toJSON())).not.toMatch(/cursor|pointer|awareness/i);
+        await restored.close();
     });
 
     it('keeps offline stores isolated per scene', async () => {

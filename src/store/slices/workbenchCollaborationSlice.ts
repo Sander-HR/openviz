@@ -2,6 +2,7 @@ import { StateCreator } from "zustand";
 import { AppState } from "../storeTypes";
 import { NodeLockState, PresenceState } from "@/types";
 import type { CollabPresencePeer, CollabRemoteAwarenessEntry, CollabRemoteCursorState } from "@/types/collab.types";
+import type { SceneDocCommands } from '@/services/collab/sceneDocCommands';
 
 const PRESENCE_COLORS = ['#f97316', '#0ea5e9', '#22c55e', '#a855f7', '#ef4444', '#eab308'];
 
@@ -52,6 +53,7 @@ export interface WorkbenchCollaborationSlice {
     sceneHydrated: boolean;
     /** True while a real-time collaboration session owns this scene's writes (single-writer rule). */
     collabSessionActive: boolean;
+    collabDocumentCommands: SceneDocCommands | null;
     nodeLocks: Record<string, NodeLockState>;
     /** Remote peers keyed by user id (derived from awareness; one entry per user). */
     presenceByUser: Record<string, CollabPresencePeer>;
@@ -67,6 +69,7 @@ export interface WorkbenchCollaborationSlice {
     setCurrentSceneVersion: (version: number) => void;
     setSceneHydrated: (hydrated: boolean) => void;
     setCollabSessionActive: (active: boolean) => void;
+    setCollabDocumentCommands: (commands: SceneDocCommands | null) => void;
     setNodeLockState: (lock: NodeLockState) => void;
     clearNodeLockState: (nodeId: string) => void;
     upsertPresenceState: (presence: PresenceState) => void;
@@ -78,12 +81,14 @@ export const createWorkbenchCollaborationSlice: StateCreator<AppState, [], [], W
     currentSceneVersion: 0,
     sceneHydrated: false,
     collabSessionActive: false,
+    collabDocumentCommands: null,
     nodeLocks: {},
     presenceByUser: {},
     remoteCursors: {},
     setCurrentSceneVersion: (version) => set({ currentSceneVersion: version }),
     setSceneHydrated: (hydrated) => set({ sceneHydrated: hydrated }),
     setCollabSessionActive: (active) => set({ collabSessionActive: active }),
+    setCollabDocumentCommands: (commands) => set({ collabDocumentCommands: commands }),
     setNodeLockState: (lock) =>
         set((state: AppState) => ({
             nodeLocks: {
@@ -177,6 +182,7 @@ export const createWorkbenchCollaborationSlice: StateCreator<AppState, [], [], W
     clearCollaborationState: () =>
         set({
             collabSessionActive: false,
+            collabDocumentCommands: null,
             nodeLocks: {},
             presenceByUser: {},
             remoteCursors: {},

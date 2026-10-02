@@ -1,4 +1,6 @@
 import { useSession } from 'next-auth/react';
+import { useParams } from 'next/navigation';
+import { useCallback } from 'react';
 
 import { useStore } from '@/store/useStore';
 import { resolveCollabServerUrl } from '@/services/collab/collabUrl';
@@ -10,6 +12,8 @@ const COLLAB_SERVER_URL = resolveCollabServerUrl(process.env.NEXT_PUBLIC_COLLAB_
 export interface WorkbenchCollabSession extends UseCollabSessionResult {
     /** True once the shared document is synced and owns scene writes. */
     active: boolean;
+    sceneName: string | undefined;
+    renameScene(name: string): void;
 }
 
 /**
@@ -19,15 +23,20 @@ export interface WorkbenchCollabSession extends UseCollabSessionResult {
  */
 export function useWorkbenchCollabSession(): WorkbenchCollabSession {
     const currentProjectId = useStore((state) => state.currentProjectId);
+    const routeParams = useParams<{ id: string }>();
+    const projectId = currentProjectId ?? routeParams?.id ?? null;
     const collabSessionActive = useStore((state) => state.collabSessionActive);
     const { data: session } = useSession();
 
     const result = useCollabSession({
-        projectId: currentProjectId,
+        projectId,
         userId: session?.user?.id ?? '',
         userName: session?.user?.name ?? session?.user?.email ?? 'Guest',
         serverUrl: COLLAB_SERVER_URL,
     });
+    const renameScene = useCallback((name: string) => {
+        result.commands?.setSceneName(name);
+    }, [result.commands]);
 
-    return { ...result, active: collabSessionActive };
+    return { ...result, active: collabSessionActive, renameScene };
 }

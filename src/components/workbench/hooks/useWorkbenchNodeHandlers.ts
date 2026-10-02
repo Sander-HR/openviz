@@ -3,10 +3,11 @@ import { Node, OnNodesChange } from '@xyflow/react';
 
 import { WorkbenchNode } from '@/types';
 
-import { normalizeArrowGeometry } from '@/services/workbench/arrowGeometry';
 import { requestImmediateSceneSave } from '@/services/workbench/sceneSyncBus';
 import { BasicBlocksMenuState } from './useWorkbenchBlockCreation';
 import { useStore } from '@/store/useStore';
+import type { SceneDocCommands } from '@/services/collab/sceneDocCommands';
+import { buildNodeFieldDiff, buildNodeFieldPatches, getNodeResizeUpdates } from './workbenchNodeCommandLogic';
 
 type ContextMenuState = { x: number; y: number; nodeId: string | null } | null;
 
@@ -21,6 +22,7 @@ type UseWorkbenchNodeHandlersOptions = {
     openNodeInStudio: (id: string) => void;
     setActiveNodeId: (id: string | null) => void;
     setBasicBlocksMenu: (value: BasicBlocksMenuState) => void;
+    commands?: SceneDocCommands | null;
 };
 
 /**
@@ -41,6 +43,7 @@ export function useWorkbenchNodeHandlers({
     openNodeInStudio,
     setActiveNodeId,
     setBasicBlocksMenu,
+    commands,
 }: UseWorkbenchNodeHandlersOptions) {
     const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
     const resizingNodeIdsRef = useRef<Set<string>>(new Set());
@@ -111,10 +114,11 @@ export function useWorkbenchNodeHandlers({
             // Dimension changes are handled by onResizeEnd in nodes - not here
             // This prevents flooding Zustand during drag operations
             else if (change.type === 'remove') {
-                removeWorkbenchNode(change.id);
+                if (commands?.deleteNode(change.id)) removeWorkbenchNode(change.id);
+                else if (!commands) removeWorkbenchNode(change.id);
             }
         });
-    }, [removeWorkbenchNode, updateWorkbenchNodeTransient]);
+    }, [commands, removeWorkbenchNode, updateWorkbenchNodeTransient]);
 
     const handleNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
         if (isRemotelyLocked(node.id)) return;
@@ -159,63 +163,23 @@ export function useWorkbenchNodeHandlers({
 
     const handleResize = useCallback((nodeId: string, width: number, height: number, x?: number, y?: number) => {
         if (isRemotelyLocked(nodeId)) return;
-        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-            return;
-        }
-
-        const node = workbenchNodesRef.current.find((n) => n.id === nodeId);
-        if (!node) {
-            return;
-        }
+        const node = workbenchNodesRef.current.find((candidate) => candidate.id === nodeId);
+        if (!node) return;
+        const updates = getNodeResizeUpdates(node, width, height, x, y);
+        if (!updates) return;
 
         beginWorkbenchGesture('resize', [nodeId]);
-        const xUpdate = Number.isFinite(x) ? x : undefined;
-        const yUpdate = Number.isFinite(y) ? y : undefined;
-        let updates: Partial<WorkbenchNode>;
-
-        if (node.type === 'arrow') {
-            const currentWidth = Number.isFinite(node.width) && (node.width as number) > 0 ? (node.width as number) : width;
-            const currentHeight = Number.isFinite(node.height) && (node.height as number) > 0 ? (node.height as number) : height;
-            updates = {
-                width,
-                height,
-                data: normalizeArrowGeometry(node.data, currentWidth, currentHeight, width, height),
-                ...(xUpdate !== undefined ? { x: xUpdate } : {}),
-                ...(yUpdate !== undefined ? { y: yUpdate } : {}),
-            };
-        } else if ((node.type === 'image' || node.type === 'video') && node.project?.canvas) {
-            const canvasWidth = node.project.canvas.width;
-            if (!Number.isFinite(canvasWidth) || canvasWidth <= 0) {
-                updates = { width, height };
-            } else {
-                const scale = width / canvasWidth;
-                if (!Number.isFinite(scale) || scale <= 0) {
-                    return;
-                }
-                updates = { scale, width, height };
-            }
-            updates = {
-                ...updates,
-                ...(xUpdate !== undefined ? { x: xUpdate } : {}),
-                ...(yUpdate !== undefined ? { y: yUpdate } : {}),
-            };
-        } else {
-            updates = {
-                width,
-                height,
-                ...(xUpdate !== undefined ? { x: xUpdate } : {}),
-                ...(yUpdate !== undefined ? { y: yUpdate } : {}),
-            };
-        }
-
         updateWorkbenchNodeTransient(nodeId, updates);
     }, [beginWorkbenchGesture, updateWorkbenchNodeTransient]);
 
     const handleResizeEnd = useCallback((nodeId: string, width: number, height: number, x?: number, y?: number) => {
+        const node = workbenchNodesRef.current.find((candidate) => candidate.id === nodeId);
         handleResize(nodeId, width, height, x, y);
+        const updates = node ? getNodeResizeUpdates(node, width, height, x, y) : null;
+        if (commands && updates) commands.updateNodeFields(nodeId, buildNodeFieldPatches(updates));
         commitWorkbenchGesture();
-        requestImmediateSceneSave();
-    }, [commitWorkbenchGesture, handleResize]);
+        if (!commands) requestImmediateSceneSave();
+    }, [commands, commitWorkbenchGesture, handleResize]);
 
     const handleTransientDataChange = useCallback((nodeId: string, data: Record<string, unknown>) => {
         if (isRemotelyLocked(nodeId)) return;
@@ -243,9 +207,18 @@ export function useWorkbenchNodeHandlers({
             cancelWorkbenchGesture();
             return;
         }
+        if (commands) {
+            const state = useStore.getState();
+            const gesture = state.activeWorkbenchGesture;
+            for (const nodeId of gesture?.affectedNodeIds ?? []) {
+                const previous = gesture?.startSnapshot.workbenchNodes.find((node) => node.id === nodeId);
+                const current = state.workbenchNodes.find((node) => node.id === nodeId);
+                if (previous && current) commands.updateNodeFields(nodeId, buildNodeFieldDiff(previous, current));
+            }
+        }
         commitWorkbenchGesture();
-        requestImmediateSceneSave();
-    }, [cancelWorkbenchGesture, commitWorkbenchGesture]);
+        if (!commands) requestImmediateSceneSave();
+    }, [cancelWorkbenchGesture, commands, commitWorkbenchGesture]);
 
     const handleDataChange = useCallback((nodeId: string, data: Record<string, unknown>) => {
         if (isRemotelyLocked(nodeId)) return;
@@ -261,8 +234,12 @@ export function useWorkbenchNodeHandlers({
             },
         } as Partial<WorkbenchNode>;
 
+        if (commands) {
+            commands.updateNodeFields(nodeId, buildNodeFieldPatches({ data }));
+            return;
+        }
         updateWorkbenchNode(nodeId, updates);
-    }, [updateWorkbenchNode]);
+    }, [commands, updateWorkbenchNode]);
 
     return {
         contextMenu,

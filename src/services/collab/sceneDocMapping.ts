@@ -46,7 +46,11 @@ export function yValueToJson(value: unknown): SceneJsonValue {
 
 export const SCENE_NODES_MAP = 'nodes';
 export const SCENE_CONNECTIONS_MAP = 'connections';
+export const SCENE_METADATA_MAP = 'metadata';
 const SEED_ORIGIN = 'collab-seed';
+
+type SceneEntityCollection = 'nodes' | 'connections';
+type SceneFieldSegment = string | number;
 
 /** Creates a shared document with the scene's keyed collections. */
 export function createSceneDoc(): Y.Doc {
@@ -59,6 +63,70 @@ export function getNodesMap(doc: Y.Doc): Y.Map<unknown> {
 
 export function getConnectionsMap(doc: Y.Doc): Y.Map<unknown> {
     return doc.getMap(SCENE_CONNECTIONS_MAP);
+}
+
+export function getSceneMetadataMap(doc: Y.Doc): Y.Map<unknown> {
+    return doc.getMap(SCENE_METADATA_MAP);
+}
+
+export function getSceneName(doc: Y.Doc): string | undefined {
+    const name = getSceneMetadataMap(doc).get('name');
+    return typeof name === 'string' ? name : undefined;
+}
+
+export function setSceneName(doc: Y.Doc, name: string, origin?: unknown): void {
+    doc.transact(() => getSceneMetadataMap(doc).set('name', name), origin);
+}
+
+/**
+ * Mutates an existing nested entity field without replacing its node or connection map.
+ * Field paths must already exist; create operations belong in sceneDocCommands.
+ */
+export function updateSceneEntityField(
+    doc: Y.Doc,
+    collection: SceneEntityCollection,
+    entityId: string,
+    path: readonly SceneFieldSegment[],
+    value: SceneJsonValue,
+    origin?: unknown,
+): boolean {
+    if (path.length === 0) return false;
+
+    const entities = collection === 'nodes' ? getNodesMap(doc) : getConnectionsMap(doc);
+    const entity = entities.get(entityId);
+    if (!(entity instanceof Y.Map)) return false;
+
+    let updated = false;
+    doc.transact(() => {
+        let parent: Y.Map<unknown> | Y.Array<unknown> = entity;
+        for (const segment of path.slice(0, -1)) {
+            if (parent instanceof Y.Map && typeof segment === 'string') {
+                const child = parent.get(segment);
+                if (!(child instanceof Y.Map) && !(child instanceof Y.Array)) return;
+                parent = child;
+            } else if (parent instanceof Y.Array && typeof segment === 'number') {
+                if (!Number.isInteger(segment) || segment < 0 || segment >= parent.length) return;
+                const child: unknown = (parent as Y.Array<unknown>).get(segment);
+                if (!(child instanceof Y.Map) && !(child instanceof Y.Array)) return;
+                parent = child as Y.Map<unknown> | Y.Array<unknown>;
+            } else {
+                return;
+            }
+        }
+
+        const leaf = path[path.length - 1];
+        const yValue = jsonToYValue(value);
+        if (parent instanceof Y.Map && typeof leaf === 'string') {
+            parent.set(leaf, yValue);
+            updated = true;
+        } else if (parent instanceof Y.Array && typeof leaf === 'number') {
+            if (!Number.isInteger(leaf) || leaf < 0 || leaf >= parent.length) return;
+            parent.delete(leaf, 1);
+            parent.insert(leaf, [yValue]);
+            updated = true;
+        }
+    }, origin);
+    return updated;
 }
 
 /**

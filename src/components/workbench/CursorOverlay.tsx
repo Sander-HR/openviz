@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { CollabRemoteCursorState } from '@/types/collab.types';
 
 export interface FlowViewport {
@@ -23,7 +24,7 @@ function firstName(name?: string): string {
     return name.trim().split(/\s+/)[0];
 }
 
-export function CursorOverlay({ remoteCursors, viewport }: CursorOverlayProps): JSX.Element {
+export const CursorOverlay = memo(function CursorOverlay({ remoteCursors, viewport }: CursorOverlayProps): JSX.Element {
     return (
         <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden="true">
             {Object.entries(remoteCursors).map(([clientId, cursor]) => {
@@ -55,4 +56,4 @@ export function CursorOverlay({ remoteCursors, viewport }: CursorOverlayProps): 
             })}
         </div>
     );
-}
+});

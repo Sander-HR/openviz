@@ -63,7 +63,7 @@ export interface CollabPresencePeer {
 }
 
 /** Session lifecycle states surfaced to the workbench UI. */
-export type CollabSessionStatus = 'idle' | 'connecting' | 'connected' | 'failed' | 'offline-queued' | 'denied';
+export type CollabSessionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'failed' | 'offline-queued' | 'offline-unpersisted' | 'denied';
 
 /** Response of POST /api/projects/:id/scenes/collab-token (contracts/room-token-api.md). */
 export interface CollabTokenResponse {

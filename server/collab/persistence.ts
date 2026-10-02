@@ -2,19 +2,21 @@ import * as Y from 'yjs';
 import type { fetchPayload, storePayload } from '@hocuspocus/server';
 import { eq, sql } from 'drizzle-orm';
 import type { SceneDataJson } from '../../src/types/collab.types';
-import { createSceneDoc, extractSceneFromDoc, seedSceneFromJson } from '../../src/services/collab/sceneDocMapping';
+import { createSceneDoc, extractSceneFromDoc, getSceneName, seedSceneFromJson, setSceneName } from '../../src/services/collab/sceneDocMapping';
 import { scenes } from '../../src/lib/db/schema';
 import { getDb } from './db';
 
 /** A `scenes` row narrowed to what the persistence layer needs. */
 export interface SceneRow {
     id: string;
+    name: string;
     data: SceneDataJson;
     ydoc: Uint8Array | null;
 }
 
 export interface SaveSceneInput {
     sceneId: string;
+    name: string | null;
     data: SceneDataJson;
     ydoc: Uint8Array;
     /** Last editor derived from the transaction origin, when known. */
@@ -46,17 +48,21 @@ export function createFetch(deps: PersistenceDependencies) {
         if (!row) return null;
 
         if (row.ydoc && row.ydoc.byteLength > 0) {
-            return row.ydoc;
+            const stored = createSceneDoc();
+            Y.applyUpdate(stored, row.ydoc);
+            if (!getSceneName(stored)) setSceneName(stored, row.name, 'collab-seed');
+            const update = Y.encodeStateAsUpdate(stored);
+            stored.destroy();
+            return update;
         }
 
         const data = row.data ?? { nodes: [], connections: [] };
-        if (data.nodes.length === 0 && data.connections.length === 0) {
-            return null;
-        }
-
         const seeded = createSceneDoc();
         seedSceneFromJson(seeded, data);
-        return Y.encodeStateAsUpdate(seeded);
+        setSceneName(seeded, row.name, 'collab-seed');
+        const update = Y.encodeStateAsUpdate(seeded);
+        seeded.destroy();
+        return update;
     };
 }
 
@@ -71,6 +77,7 @@ export function createStore(deps: PersistenceDependencies) {
         const data = extractSceneFromDoc(payload.document);
         const input: SaveSceneInput = {
             sceneId: payload.documentName,
+            name: getSceneName(payload.document) ?? null,
             data,
             ydoc: new Uint8Array(payload.state),
             updatedBy: parseOriginUser(payload.lastTransactionOrigin),
@@ -93,15 +100,17 @@ export function createDbPersistence(): PersistenceDependencies {
             if (!row) return null;
             return {
                 id: row.id,
+                name: row.name,
                 data: (row.data as SceneDataJson | null) ?? { nodes: [], connections: [] },
                 ydoc: row.ydoc ? new Uint8Array(row.ydoc) : null,
             };
         },
-        saveScene: async ({ sceneId, data, ydoc, updatedBy }) => {
+        saveScene: async ({ sceneId, name, data, ydoc, updatedBy }) => {
             const db = getDb();
             await db
                 .update(scenes)
                 .set({
+                    ...(name === null ? {} : { name }),
                     data,
                     ydoc,
                     version: sql`${scenes.version} + 1`,

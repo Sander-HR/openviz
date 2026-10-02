@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useReactFlow } from '@xyflow/react';
+import type { WorkbenchNode } from '@/types';
 
 import { sketchFormats, useWorkbenchFormatMenu } from './useWorkbenchFormatMenu';
 import { useWorkbenchKeyboardShortcuts } from './useWorkbenchKeyboardShortcuts';
@@ -9,6 +10,8 @@ import { useWorkbenchPointerTracking } from './useWorkbenchPointerTracking';
 import { useWorkbenchConnectionHandlers } from './useWorkbenchConnectionHandlers';
 import { useWorkbenchBlockCreation } from './useWorkbenchBlockCreation';
 import { useWorkbenchNodeHandlers } from './useWorkbenchNodeHandlers';
+import type { SceneNodeJson } from '@/types/collab.types';
+import type { SceneDocCommands } from '@/services/collab/sceneDocCommands';
 
 /**
  * Optional undo/redo routing (collaboration mode): when a shared session is
@@ -19,6 +22,7 @@ export interface UseWorkbenchOptions {
     enabled?: boolean;
     undoAction?: () => void;
     redoAction?: () => void;
+    commands?: SceneDocCommands | null;
     /** US3 (ui-translation §6): `I` starts the image upload flow directly. */
     onUploadImage?: () => void;
     /** US3 (ui-translation §6): `/` opens the phone-upload flow. */
@@ -53,6 +57,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         selectedNodeIds,
         setSelectedNodeIds,
         addConnection,
+        removeConnection: removeConnectionFromStore,
         createSketchWithFormat,
         isDrawMode,
         activeWorkbenchTool,
@@ -68,12 +73,18 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         redoWorkbench,
     } = useWorkbenchStore();
     const commitNodePositions = useCallback((positions: Array<{ id: string; position: { x: number; y: number } }>) => {
+        if (options?.commands) {
+            const moves = positions.map(({ id, position }) => ({ id, x: position.x, y: position.y }));
+            options.commands.moveNodes(moves);
+            for (const move of moves) updateWorkbenchNodeTransient(move.id, { x: move.x, y: move.y });
+            return;
+        }
         commitWorkbenchNodePositions(positions.map(({ id, position }) => ({
             id,
             x: position.x,
             y: position.y,
         })));
-    }, [commitWorkbenchNodePositions]);
+    }, [commitWorkbenchNodePositions, options?.commands, updateWorkbenchNodeTransient]);
 
     const router = useRouter();
 
@@ -89,13 +100,45 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         }
     }, [currentProjectId, openNodeInStudio, options?.onOpenNodeInStudio, router]);
 
+    const addNode = useCallback((node: WorkbenchNode) => {
+        if (options?.commands) options.commands.createNode(node as unknown as SceneNodeJson);
+        else addWorkbenchNode(node);
+    }, [addWorkbenchNode, options?.commands]);
+
+    const createOneShot = useCallback((node: Parameters<typeof createOneShotNode>[0]) => {
+        if (!options?.commands) {
+            createOneShotNode(node);
+            return;
+        }
+        if (!options.commands.createNode(node as unknown as SceneNodeJson)) return;
+        setActiveNodeId(node.id);
+        setSelectedNodeIds([node.id]);
+        setActiveWorkbenchTool('select');
+    }, [createOneShotNode, options?.commands, setActiveNodeId, setActiveWorkbenchTool, setSelectedNodeIds]);
+
+    const removeNode = useCallback((id?: string) => {
+        if (!options?.commands) {
+            removeWorkbenchNode(id);
+            return;
+        }
+        removeWorkbenchNode(id);
+    }, [options?.commands, removeWorkbenchNode]);
+
     const { showFormatDropdown, setShowFormatDropdown, dropdownRef, handleFormatSelect } =
         useWorkbenchFormatMenu({ createSketchWithFormat });
 
+    const { createConnection, handleConnect, removeConnection, onConnectStart, onConnectEnd } = useWorkbenchConnectionHandlers({
+        workbenchNodes,
+        connections,
+        commands: options?.commands,
+        removeConnectionFromStore,
+        addConnection,
+    });
+
     const { basicBlocksMenu, setBasicBlocksMenu, handleBlockSelect } = useWorkbenchBlockCreation({
         workbenchNodes,
-        addWorkbenchNode,
-        addConnection,
+        addWorkbenchNode: addNode,
+        addConnection: createConnection,
     });
 
     const {
@@ -124,11 +167,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         openNodeInStudio: openNodeInStudioAndNavigate,
         setActiveNodeId,
         setBasicBlocksMenu,
-    });
-
-    const { handleConnect, onConnectStart, onConnectEnd } = useWorkbenchConnectionHandlers({
-        workbenchNodes,
-        addConnection,
+        commands: options?.commands,
     });
 
     const { screenToFlowPosition, getViewport, setViewport, zoomIn, zoomOut, fitView } = useReactFlow();
@@ -167,7 +206,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
         copyToClipboard,
         pasteFromClipboard,
         duplicateWorkbenchNode,
-        removeWorkbenchNode,
+        removeWorkbenchNode: removeNode,
         reorderWorkbenchNode,
         activeNodeId,
         selectedNodeIds,
@@ -213,6 +252,7 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
             handleFormatSelect,
             handleNodesChange,
             handleConnect,
+            removeConnection,
             onConnectStart,
             onConnectEnd,
             handleNodeDoubleClick,
@@ -239,14 +279,14 @@ export const useWorkbench = (options?: UseWorkbenchOptions) => {
             copyToClipboard,
             pasteFromClipboard,
             duplicateWorkbenchNode,
-            removeWorkbenchNode,
+            removeWorkbenchNode: removeNode,
             setDrawMode,
             toggleDrawMode,
             setActiveWorkbenchTool,
             setActiveNodeId,
             setSelectedNodeIds,
-            addWorkbenchNode,
-            createOneShotNode,
+            addWorkbenchNode: addNode,
+            createOneShotNode: createOneShot,
             setFreehandColor,
             setFreehandStrokeWidth,
             undoLastFreehandNode,

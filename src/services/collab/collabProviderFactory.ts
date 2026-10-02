@@ -1,8 +1,8 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
-import { HocuspocusProvider, type HocuspocusProviderConfiguration } from '@hocuspocus/provider';
-import type { CollabPresenceState } from '@/types/collab.types';
+import { HocuspocusProvider, HocuspocusProviderWebsocket, type HocuspocusProviderConfiguration } from '@hocuspocus/provider';
 import { createSceneDoc } from './sceneDocMapping';
+import { publishInitialPresence } from './awareness';
 
 /** Per-user transaction origin: `user:<userId>` (server parses it for `updatedBy`). */
 /**
@@ -29,8 +29,10 @@ export interface CollabProviderHandle {
     provider: HocuspocusProvider;
     doc: Y.Doc;
     origin: string;
+    connect(): Promise<unknown>;
+    disconnect(): void;
     /** Per-scene offline queue (y-indexeddb) — survives disconnects and browser close. */
-    offlineStore: IndexeddbPersistence;
+    offlineStore: IndexeddbPersistence | null;
     destroy(): void;
 }
 
@@ -49,40 +51,45 @@ export function createCollabProvider(
 ): CollabProviderHandle {
     const ProviderClass = options.ProviderClass ?? HocuspocusProvider;
     const doc = createSceneDoc();
+    const websocketProvider = new HocuspocusProviderWebsocket({ url: config.url, autoConnect: false });
 
     const providerConfiguration: HocuspocusProviderConfiguration = {
         url: config.url,
+        websocketProvider,
         token: config.token,
         name: config.sceneId,
         document: doc,
     };
     const provider = new ProviderClass(providerConfiguration);
+    provider.attach();
 
     // Offline queue (US3): mirror the document into a per-scene IndexedDB store
     // so edits made while disconnected — or before the browser closed cleanly —
     // merge back in on reconnect.
-    const offlineStore = bindSceneOfflineStore(doc, config.sceneId);
+    let offlineStore: IndexeddbPersistence | null = null;
+    try {
+        offlineStore = bindSceneOfflineStore(doc, config.sceneId);
+    } catch (error) {
+        console.warn('[collab] local IndexedDB persistence unavailable; offline changes will not survive tab close', error);
+    }
 
     // Per-client origin (multi-tab isolation): two tabs of the same user must
     // not share an undo stack or overwrite each other's attribution.
     const origin = collabOriginFor(config.userId, provider.awareness?.clientID);
 
-    // Announce ourselves on the awareness channel (presence + cursor host).
-    const presence: CollabPresenceState = {
-        user: { id: config.userId, name: config.userName },
-        cursor: null,
-    };
-    provider.setAwarenessField('user', presence.user);
-    provider.setAwarenessField('cursor', presence.cursor);
+    publishInitialPresence(provider, { id: config.userId, name: config.userName });
 
     return {
         provider,
         doc,
         origin,
         offlineStore,
+        connect: () => websocketProvider.connect(),
+        disconnect: () => websocketProvider.disconnect(),
         destroy: () => {
-            void offlineStore.destroy();
+            void offlineStore?.destroy();
             provider.destroy();
+            websocketProvider.destroy();
         },
     };
 }

@@ -153,10 +153,31 @@ resolve_port() {
   printf '%s' "$available_port"
 }
 
+TREE_PIDS=""
+
+# `pnpm exec` spawns sh -> pnpm -> node, so killing only the wrapper PID
+# orphans the real server processes. Track the full process tree instead.
+collect_tree() {
+  local pid="$1" child
+  [[ -n "$pid" ]] || return 0
+  TREE_PIDS="${TREE_PIDS}${pid}"$'\n'
+  for child in $(pgrep -P "$pid" 2>/dev/null || true); do
+    collect_tree "$child"
+  done
+}
+
 cleanup() {
   local pid
+
+  TREE_PIDS=""
   for pid in "${NEXT_PID:-}" "${COLLAB_PID:-}"; do
     [[ -n "$pid" ]] || continue
+    if kill -0 "$pid" 2>/dev/null; then
+      collect_tree "$pid"
+    fi
+  done
+
+  for pid in $TREE_PIDS; do
     if kill -0 "$pid" 2>/dev/null; then
       echo "[dev] Stopping process $pid gracefully..."
       kill -TERM "$pid" 2>/dev/null || true
@@ -166,7 +187,7 @@ cleanup() {
   local deadline=$((SECONDS + 10))
   while [[ $SECONDS -lt $deadline ]]; do
     local running=0
-    for pid in "${NEXT_PID:-}" "${COLLAB_PID:-}"; do
+    for pid in $TREE_PIDS; do
       if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
         running=1
       fi
@@ -175,8 +196,7 @@ cleanup() {
     sleep 1
   done
 
-  for pid in "${NEXT_PID:-}" "${COLLAB_PID:-}"; do
-    [[ -n "$pid" ]] || continue
+  for pid in $TREE_PIDS; do
     if kill -0 "$pid" 2>/dev/null; then
       echo "[dev] Process $pid did not stop after 10 seconds; terminating it."
       kill -KILL "$pid" 2>/dev/null || true
@@ -195,6 +215,7 @@ handle_signal() {
 
 trap 'handle_signal INT' INT
 trap 'handle_signal TERM' TERM
+trap 'handle_signal HUP' HUP
 trap cleanup EXIT
 if port_in_use "$APP_PORT"; then
   APP_PORT="$(resolve_port "Next.js" "$APP_PORT")"

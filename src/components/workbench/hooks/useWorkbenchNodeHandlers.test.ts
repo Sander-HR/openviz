@@ -3,6 +3,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { MediaWorkbenchNode, NoteWorkbenchNode } from '@/types';
 import { useStore } from '@/store/useStore';
 import { useWorkbenchNodeHandlers } from './useWorkbenchNodeHandlers';
+import type { SceneDocCommands } from '@/services/collab/sceneDocCommands';
 
 afterEach(() => {
     // Lock guards read the live store — never leak locks between tests.
@@ -105,6 +106,73 @@ describe('useWorkbenchNodeHandlers gesture updates', () => {
         expect(onTransientPositionChange).not.toHaveBeenCalled();
         expect(updateWorkbenchNodeTransient).not.toHaveBeenCalled();
         expect(updateWorkbenchNode).not.toHaveBeenCalled();
+    });
+});
+
+describe('useWorkbenchNodeHandlers collaborative document routing', () => {
+    function renderCollaborativeHandlers(workbenchNode: NoteWorkbenchNode = note) {
+        const updateWorkbenchNode = vi.fn();
+        const updateWorkbenchNodeTransient = vi.fn();
+        const removeWorkbenchNode = vi.fn();
+        const commands = {
+            updateNodeFields: vi.fn(),
+            deleteNode: vi.fn(() => true),
+        } as unknown as SceneDocCommands;
+        const options = {
+            workbenchNodes: [workbenchNode],
+            updateWorkbenchNode,
+            updateWorkbenchNodeTransient,
+            beginWorkbenchGesture: vi.fn(),
+            commitWorkbenchGesture: vi.fn(),
+            cancelWorkbenchGesture: vi.fn(),
+            removeWorkbenchNode,
+            openNodeInStudio: vi.fn(),
+            setActiveNodeId: vi.fn(),
+            setBasicBlocksMenu: vi.fn(),
+            commands,
+        } as Parameters<typeof useWorkbenchNodeHandlers>[0];
+
+        return {
+            ...renderHook(() => useWorkbenchNodeHandlers(options)),
+            commands,
+            updateWorkbenchNode,
+            updateWorkbenchNodeTransient,
+            removeWorkbenchNode,
+        };
+    }
+
+    it('routes persistent node-data edits through field-level Y.Doc commands', () => {
+        const { result, commands, updateWorkbenchNode } = renderCollaborativeHandlers();
+
+        act(() => result.current.handleDataChange('note-1', { text: 'Shared edit' }));
+
+        expect(commands.updateNodeFields).toHaveBeenCalledWith('note-1', [
+            { path: ['data', 'text'], value: 'Shared edit' },
+        ]);
+        expect(updateWorkbenchNode).not.toHaveBeenCalled();
+    });
+
+    it('routes node resize completion through one batched document command', () => {
+        const { result, commands, updateWorkbenchNodeTransient } = renderCollaborativeHandlers();
+
+        act(() => result.current.handleResizeEnd('note-1', 200, 120, 15, 25));
+
+        expect(updateWorkbenchNodeTransient).toHaveBeenCalledWith('note-1', expect.objectContaining({ width: 200, height: 120 }));
+        expect(commands.updateNodeFields).toHaveBeenCalledWith('note-1', expect.arrayContaining([
+            { path: ['width'], value: 200 },
+            { path: ['height'], value: 120 },
+            { path: ['x'], value: 15 },
+            { path: ['y'], value: 25 },
+        ]));
+    });
+
+    it('routes node removal through the document command and cleans local resources', () => {
+        const { result, commands, removeWorkbenchNode } = renderCollaborativeHandlers();
+
+        act(() => result.current.handleNodesChange([{ id: 'note-1', type: 'remove' }]));
+
+        expect(commands.deleteNode).toHaveBeenCalledWith('note-1');
+        expect(removeWorkbenchNode).toHaveBeenCalledWith('note-1');
     });
 });
 

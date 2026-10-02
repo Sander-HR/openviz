@@ -1,81 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Y from 'yjs';
-import type { CollabRemoteAwarenessEntry, CollabSessionStatus, CollabTokenResponse, SceneDataJson } from '@/types/collab.types';
-import type { Connection, WorkbenchNode } from '@/types';
+import type { CollabRemoteAwarenessEntry, CollabSessionStatus, CollabTokenResponse } from '@/types/collab.types';
+import type { CollabProviderLike, CollabSessionHandle, CreateCollabProvider, UseCollabSessionOptions, UseCollabSessionResult } from './useCollabSession.types';
+export type { CollabAwarenessStateEntry, CollabProviderLike, CollabProviderRequest, CollabSessionHandle, CreateCollabProvider, UseCollabSessionOptions, UseCollabSessionResult } from './useCollabSession.types';
 import { useStore } from '@/store/useStore';
 import { createCollabProvider } from '@/services/collab/collabProviderFactory';
-import { createCollabStoreSync, type CollabStoreSync } from '@/services/collab/collabStoreSync';
+import { createSceneDocCommands, type SceneDocCommands } from '@/services/collab/sceneDocCommands';
+import { createAwarenessUpdateCoalescer, createStalePeerCleanup, type AwarenessUpdateCoalescer, type StalePeerCleanup } from '@/services/collab/awareness';
+import { emitBrowserCollaborationMetric, installBrowserCollabBenchControl } from '@/services/collab/performanceTelemetry';
+import { waitForLocalDocumentReadiness } from '@/services/collab/localStoreReadiness';
+import { useWorkbenchGraphProjection } from './useWorkbenchGraphProjection';
 import { createCollabUndoManager, type CollabUndoManager } from '@/services/collab/undoOrigin';
-
-/**
- * Structural view of the collaboration provider — everything the session hook
- * needs. The real HocuspocusProvider satisfies this; tests inject fakes.
- */
-/** One awareness state as emitted by the provider (`clientId` + flat payload). */
-export type CollabAwarenessStateEntry = Record<string, unknown> & { clientId: number };
-
-export interface CollabProviderLike {
-    on(event: 'status', listener: (event: { status: string }) => void): unknown;
-    on(event: 'synced', listener: () => void): unknown;
-    on(event: 'maxAttemptsFailed', listener: () => void): unknown;
-    on(event: 'authenticationFailed', listener: (data: { reason: string }) => void): unknown;
-    on(event: 'awarenessUpdate', listener: (data: { states: CollabAwarenessStateEntry[] }) => void): unknown;
-    /** The awareness instance backing this provider (null when disabled). */
-    readonly awareness?: { readonly clientID: number } | null;
-    /** Awareness publishing (presence/cursors/soft locks, US2). */
-    setAwarenessField(key: string, value: unknown): void;
-    connect(): void | Promise<unknown>;
-    disconnect(): void;
-    destroy(): void;
-}
-
-/** Request the session hook hands to the provider factory. */
-export interface CollabProviderRequest {
-    url: string;
-    token: string;
-    /** Room name — the project's main scene ID. */
-    name: string;
-    userId: string;
-    userName: string;
-}
-
-/** Handle returned by a provider factory (real or injected). */
-export interface CollabSessionHandle {
-    provider: CollabProviderLike;
-    doc: Y.Doc;
-    origin: string;
-    destroy(): void;
-}
-
-export type CreateCollabProvider = (request: CollabProviderRequest) => CollabSessionHandle;
-
-export interface UseCollabSessionOptions {
-    projectId: string | null;
-    userId: string;
-    userName: string;
-    /** Collaboration server WebSocket URL, e.g. ws://localhost:1234 (env-driven). */
-    serverUrl: string;
-    /** Injectable token fetcher (defaults to the collab-token API route). */
-    getToken?: (projectId: string) => Promise<CollabTokenResponse>;
-    /** Injectable provider factory (defaults to the Hocuspocus stack). */
-    createProvider?: CreateCollabProvider;
-}
-
-export interface UseCollabSessionResult {
-    status: CollabSessionStatus;
-    doc: Y.Doc | null;
-    origin: string | null;
-    /** Live provider while a session is joining/active — used for awareness publishing. */
-    provider: CollabProviderLike | null;
-    userId: string;
-    userName: string;
-    /** Re-fetches the room token and rejoins (US4 recovery after `denied`). */
-    retryWithFreshToken(): void;
-    undo(): void;
-    redo(): void;
-    canUndo: boolean;
-    canRedo: boolean;
-}
 
 async function fetchRoomToken(projectId: string): Promise<CollabTokenResponse> {
     const response = await fetch(`/api/projects/${projectId}/scenes/collab-token`, { method: 'POST' });
@@ -93,15 +28,22 @@ const defaultCreateProvider: CreateCollabProvider = (request) => {
         userId: request.userId,
         userName: request.userName,
     });
-    return { provider: handle.provider, doc: handle.doc, origin: handle.origin, destroy: handle.destroy };
+    return {
+        provider: handle.provider,
+        doc: handle.doc,
+        origin: handle.origin,
+        connect: () => handle.connect(),
+        disconnect: () => handle.disconnect(),
+        localStoreReady: handle.offlineStore?.whenSynced.then(() => undefined),
+        localPersistenceAvailable: handle.offlineStore !== null,
+        destroy: handle.destroy,
+    };
 };
 
 /**
  * Owns the real-time collaboration session for the current project's main
- * scene: token fetch → provider join → bidirectional store sync → teardown.
- *
- * The bridge starts only after the provider reports `synced` so an empty
- * pre-sync document can never blank a freshly hydrated canvas.
+ * scene: token fetch → local replica restore → WebSocket join → Y.Doc projection → teardown.
+ * The shared graph is not written from Zustand back to the document.
  */
 export function useCollabSession(options: UseCollabSessionOptions): UseCollabSessionResult {
     const { projectId, userId, userName, serverUrl } = options;
@@ -109,29 +51,41 @@ export function useCollabSession(options: UseCollabSessionOptions): UseCollabSes
     const createProvider = options.createProvider ?? defaultCreateProvider;
 
     const [status, setStatus] = useState<CollabSessionStatus>('idle');
+    const [localPersistenceAvailable, setLocalPersistenceAvailable] = useState(true);
     const [doc, setDoc] = useState<Y.Doc | null>(null);
     const [origin, setOrigin] = useState<string | null>(null);
+    const [commands, setCommands] = useState<SceneDocCommands | null>(null);
     const [provider, setProvider] = useState<CollabProviderLike | null>(null);
     // Bumped by retryWithFreshToken — re-runs the join effect with a new token.
     const [joinEpoch, setJoinEpoch] = useState(0);
     const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false });
     const undoRef = useRef<CollabUndoManager | null>(null);
+    const collabSessionActive = useStore((state) => state.collabSessionActive);
+    const graphProjection = useWorkbenchGraphProjection({ doc, enabled: collabSessionActive });
 
     useEffect(() => {
         if (!projectId) {
             setStatus('idle');
+            setLocalPersistenceAvailable(true);
+            setCommands(null);
+            useStore.getState().setCollabDocumentCommands(null);
+            useStore.getState().setCollabSessionActive(false);
             return;
         }
 
         let cancelled = false;
         let handle: CollabSessionHandle | null = null;
-        let sync: CollabStoreSync | null = null;
         let unsubscribeUndo: (() => void) | null = null;
+        let stalePeerCleanup: StalePeerCleanup | null = null;
+        let awarenessCoalescer: AwarenessUpdateCoalescer | null = null;
+        let disposeBenchControl: (() => void) | null = null;
+        const awarenessStates = new Map<number, CollabRemoteAwarenessEntry>();
         let sessionStatus: CollabSessionStatus = 'connecting';
         // Once the document has synced, a transport drop is an OFFLINE state
         // (US3): local edits keep flowing into the doc and merge on reconnect.
         // Before the first sync it is just a cold connection attempt.
         let wasSynced = false;
+        let sessionLocalPersistenceAvailable = true;
 
         const updateStatus = (next: CollabSessionStatus): void => {
             if (cancelled) return;
@@ -147,25 +101,9 @@ export function useCollabSession(options: UseCollabSessionOptions): UseCollabSes
             if (cancelled || !handle) return;
             if (document.visibilityState !== 'visible') return;
             if (sessionStatus === 'connected') return;
-            void handle.provider.connect();
+            void handle.connect();
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        const applyToStore = (scene: SceneDataJson): void => {
-            const state = useStore.getState();
-            // A remote projection must not yank a node that is mid-gesture
-            // back to its pre-drag position — keep the in-flight transient
-            // position for affected nodes; the gesture commit flushes the
-            // final value afterwards (last-write-wins per field).
-            const protectedIds = state.activeWorkbenchGesture?.affectedNodeIds ?? [];
-            const nodes = scene.nodes.map((node) => {
-                if (!protectedIds.includes(node.id)) return node;
-                const live = state.workbenchNodes.find((candidate) => candidate.id === node.id);
-                return live ? { ...node, x: live.x, y: live.y } : node;
-            });
-            state.setWorkbenchNodes(nodes as unknown as WorkbenchNode[]);
-            state.setConnections(scene.connections as unknown as Connection[]);
-        };
 
         updateStatus('connecting');
 
@@ -181,23 +119,30 @@ export function useCollabSession(options: UseCollabSessionOptions): UseCollabSes
                     userId,
                     userName,
                 });
-
-                sync = createCollabStoreSync({
-                    doc: handle.doc,
-                    origin: handle.origin,
-                    getStoreState: () => {
-                        const state = useStore.getState();
-                        return {
-                            nodes: state.workbenchNodes,
-                            connections: state.connections,
-                            gestureActive: state.activeWorkbenchGesture !== null,
-                        };
-                    },
-                    getActiveGestureNodeIds: () => {
-                        return useStore.getState().activeWorkbenchGesture?.affectedNodeIds ?? null;
-                    },
-                    applyToStore,
-                    subscribeStore: (listener) => useStore.subscribe(listener),
+                sessionLocalPersistenceAvailable = handle.localPersistenceAvailable ?? true;
+                setLocalPersistenceAvailable(sessionLocalPersistenceAvailable);
+                try {
+                    await waitForLocalDocumentReadiness(handle.localStoreReady);
+                } catch (error) {
+                    sessionLocalPersistenceAvailable = false;
+                    setLocalPersistenceAvailable(false);
+                    console.warn('[collab] local document restore unavailable; offline edits are not durable', error);
+                }
+                if (cancelled) {
+                    handle.destroy();
+                    return;
+                }
+                const sessionCommands = createSceneDocCommands(handle.doc, handle.origin);
+                disposeBenchControl = installBrowserCollabBenchControl(handle.doc, handle.origin, sessionCommands);
+                setCommands(sessionCommands);
+                const applyAwarenessProjection = (): void => {
+                    const localClientId = handle?.provider.awareness?.clientID ?? -1;
+                    useStore.getState().applyRemoteAwareness(Array.from(awarenessStates.values()), localClientId);
+                };
+                awarenessCoalescer = createAwarenessUpdateCoalescer(applyAwarenessProjection);
+                stalePeerCleanup = createStalePeerCleanup((clientId) => {
+                    awarenessStates.delete(clientId);
+                    awarenessCoalescer?.schedule();
                 });
 
                 const undoManager = createCollabUndoManager(handle.doc, handle.origin);
@@ -208,20 +153,21 @@ export function useCollabSession(options: UseCollabSessionOptions): UseCollabSes
 
                 // The document is only safe to project after the initial sync.
                 handle.provider.on('synced', () => {
-                    if (cancelled || !sync) return;
+                    if (cancelled) return;
                     wasSynced = true;
+                    useStore.getState().setCollabDocumentCommands(sessionCommands);
                     useStore.getState().setCollabSessionActive(true);
-                    sync.start();
+                    if (typeof window !== 'undefined') window.__openvizCollabBenchControl?.markReady();
                     console.info('[collab] synced — live co-editing active for scene', tokenResponse.sceneId);
                 });
                 handle.provider.on('status', (event) => {
                     let next: CollabSessionStatus;
                     if (event.status === 'connected') {
                         next = 'connected';
+                    } else if (wasSynced && event.status === 'connecting') {
+                        next = 'reconnecting';
                     } else if (wasSynced && sessionStatus !== 'failed') {
-                        // Post-sync drop/retry: offline with a local queue, not
-                        // a cold start. The session keeps owning scene writes.
-                        next = 'offline-queued';
+                        next = sessionLocalPersistenceAvailable ? 'offline-queued' : 'offline-unpersisted';
                     } else {
                         next = 'connecting';
                     }
@@ -230,17 +176,34 @@ export function useCollabSession(options: UseCollabSessionOptions): UseCollabSes
                 });
                 handle.provider.on('awarenessUpdate', (data) => {
                     if (cancelled) return;
-                    // The provider emits the full snapshot with each client's
-                    // payload fields spread flat next to `clientId`.
                     const localClientId = handle?.provider.awareness?.clientID ?? -1;
-                    const entries: CollabRemoteAwarenessEntry[] = data.states.map(({ clientId, ...state }) => ({
-                        clientId,
-                        state: state as CollabRemoteAwarenessEntry['state'],
-                    }));
-                    useStore.getState().applyRemoteAwareness(entries, localClientId);
+                    const entries: CollabRemoteAwarenessEntry[] = data.states
+                        .filter(({ clientId }) => clientId !== localClientId)
+                        .map(({ clientId, ...state }) => ({
+                            clientId,
+                            state: state as CollabRemoteAwarenessEntry['state'],
+                        }));
+                    for (const entry of entries) {
+                        const state = entry.state as Record<string, unknown>;
+                        const previous = awarenessStates.get(entry.clientId)?.state as Record<string, unknown> | undefined;
+                        const sentAt = state.collabBenchSentAt;
+                        if (typeof sentAt === 'number' && state.collabBenchSequence !== previous?.collabBenchSequence) {
+                            emitBrowserCollaborationMetric('cursorLatencyMs', Math.max(0, Date.now() - sentAt));
+                        }
+                    }
+                    const liveClientIds = new Set(entries.map(({ clientId }) => clientId));
+                    const removedClientIds = Array.from(awarenessStates.keys()).filter((clientId) => !liveClientIds.has(clientId));
+                    awarenessStates.clear();
+                    for (const entry of entries) {
+                        awarenessStates.set(entry.clientId, entry);
+                        stalePeerCleanup?.refresh(entry.clientId);
+                    }
+                    for (const clientId of removedClientIds) stalePeerCleanup?.remove(clientId);
+                    if (removedClientIds.length > 0) awarenessCoalescer?.flush();
+                    else awarenessCoalescer?.schedule();
                 });
                 handle.provider.on('maxAttemptsFailed', () => {
-                    updateStatus('failed');
+                    updateStatus(sessionLocalPersistenceAvailable ? 'failed' : 'offline-unpersisted');
                 });
                 handle.provider.on('authenticationFailed', (data) => {
                     if (cancelled) return;
@@ -248,7 +211,11 @@ export function useCollabSession(options: UseCollabSessionOptions): UseCollabSes
                     // SC-006: a rejected join must not be retried with the same
                     // token — stop the provider and surface `denied`. Recovery is
                     // explicit (retryWithFreshToken re-fetches a fresh token).
+                    stalePeerCleanup?.dispose();
+                    awarenessCoalescer?.dispose();
+                    disposeBenchControl?.();
                     handle?.destroy();
+                    setCommands(null);
                     useStore.getState().clearCollaborationState();
                     updateStatus('denied');
                 });
@@ -256,9 +223,12 @@ export function useCollabSession(options: UseCollabSessionOptions): UseCollabSes
                 setDoc(handle.doc);
                 setOrigin(handle.origin);
                 setProvider(handle.provider);
-                void handle.provider.connect();
+                void handle.connect();
             } catch (error) {
                 console.error('Failed to join collaboration session:', error);
+                disposeBenchControl?.();
+                setCommands(null);
+                useStore.getState().setCollabDocumentCommands(null);
                 updateStatus('idle');
             }
         })();
@@ -266,12 +236,17 @@ export function useCollabSession(options: UseCollabSessionOptions): UseCollabSes
         return () => {
             cancelled = true;
             document.removeEventListener('visibilitychange', handleVisibilityChange);
-            sync?.stop();
+            stalePeerCleanup?.dispose();
+            awarenessCoalescer?.dispose();
+            disposeBenchControl?.();
+            awarenessStates.clear();
             unsubscribeUndo?.();
             undoRef.current?.destroy();
             undoRef.current = null;
             handle?.destroy();
             useStore.getState().setCollabSessionActive(false);
+            useStore.getState().setCollabDocumentCommands(null);
+            setCommands(null);
             setDoc(null);
             setOrigin(null);
             setProvider(null);
@@ -292,5 +267,5 @@ export function useCollabSession(options: UseCollabSessionOptions): UseCollabSes
         undoRef.current?.redo();
     }, []);
 
-    return { status, doc, origin, provider, userId, userName, retryWithFreshToken, undo, redo, canUndo: undoState.canUndo, canRedo: undoState.canRedo };
+    return { status, doc, sceneName: graphProjection.sceneName, origin, commands, localPersistenceAvailable, provider, userId, userName, retryWithFreshToken, undo, redo, canUndo: undoState.canUndo, canRedo: undoState.canRedo };
 }

@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Connection, WorkbenchNode } from '@/types';
 import { useStore } from './useStore';
+import type { SceneDocCommands } from '@/services/collab/sceneDocCommands';
 
 function imageNode(id: string, x = 0): WorkbenchNode {
     return {
@@ -93,6 +94,8 @@ describe('workbench store connection policy', () => {
             connections: [],
             selectedNodeIds: [],
             activeNodeId: null,
+            collabSessionActive: false,
+            collabDocumentCommands: null,
         });
     });
 
@@ -222,6 +225,35 @@ describe('workbench store connection policy', () => {
 
         store.removeConnection(connectionId);
         expect(useStore.getState().connections).toHaveLength(0);
+    });
+
+    it('routes graph store actions to explicit document commands in collaboration mode', () => {
+        const commands = {
+            createNode: vi.fn(() => true),
+            updateNodeFields: vi.fn(() => true),
+            moveNodes: vi.fn(() => true),
+            deleteNodes: vi.fn(() => true),
+            applyConnectionChanges: vi.fn(() => true),
+        } as unknown as SceneDocCommands;
+        useStore.getState().setCollabDocumentCommands(commands);
+        useStore.getState().setCollabSessionActive(true);
+        const store = useStore.getState();
+        const image = imageNode('collab-image');
+
+        store.addWorkbenchNode(image);
+        store.updateWorkbenchNode('collab-image', { x: 20, y: 30 });
+        store.commitWorkbenchNodePositions([{ id: 'collab-image', x: 25, y: 35 }]);
+        store.setWorkbenchNodes([imageNode('store-only')]);
+        store.setConnections([{ id: 'store-only-edge', from: 'collab-image', to: 'missing' }]);
+
+        expect(commands.createNode).toHaveBeenCalledWith(image);
+        expect(commands.updateNodeFields).toHaveBeenCalledWith('collab-image', [
+            { path: ['x'], value: 20 },
+            { path: ['y'], value: 30 },
+        ]);
+        expect(commands.moveNodes).toHaveBeenCalledWith([{ id: 'collab-image', x: 25, y: 35 }]);
+        expect(useStore.getState().workbenchNodes).toEqual([]);
+        expect(useStore.getState().connections).toEqual([]);
     });
 
     it('keeps swap-frame behavior deterministic after remove/re-add flow', () => {

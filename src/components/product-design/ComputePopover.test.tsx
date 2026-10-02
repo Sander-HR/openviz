@@ -31,6 +31,7 @@ vi.mock('@/services/renderService', () => ({
     },
 }));
 
+import { comfyConnectionManager } from '@/services/ai/comfyConnectionManager';
 import { ComputePopover } from './ComputePopover';
 
 function makeSettings(overrides: Partial<ComputeSettings> = {}): ComputeSettings {
@@ -71,6 +72,7 @@ function openPopover() {
 
 afterEach(() => {
     vi.unstubAllGlobals();
+    comfyConnectionManager.reset();
     storeState.setImageApiModel.mockReset();
     queueState.snapshot = { endpoint: '', active: 0, queued: 0, concurrency: 2 };
     queueState.listeners = [];

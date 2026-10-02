@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { renderService } from '@/services/renderService';
 import type { ComputeSettings, TargetCapabilities } from '@/types/executionTarget.types';
-import { normalizeComfyCapabilities } from '@/services/ai/targets/comfyCapabilitiesService';
+import { comfyConnectionManager } from '@/services/ai/comfyConnectionManager';
 import { createOpenAIImageTarget } from '@/services/ai/targets/openAIImageTarget';
 import { useStore } from '@/store/useStore';
 
@@ -97,18 +96,11 @@ export function useAIComputeSettings() {
         return () => window.clearTimeout(timer);
     }, [saveSettings]);
 
+    // Gated by the shared manager: /object_info only runs after a successful
+    // reachability probe, so a down endpoint costs exactly one request.
     const refreshCapabilities = useCallback(async () => {
-        const [statsResponse, objectInfoResponse] = await Promise.all([
-            fetch(`${endpoint}/system_stats`),
-            fetch(`${endpoint}/object_info`),
-        ]);
-        if (!statsResponse.ok || !objectInfoResponse.ok) {
-            setCapabilities(null);
-            return;
-        }
-        const stats: unknown = await statsResponse.json();
-        const objectInfo: unknown = await objectInfoResponse.json();
-        setCapabilities(normalizeComfyCapabilities(stats, objectInfo));
+        const state = await comfyConnectionManager.check(endpoint, { force: true });
+        setCapabilities(state.capabilities);
     }, [endpoint]);
 
     const testConnection = useCallback(async () => {
@@ -128,12 +120,29 @@ export function useAIComputeSettings() {
                 setStatus(health.status === 'ready' ? 'connected' : 'unavailable');
                 return;
             }
-            const connected = await renderService.checkConnection();
-            setStatus(connected ? 'connected' : 'unavailable');
+            const state = await comfyConnectionManager.check(endpoint, { force: true });
+            setStatus(state.status === 'ready' ? 'connected' : 'unavailable');
         } catch {
             setStatus('unavailable');
         }
-    }, [imageApiEndpoint, imageApiKey, imageApiKeyless, imageApiModel, protocol, setImageApiModels]);
+    }, [endpoint, imageApiEndpoint, imageApiKey, imageApiKeyless, imageApiModel, protocol, setImageApiModels]);
+
+    // Live ComfyUI status via the shared connection manager: one probe per
+    // failure TTL while down (the old 10s retry loop), and background refresh
+    // while up. No per-component interval anymore.
+    useEffect(() => {
+        if (protocol !== 'comfyui' || !endpoint) return;
+        const unsubscribe = comfyConnectionManager.subscribe((state) => {
+            if (state.endpoint !== endpoint) return;
+            setStatus(state.status === 'ready' ? 'connected' : 'unavailable');
+        });
+        comfyConnectionManager.watch(endpoint);
+        void comfyConnectionManager.check(endpoint);
+        return () => {
+            unsubscribe();
+            comfyConnectionManager.unwatch(endpoint);
+        };
+    }, [protocol, endpoint]);
 
     return {
         endpoint,

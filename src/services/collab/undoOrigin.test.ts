@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
 import type { SceneDataJson } from '@/types/collab.types';
-import { createSceneDoc, getNodesMap, jsonToYValue, extractSceneFromDoc } from './sceneDocMapping';
+import { createSceneDoc, getNodesMap, jsonToYValue, extractSceneFromDoc, seedSceneFromJson } from './sceneDocMapping';
 import { createCollabUndoManager } from './undoOrigin';
 
 const ORIGIN_A = 'user:alice';
@@ -57,6 +57,21 @@ describe('createCollabUndoManager (SC-005, FR-008)', () => {
         expect(nodeXY(doc, 'n1')).toEqual({ x: 0, y: 0 });
         // Exactly one step was consumed — the pre-join node is not on the stack.
         expect(undo.canUndo()).toBe(false);
+    });
+
+    it('undo after a remote same-node edit preserves the remote field', () => {
+        const doc = createSceneDoc();
+        const undo = createCollabUndoManager(doc, ORIGIN_A);
+        seedSceneFromJson(doc, { nodes: [{ id: 'shared', x: 0, y: 0 }], connections: [] });
+
+        moveNode(doc, 'shared', 5, 5, ORIGIN_A);
+        doc.transact(() => {
+            const node = getNodesMap(doc).get('shared') as Y.Map<unknown>;
+            node.set('y', 12);
+        }, ORIGIN_B);
+        undo.undo();
+
+        expect(nodeXY(doc, 'shared')).toEqual({ x: 0, y: 12 });
     });
 
     it('undoing own actions leaves all remote changes intact', () => {

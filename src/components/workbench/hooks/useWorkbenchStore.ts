@@ -29,6 +29,7 @@ export function useWorkbenchStore() {
             selectedNodeIds: state.selectedNodeIds,
             setSelectedNodeIds: state.setSelectedNodeIds,
             addConnection: state.addConnection,
+            removeConnection: state.removeConnection,
             createSketchWithFormat: state.createSketchWithFormat,
             isDrawMode: state.isDrawMode,
             activeWorkbenchTool: state.activeWorkbenchTool,

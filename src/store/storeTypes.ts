@@ -24,6 +24,7 @@ import {
 import type { CollabPresencePeer, CollabRemoteAwarenessEntry, CollabRemoteCursorState } from '@/types/collab.types';
 import type { ComputeSettings } from '@/types/executionTarget.types';
 import type { GenerationJob } from '@/types/generationJob.types';
+import type { SceneDocCommands } from '@/services/collab/sceneDocCommands';
 
 export interface WorkbenchHistorySnapshot {
     workbenchNodes: WorkbenchNode[];
@@ -62,6 +63,7 @@ export interface AppState {
     sceneHydrated: boolean;
     /** True while a real-time collaboration session owns this scene's writes. */
     collabSessionActive: boolean;
+    collabDocumentCommands: SceneDocCommands | null;
     nodeLocks: Record<string, NodeLockState>;
     presenceByUser: Record<string, CollabPresencePeer>;
     /** Remote cursor markers keyed by awareness client id. */
@@ -183,12 +185,14 @@ export interface AppState {
     createSketchWithFormat: (width: number, height: number) => void;
     setExitingStudio: (exiting: boolean) => void;
     setWorkbenchNodes: (nodes: WorkbenchNode[]) => void;
+    projectCollaborativeGraph: (nodes: WorkbenchNode[], connections: Connection[]) => void;
     setProjectNodes: (projectId: string, nodes: WorkbenchNode[]) => void;
     setConnections: (connections: Connection[]) => void;
     setCurrentProjectId: (id: string | null) => void;
     setCurrentSceneVersion: (version: number) => void;
     setSceneHydrated: (hydrated: boolean) => void;
     setCollabSessionActive: (active: boolean) => void;
+    setCollabDocumentCommands: (commands: SceneDocCommands | null) => void;
     setNodeLockState: (lock: NodeLockState) => void;
     clearNodeLockState: (nodeId: string) => void;
     upsertPresenceState: (presence: PresenceState) => void;

@@ -2,6 +2,7 @@ import { RenderOperation, RenderService, GenerateRequest, GenerateResponse, Anim
 import { getWorkflow, mapStyleToId, WorkflowDefinition } from './ai/workflowRegistry';
 import { composeNewViewPrompt, composeStylePrompt } from './ai/stylePromptRegistry';
 import { client_id, fetchWithTimeout, getComfyUrl, uploadImage, waitForCompletion } from './comfyuiClient';
+import { comfyConnectionManager } from './ai/comfyConnectionManager';
 
 /**
  * Executes a ComfyUI workflow by:
@@ -23,8 +24,8 @@ const executeWorkflow = async (
     }
 ): Promise<string[]> => {
 
-    // 1. Prepare Payload
-    const workflowPayload = JSON.parse(JSON.stringify(workflow.template));
+    // 1. Prepare Payload (structuredClone avoids the throwing JSON round-trip)
+    const workflowPayload = structuredClone(workflow.template);
     const seed = Math.floor(Math.random() * 1_000_000_000_000);
 
     // 2. Inject Values
@@ -257,18 +258,9 @@ export const comfyRenderService: RenderService = {
     },
 
     checkConnection: async (): Promise<boolean> => {
-        console.log(`🔍 Checking ComfyUI connection via proxy (${getComfyUrl()})...`);
-        try {
-            const response = await fetchWithTimeout(`${getComfyUrl()}/system_stats`, { timeout: 2000 });
-            if (response.ok) {
-                const stats = await response.json();
-                console.log('✅ ComfyUI System Stats:', stats);
-                return true;
-            }
-        } catch {
-            console.warn(`⚠️ Connection to ${getComfyUrl()} failed.`);
-        }
-
-        return false;
+        // Routed through the shared connection manager so this probe is
+        // coalesced with (and gated by) every other ComfyUI status check.
+        const state = await comfyConnectionManager.check(getComfyUrl());
+        return state.status === 'ready';
     }
 };

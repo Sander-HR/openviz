@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 
 import { useStore } from '@/store/useStore';
+import { createCursorPublishGate } from '@/services/collab/awareness';
 
 /** The subset of the Hocuspocus provider used for awareness publishing. */
 export interface CollabAwarenessPublisherProvider {
@@ -73,6 +74,7 @@ export function useCollabPresencePublisher(options: UseCollabPresencePublisherOp
         let pending: { x: number; y: number } | null = null;
         let rafId = 0;
         let lastPublished: { x: number; y: number } | null = null;
+        const cursorGate = createCursorPublishGate();
 
         const flush = (): void => {
             rafId = 0;
@@ -80,8 +82,7 @@ export function useCollabPresencePublisher(options: UseCollabPresencePublisherOp
             const world = toWorldRef.current(pending);
             pending = null;
             if (lastPublished && lastPublished.x === world.x && lastPublished.y === world.y) return;
-            lastPublished = world;
-            provider.setAwarenessField('cursor', world);
+            if (cursorGate(() => provider.setAwarenessField('cursor', world))) lastPublished = world;
         };
 
         const onPointerMove = (event: MouseEvent): void => {
@@ -91,6 +92,7 @@ export function useCollabPresencePublisher(options: UseCollabPresencePublisherOp
         const onPointerLeave = (): void => {
             pending = null;
             lastPublished = null;
+            cursorGate.reset();
             provider.setAwarenessField('cursor', null);
         };
 

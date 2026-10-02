@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { issueRoomToken } from '../../src/services/collab/roomTokenService';
 import { createOnAuthenticate, hasProjectAccessForScene } from './auth';
 
@@ -8,7 +8,7 @@ const NOW = 1_700_000_000_000;
 const SCENE_ID = 'scene-1';
 const PROJECT_ID = 'project-1';
 
-function makePayload(token: string, documentName: string) {
+function makePayload(token: string, documentName: string, socketId = 'socket-1') {
     return {
         token,
         documentName,
@@ -17,7 +17,7 @@ function makePayload(token: string, documentName: string) {
         requestHeaders: new Headers(),
         requestParameters: new URLSearchParams(),
         request: new Request('http://localhost/'),
-        socketId: 'socket-1',
+        socketId,
         connectionConfig: {},
         providerVersion: 'test',
     } as never;
@@ -33,6 +33,45 @@ describe('createOnAuthenticate (SC-006)', () => {
         });
         const result = await onAuthenticate(makePayload(token, SCENE_ID));
         expect(result).toEqual({ userId: 'u-1' });
+    });
+
+    it('reserves capacity only after a valid token and membership check', async () => {
+        const token = await issueRoomToken({ projectId: PROJECT_ID, sceneId: SCENE_ID, userId: 'u-1', secret: SECRET, now: NOW });
+        const reserveConnection = vi.fn(() => true);
+        const onAuthenticate = createOnAuthenticate({
+            secret: SECRET,
+            checkMembership: async () => true,
+            reserveConnection,
+            now: NOW + 60_000,
+        });
+
+        expect(await onAuthenticate(makePayload(token, SCENE_ID, 'socket-7'))).toEqual({ userId: 'u-1' });
+        expect(reserveConnection).toHaveBeenCalledWith(SCENE_ID, 'socket-7');
+    });
+
+    it('rejects a valid member when the room is at capacity', async () => {
+        const token = await issueRoomToken({ projectId: PROJECT_ID, sceneId: SCENE_ID, userId: 'u-1', secret: SECRET, now: NOW });
+        const reserveConnection = vi.fn(() => false);
+        const onAuthenticate = createOnAuthenticate({
+            secret: SECRET,
+            checkMembership: async () => true,
+            reserveConnection,
+            now: NOW + 60_000,
+        });
+
+        expect(await onAuthenticate(makePayload(token, SCENE_ID, 'socket-51'))).toBeNull();
+    });
+
+    it('does not reserve a room slot when token or membership validation fails', async () => {
+        const reserveConnection = vi.fn(() => true);
+        const onAuthenticate = createOnAuthenticate({
+            secret: SECRET,
+            checkMembership: async () => false,
+            reserveConnection,
+        });
+
+        expect(await onAuthenticate(makePayload('invalid', SCENE_ID))).toBeNull();
+        expect(reserveConnection).not.toHaveBeenCalled();
     });
 
     it('rejects a malformed token', async () => {

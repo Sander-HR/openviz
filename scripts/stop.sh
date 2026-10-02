@@ -65,6 +65,47 @@ stop_host_launcher() {
   remove_runtime_state
 }
 
+# Kill Next.js/collab processes that outlived their launcher (e.g. the
+# launcher was SIGKILLed or its terminal closed). Matched by command line and
+# verified against this repo's cwd so other projects are never touched.
+sweep_orphaned_dev_processes() {
+  local pid cwd pids=""
+
+  while IFS= read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    kill -0 "$pid" 2>/dev/null || continue
+    cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | awk '/^n/ { print substr($0, 2); exit }')"
+    [[ "$cwd" == "$REPO_ROOT" ]] || continue
+    pids="$pids $pid"
+  done < <(pgrep -f "pnpm exec next dev|next/dist/bin/next dev|next-server \(v|server/collab/index.ts" 2>/dev/null || true)
+
+  [[ -n "${pids// }" ]] || return 0
+
+  echo "[stop] Found OpenViz development processes outside the launcher:$pids"
+  for pid in $pids; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+
+  local deadline=$((SECONDS + 10))
+  while [[ $SECONDS -lt $deadline ]]; do
+    local running=0
+    for pid in $pids; do
+      if kill -0 "$pid" 2>/dev/null; then
+        running=1
+      fi
+    done
+    [[ $running -eq 0 ]] && break
+    sleep 1
+  done
+
+  for pid in $pids; do
+    if kill -0 "$pid" 2>/dev/null; then
+      echo "[stop] Process $pid did not stop after 10 seconds; terminating it."
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+  done
+}
+
 compose() {
   if [[ -f "$REPO_ROOT/.env.docker" ]]; then
     docker compose --env-file "$REPO_ROOT/.env.docker" "$@"
@@ -74,6 +115,7 @@ compose() {
 }
 
 stop_host_launcher
+sweep_orphaned_dev_processes
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   echo "[stop] Stopping PostgreSQL and Redis..."

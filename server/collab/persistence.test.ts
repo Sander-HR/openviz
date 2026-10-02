@@ -2,8 +2,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as Y from 'yjs';
 import type { SceneDataJson } from '../../src/types/collab.types';
-import { createSceneDoc, seedSceneFromJson, extractSceneFromDoc, getNodesMap, jsonToYValue } from '../../src/services/collab/sceneDocMapping';
+import {
+    createSceneDoc,
+    seedSceneFromJson,
+    extractSceneFromDoc,
+    getNodesMap,
+    jsonToYValue,
+    getSceneName,
+    setSceneName,
+} from '../../src/services/collab/sceneDocMapping';
 import { createFetch, createStore, parseOriginUser } from './persistence';
+import { createCollabUndoManager } from '../../src/services/collab/undoOrigin';
 
 const SCENE_ID = 'scene-1';
 
@@ -34,10 +43,41 @@ describe('createFetch (load / lazy import)', () => {
     it('prefers the stored ydoc over JSON when both exist', async () => {
         const doc = makeDoc(sampleData);
         const ydocBytes = Y.encodeStateAsUpdate(doc);
-        const getScene = vi.fn(async () => ({ id: SCENE_ID, data: sampleData, ydoc: ydocBytes }));
+        const getScene = vi.fn(async () => ({ id: SCENE_ID, name: 'Scene One', data: sampleData, ydoc: ydocBytes }));
         const fetch = createFetch({ getScene });
         const result = await fetch({ documentName: SCENE_ID } as never);
-        expect(new Uint8Array(result)).toEqual(ydocBytes);
+        const loaded = createSceneDoc();
+        Y.applyUpdate(loaded, result!);
+        expect(extractSceneFromDoc(loaded)).toEqual(extractSceneFromDoc(doc));
+        expect(getSceneName(loaded)).toBe('Scene One');
+    });
+
+    it('hydrates a legacy stored Y.Doc with the row name without replacing its graph', async () => {
+        const legacyDoc = makeDoc(sampleData);
+        const legacyBytes = Y.encodeStateAsUpdate(legacyDoc);
+        const fetch = createFetch({
+            getScene: async () => ({ id: SCENE_ID, name: 'Scene One', data: sampleData, ydoc: legacyBytes }),
+        });
+
+        const result = await fetch({ documentName: SCENE_ID } as never);
+        const hydrated = createSceneDoc();
+        Y.applyUpdate(hydrated, result!);
+
+        expect(getSceneName(hydrated)).toBe('Scene One');
+        expect(extractSceneFromDoc(hydrated)).toEqual(extractSceneFromDoc(legacyDoc));
+    });
+
+    it('keeps the Y.Doc scene name when it differs from the row name', async () => {
+        const namedDoc = makeDoc(sampleData);
+        setSceneName(namedDoc, 'Document Name');
+        const fetch = createFetch({
+            getScene: async () => ({ id: SCENE_ID, name: 'Stale Row Name', data: sampleData, ydoc: Y.encodeStateAsUpdate(namedDoc) }),
+        });
+
+        const result = await fetch({ documentName: SCENE_ID } as never);
+        const loaded = createSceneDoc();
+        Y.applyUpdate(loaded, result!);
+        expect(getSceneName(loaded)).toBe('Document Name');
     });
 
     it('seeds from JSON when ydoc is absent, preserving 100% of content (SC-007)', async () => {
@@ -48,13 +88,14 @@ describe('createFetch (load / lazy import)', () => {
             ],
             connections: [{ id: 'c1', source: 'a', target: 'b' }],
         };
-        const getScene = vi.fn(async () => ({ id: SCENE_ID, data: rich, ydoc: null }));
+        const getScene = vi.fn(async () => ({ id: SCENE_ID, name: 'Scene One', data: rich, ydoc: null }));
         const fetch = createFetch({ getScene });
         const result = await fetch({ documentName: SCENE_ID } as never);
         expect(result).not.toBeNull();
         const decoded = createSceneDoc(); // empty doc — the update must carry all content
         Y.applyUpdate(decoded, result!);
         expect(extractSceneFromDoc(decoded)).toEqual(rich);
+        expect(getSceneName(decoded)).toBe('Scene One');
     });
 
     it('returns null for a scene that does not exist yet', async () => {
@@ -67,15 +108,16 @@ describe('createFetch (load / lazy import)', () => {
 describe('US5 adoption cycle (SC-007)', () => {
     it('JSON-only scene seeds on first open, and reload loads the converged ydoc — not a stale snapshot', async () => {
         // In-memory stand-in for the scenes row, mutated by the store hook.
-        let row: { id: string; data: SceneDataJson; ydoc: Uint8Array | null } = {
+        let row: { id: string; name: string; data: SceneDataJson; ydoc: Uint8Array | null } = {
             id: SCENE_ID,
+            name: 'Scene One',
             data: sampleData,
             ydoc: null, // pre-feature scene: JSON only
         };
         const deps = {
             getScene: vi.fn(async () => row),
-            saveScene: vi.fn(async (input: { data: SceneDataJson; ydoc: Uint8Array }) => {
-                row = { id: SCENE_ID, data: input.data, ydoc: input.ydoc };
+            saveScene: vi.fn(async (input: { name: string | null; data: SceneDataJson; ydoc: Uint8Array }) => {
+                row = { id: SCENE_ID, name: input.name ?? row.name, data: input.data, ydoc: input.ydoc };
             }),
         };
         const fetch = createFetch(deps);
@@ -104,21 +146,43 @@ describe('US5 adoption cycle (SC-007)', () => {
         const reloaded = new Y.Doc();
         Y.applyUpdate(reloaded, second!);
         expect(extractSceneFromDoc(reloaded).nodes.map((node) => node.id)).toEqual(['n1', 'n2']);
+        expect(getSceneName(reloaded)).toBe('Scene One');
     });
 });
 
 describe('createStore (save)', () => {
     it('writes extracted data, encoded ydoc, and the last editor from the transaction origin', async () => {
         const doc = makeDoc(sampleData);
+        setSceneName(doc, 'Shared scene');
         const saveScene = vi.fn(async () => undefined);
         const store = createStore({ saveScene });
         await store(fakeStorePayload(doc, 'user:u-9'));
         expect(saveScene).toHaveBeenCalledTimes(1);
         const input = saveScene.mock.calls[0][0];
         expect(input.sceneId).toBe(SCENE_ID);
+        expect(input.name).toBe('Shared scene');
         expect(input.data).toEqual(sampleData);
         expect(new Uint8Array(input.ydoc)).toEqual(Y.encodeStateAsUpdate(doc));
         expect(input.updatedBy).toBe('u-9');
+    });
+
+    it('persists only document graph state, never awareness or undo history', async () => {
+        const doc = makeDoc(sampleData);
+        const undo = createCollabUndoManager(doc, 'user:u-9');
+        doc.transact(() => {
+            (getNodesMap(doc).get('n1') as Y.Map<unknown>).set('x', 99);
+        }, 'user:u-9');
+        const saveScene = vi.fn(async () => undefined);
+        await createStore({ saveScene })(fakeStorePayload(doc, 'user:u-9'));
+
+        const persisted = createSceneDoc();
+        Y.applyUpdate(persisted, saveScene.mock.calls[0][0].ydoc);
+        expect(Object.keys(persisted.toJSON())).toContain('nodes');
+        expect(Object.keys(persisted.toJSON())).not.toContain('awareness');
+        expect(Object.keys(persisted.toJSON())).not.toContain('undo');
+        expect(JSON.stringify(persisted.toJSON())).not.toMatch(/cursor|presence|undo/i);
+        expect(undo.canUndo()).toBe(true);
+        undo.destroy();
     });
 
     it('uses null updatedBy for non-user transaction origins', async () => {

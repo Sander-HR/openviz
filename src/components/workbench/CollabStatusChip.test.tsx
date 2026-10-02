@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 import { CollabStatusChip } from './CollabStatusChip';
@@ -21,6 +21,27 @@ describe('CollabStatusChip (US3 / SC-004)', () => {
     it('shows a connecting state before the first sync', () => {
         render(<CollabStatusChip status="connecting" />);
         expect(screen.getByRole('status')).toHaveTextContent(/connecting/i);
+    });
+
+    it('warns when live collaboration has no offline backup', () => {
+        render(<CollabStatusChip status="connected" localPersistenceAvailable={false} />);
+        expect(screen.getByText(/offline backup unavailable/i)).toBeInTheDocument();
+        expect(screen.getByText(/changes may be lost if this tab closes/i)).toBeInTheDocument();
+    });
+
+    it('shows the reconnecting state after a previously connected session drops', () => {
+        render(<CollabStatusChip status="reconnecting" />);
+        expect(screen.getByRole('status')).toHaveTextContent(/reconnecting/i);
+    });
+
+    it('uses a generic access-unavailable message and safe retry action when denied', () => {
+        const onRetry = vi.fn();
+        render(<CollabStatusChip status="denied" onRetry={onRetry} />);
+
+        expect(screen.getByText(/check that you.re signed in or request access/i)).toBeInTheDocument();
+        expect(screen.queryByText(/permission|scene|project/i)).not.toBeInTheDocument();
+        screen.getByRole('button', { name: /retry/i }).click();
+        expect(onRetry).toHaveBeenCalledTimes(1);
     });
 
     it('renders nothing when there is no session (idle)', () => {

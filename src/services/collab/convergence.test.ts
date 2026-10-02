@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
 import type { SceneDataJson } from '@/types/collab.types';
-import { createSceneDoc, seedSceneFromJson, extractSceneFromDoc, getNodesMap, getConnectionsMap, jsonToYValue } from './sceneDocMapping';
+import {
+    createSceneDoc,
+    seedSceneFromJson,
+    extractSceneFromDoc,
+    getNodesMap,
+    getConnectionsMap,
+    jsonToYValue,
+    updateSceneEntityField,
+} from './sceneDocMapping';
+import { createCollabUndoManager } from './undoOrigin';
+import { createSceneDocCommands } from './sceneDocCommands';
 
 /**
  * Convergence harness: N documents exchange updates over a broadcast bus in
@@ -137,6 +147,72 @@ describe('convergence (SC-001, SC-002)', () => {
 
         const sceneB = extractSceneFromDoc(b.doc);
         expect(sceneB.nodes).toEqual([{ id: 'early', type: 'image', x: 3, y: 4, data: { alt: 'early' } }]);
+    });
+
+    it('three clients merge disjoint fields and a causally later same-field write wins', () => {
+        const clients = makeClients(3);
+        seedSceneFromJson(clients[0].doc, {
+            nodes: [{ id: 'shared', type: 'image', x: 0, y: 0, data: { alt: 'base', src: 'old.png' } }],
+            connections: [],
+        });
+        broadcast(clients);
+
+        updateSceneEntityField(clients[0].doc, 'nodes', 'shared', ['data', 'alt'], 'first', clients[0].origin);
+        Y.applyUpdate(clients[1].doc, Y.encodeStateAsUpdate(clients[0].doc));
+        updateSceneEntityField(clients[1].doc, 'nodes', 'shared', ['data', 'alt'], 'later', clients[1].origin);
+        updateSceneEntityField(clients[2].doc, 'nodes', 'shared', ['data', 'src'], 'new.png', clients[2].origin);
+
+        converge(clients);
+
+        const scenes = clients.map(({ doc }) => extractSceneFromDoc(doc));
+        expect(scenes[0]).toEqual(scenes[1]);
+        expect(scenes[1]).toEqual(scenes[2]);
+        expect(scenes[0].nodes[0].data).toEqual({ alt: 'later', src: 'new.png' });
+    });
+
+    it('captures one completed multi-field gesture as one local undo item', () => {
+        const client = makeClients(1)[0];
+        seedSceneFromJson(client.doc, { nodes: [{ id: 'move-me', x: 0, y: 0 }], connections: [] });
+        const node = getNodesMap(client.doc).get('move-me') as Y.Map<unknown>;
+        const undoManager = createCollabUndoManager(client.doc, client.origin);
+
+        client.doc.transact(() => {
+            node.set('x', 30);
+            node.set('y', 40);
+        }, client.origin);
+
+        expect(undoManager.canUndo()).toBe(true);
+        undoManager.undo();
+        expect(extractSceneFromDoc(client.doc).nodes[0]).toMatchObject({ x: 0, y: 0 });
+        expect(undoManager.canUndo()).toBe(false);
+        undoManager.destroy();
+    });
+
+    it('integrates graph commands, name sync, offline merge, and per-client undo across three peers', () => {
+        const clients = makeClients(3);
+        seedSceneFromJson(clients[0].doc, {
+            nodes: [{ id: 'base', type: 'image', x: 0, y: 0, data: { alt: 'base' } }],
+            connections: [],
+        });
+        broadcast(clients);
+        const commands = clients.map(({ doc, origin }) => createSceneDocCommands(doc, origin));
+        const undo = clients.map(({ doc, origin }) => createCollabUndoManager(doc, origin));
+
+        commands[0].setSceneName('Shared scene');
+        commands[0].moveNodes([{ id: 'base', x: 20, y: 30 }]);
+        commands[1].updateNodeField('base', ['data', 'alt'], 'remote edit');
+        commands[2].createNode({ id: 'offline-node', type: 'note', x: 80, y: 90, data: { text: 'offline' } });
+        converge(clients);
+        undo[0].undo();
+        converge(clients);
+
+        const scenes = clients.map(({ doc }) => extractSceneFromDoc(doc));
+        expect(scenes[0]).toEqual(scenes[1]);
+        expect(scenes[1]).toEqual(scenes[2]);
+        expect(scenes[0].nodes.find(({ id }) => id === 'base')).toMatchObject({ x: 0, y: 0, data: { alt: 'remote edit' } });
+        expect(scenes[0].nodes.map(({ id }) => id).sort()).toEqual(['base', 'offline-node']);
+        expect(clients.map(({ doc }) => doc.getMap('metadata').get('name'))).toEqual(['Shared scene', 'Shared scene', 'Shared scene']);
+        undo.forEach((manager) => manager.destroy());
     });
 
     it('a lazy-imported seeded scene converges identically with a fresh client', () => {

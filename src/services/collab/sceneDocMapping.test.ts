@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
 import type { SceneDataJson } from '@/types/collab.types';
-import { createSceneDoc, seedSceneFromJson, extractSceneFromDoc, getNodesMap, getConnectionsMap } from './sceneDocMapping';
+import {
+    createSceneDoc,
+    seedSceneFromJson,
+    extractSceneFromDoc,
+    getNodesMap,
+    getConnectionsMap,
+    jsonToYValue,
+    getSceneName,
+    setSceneName,
+    updateSceneEntityField,
+} from './sceneDocMapping';
 
 // Fixtures use the REAL persisted store shape (flat x/y — see BaseNode), not
 // React Flow's `position` wrapper.
@@ -78,5 +88,73 @@ describe('extractSceneFromDoc', () => {
     it('returns an empty scene for a fresh document', () => {
         const doc = createSceneDoc();
         expect(extractSceneFromDoc(doc)).toEqual({ nodes: [], connections: [] });
+    });
+
+    it('returns nodes and connections in deterministic ID order and skips malformed entries', () => {
+        const doc = createSceneDoc();
+        const nodes = getNodesMap(doc);
+        const connections = getConnectionsMap(doc);
+        nodes.set('z', jsonToYValue({ id: 'z', x: 0, y: 0 }));
+        nodes.set('a', jsonToYValue({ id: 'a', x: 0, y: 0 }));
+        nodes.set('invalid', jsonToYValue({ x: 1, y: 1 }));
+        connections.set('z-edge', jsonToYValue({ id: 'z-edge', from: 'a', to: 'z' }));
+        connections.set('invalid-edge', jsonToYValue({ id: 'invalid-edge', from: 'missing', to: 'z' }));
+
+        expect(extractSceneFromDoc(doc)).toEqual({
+            nodes: [{ id: 'a', x: 0, y: 0 }, { id: 'z', x: 0, y: 0 }],
+            connections: [{ id: 'z-edge', from: 'a', to: 'z' }],
+        });
+    });
+});
+
+describe('collaborative scene fields', () => {
+    it('updates a nested field without replacing its containing node map', () => {
+        const doc = createSceneDoc();
+        seedSceneFromJson(doc, sampleScene);
+        const node = getNodesMap(doc).get('n1');
+
+        expect(updateSceneEntityField(doc, 'nodes', 'n1', ['data', 'alt'], 'updated', 'user:a:1')).toBe(true);
+
+        expect(getNodesMap(doc).get('n1')).toBe(node);
+        expect(extractSceneFromDoc(doc).nodes[0]).toEqual({
+            id: 'n1',
+            type: 'image',
+            x: 10,
+            y: 20,
+            data: { alt: 'updated', src: 'https://x/a.png' },
+        });
+    });
+
+    it('merges concurrent edits to different nested fields of one node', () => {
+        const first = createSceneDoc();
+        const second = createSceneDoc();
+        seedSceneFromJson(first, sampleScene);
+        Y.applyUpdate(second, Y.encodeStateAsUpdate(first));
+
+        updateSceneEntityField(first, 'nodes', 'n1', ['data', 'alt'], 'updated', 'user:a:1');
+        updateSceneEntityField(second, 'nodes', 'n1', ['data', 'src'], 'https://x/new.png', 'user:b:2');
+        Y.applyUpdate(first, Y.encodeStateAsUpdate(second));
+        Y.applyUpdate(second, Y.encodeStateAsUpdate(first));
+
+        expect(extractSceneFromDoc(first).nodes[0]).toEqual(extractSceneFromDoc(second).nodes[0]);
+        expect(extractSceneFromDoc(first).nodes[0].data).toEqual({ alt: 'updated', src: 'https://x/new.png' });
+    });
+
+    it('round-trips a scene name in metadata without adding it to graph JSON', () => {
+        const doc = createSceneDoc();
+        expect(getSceneName(doc)).toBeUndefined();
+
+        setSceneName(doc, 'Storyboard', 'user:a:1');
+
+        expect(getSceneName(doc)).toBe('Storyboard');
+        expect(extractSceneFromDoc(doc)).toEqual({ nodes: [], connections: [] });
+    });
+
+    it('returns false when a field path or entity does not exist', () => {
+        const doc = createSceneDoc();
+        seedSceneFromJson(doc, sampleScene);
+
+        expect(updateSceneEntityField(doc, 'nodes', 'missing', ['x'], 10)).toBe(false);
+        expect(updateSceneEntityField(doc, 'nodes', 'n1', ['data', 'unknown', 'leaf'], 'x')).toBe(false);
     });
 });

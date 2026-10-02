@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ProjectHeader } from '../common/ProjectHeader';
 import { CanvasControls } from '../studio/CanvasControls';
 import { WorkbenchToolbar } from './WorkbenchToolbar';
+import { WorkbenchSceneNameEditor } from './WorkbenchSceneNameEditor';
 import type { AddNodeKind } from './AddNodeMenu';
 import { PhoneUploadModal } from './PhoneUploadModal';
 import { BasicBlocksMenu } from '../nodes/BasicBlocksMenu';
@@ -43,6 +44,8 @@ interface WorkbenchChromeProps {
     onBlockSelect: (type: 'modify' | 'animate' | 'variate' | 'render') => void;
     /** Add-node menu (US3): routes a chosen type to its creation flow. */
     onCreateNode: (kind: AddNodeKind) => void;
+    sceneName?: string;
+    onRenameScene?: (name: string) => void;
     isTransitioningToStudio?: boolean;
 }
 
@@ -81,6 +84,8 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
     basicBlocksMenu,
     onBlockSelect,
     onCreateNode,
+    sceneName,
+    onRenameScene,
     isTransitioningToStudio = false,
 }) => (
     <motion.div
@@ -106,8 +111,11 @@ export const WorkbenchChrome: React.FC<WorkbenchChromeProps> = ({
             onUploadComplete={onPhoneUploadComplete}
         />
 
-        <div className="pointer-events-auto absolute top-4 left-4 z-20">
+        <div className="pointer-events-auto absolute top-2 left-2 z-20 flex max-w-[calc(100vw_-_1rem)] flex-wrap items-center gap-2 sm:top-4 sm:left-4 sm:max-w-[calc(50vw_-_2rem)] sm:flex-nowrap">
             <ProjectHeader mode="workbench" />
+            {onRenameScene && (
+                <WorkbenchSceneNameEditor value={sceneName} onSave={onRenameScene} />
+            )}
         </div>
 
         <div className="pointer-events-auto absolute top-4 left-1/2 z-20 -translate-x-1/2">

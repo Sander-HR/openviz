@@ -35,6 +35,10 @@ describe('CursorOverlay', () => {
         expect(screen.getByText('Hugo')).toBeInTheDocument();
     });
 
+    it('is memoized so unchanged cursor props can skip overlay rerenders', () => {
+        expect(CursorOverlay.$$typeof).toBe(Symbol.for('react.memo'));
+    });
+
     it('renders an empty layer when there are no remote cursors', () => {
         const { container } = render(<CursorOverlay remoteCursors={{}} viewport={viewport} />);
         expect(container.querySelectorAll('[data-cursor-client]')).toHaveLength(0);

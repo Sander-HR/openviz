@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as Y from 'yjs';
-import type { HocuspocusProvider as HocuspocusProviderType } from '@hocuspocus/provider';
+import { HocuspocusProviderWebsocket, type HocuspocusProvider as HocuspocusProviderType } from '@hocuspocus/provider';
 import { getNodesMap } from './sceneDocMapping';
 import { createCollabProvider, collabOriginFor, applyLocalTransaction, getRemoteAwarenessStates } from './collabProviderFactory';
 
@@ -29,6 +29,7 @@ class FakeProvider {
     static instances: FakeProvider[] = [];
     config: Record<string, unknown>;
     awareness = new FakeAwareness();
+    isAttached = false;
 
     constructor(config: Record<string, unknown>) {
         this.config = config;
@@ -46,7 +47,16 @@ class FakeProvider {
         return this;
     }
 
+    attach(): void {
+        this.isAttached = true;
+    }
+
+    detach(): void {
+        this.isAttached = false;
+    }
+
     destroy(): void {
+        this.detach();
         this.awareness.states.clear();
     }
 }
@@ -64,13 +74,37 @@ const config = {
 };
 
 describe('createCollabProvider', () => {
-    it('connects the provider to the room named by the scene ID with token and url', () => {
+    it('configures the room provider without auto-connect and exposes websocket lifecycle control', () => {
         const handle = createCollabProvider(config, { ProviderClass: FakeProvider as unknown as typeof HocuspocusProviderType });
         const fake = FakeProvider.instances[0];
         expect(fake.config.name).toBe('scene-42');
         expect(fake.config.token).toBe('tok.abc');
         expect(fake.config.url).toBe('ws://localhost:1234');
+        const websocketProvider = fake.config.websocketProvider as HocuspocusProviderWebsocket;
+        expect(websocketProvider.configuration.autoConnect).toBe(false);
+        expect(handle.provider.isAttached).toBe(true);
+        expect(typeof handle.connect).toBe('function');
         expect(handle.doc).toBe(fake.config.document);
+        handle.destroy();
+    });
+
+    it('attaches externally managed providers so websocket lifecycle events reach the session', () => {
+        const handle = createCollabProvider(config);
+        expect(handle.provider.isAttached).toBe(true);
+        handle.destroy();
+        expect(handle.provider.isAttached).toBe(false);
+    });
+
+    it('forwards websocket status events through the attached room provider', () => {
+        const handle = createCollabProvider(config);
+        const events: string[] = [];
+        handle.provider.on('status', (event: { status: string }) => events.push(event.status));
+        const websocketEvents = handle.provider.configuration.websocketProvider as unknown as {
+            emit(eventName: string, event: { status: string }): boolean;
+        };
+        websocketEvents.emit('status', { status: 'connected' });
+
+        expect(events).toEqual(['connected']);
         handle.destroy();
     });
 

@@ -4,11 +4,17 @@ import { verifyRoomToken } from '../../src/services/collab/roomTokenService';
 import { projects, scenes, workspaceMemberships } from '../../src/lib/db/schema';
 import { getDb } from './db';
 
+export interface CollabAuthContext {
+    userId: string;
+}
+
 export interface OnAuthenticateDependencies {
     /** Shared HMAC secret; when missing the hook fails closed. */
     secret?: string;
     /** Membership re-check for (sceneId, userId). Injectable for tests. */
     checkMembership: (sceneId: string, userId: string) => Promise<boolean>;
+    /** Reserve an authenticated connection slot before the document is synchronized. */
+    reserveConnection?: (sceneId: string, socketId: string) => boolean;
     /** Injectable clock for deterministic expiry checks in tests. */
     now?: number;
 }
@@ -45,7 +51,7 @@ export async function hasProjectAccessForScene(sceneId: string, userId: string):
  * Postgres. Returns the authenticated context or null to reject.
  */
 export function createOnAuthenticate(deps: OnAuthenticateDependencies) {
-    return async (data: onAuthenticatePayload): Promise<Record<string, unknown> | null> => {
+    return async (data: onAuthenticatePayload<CollabAuthContext>): Promise<CollabAuthContext | null> => {
         if (!deps.secret) return null;
 
         const result = await verifyRoomToken(data.token, {
@@ -57,6 +63,7 @@ export function createOnAuthenticate(deps: OnAuthenticateDependencies) {
 
         const isMember = await deps.checkMembership(result.payload.sceneId, result.payload.userId);
         if (!isMember) return null;
+        if (deps.reserveConnection && !deps.reserveConnection(data.documentName, data.socketId)) return null;
 
         return { userId: result.payload.userId };
     };

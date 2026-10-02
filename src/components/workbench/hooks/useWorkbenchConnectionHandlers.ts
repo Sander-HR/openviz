@@ -6,7 +6,10 @@ import {
     OnConnectStart,
 } from '@xyflow/react';
 
-import { WorkbenchNode } from '@/types';
+import type { Connection as WorkbenchConnection, WorkbenchNode } from '@/types';
+import type { SceneConnectionJson } from '@/types/collab.types';
+import type { SceneDocCommands } from '@/services/collab/sceneDocCommands';
+import { addConnectionWithPolicy } from '@/services/workbench/connectionPolicy';
 
 import { requestImmediateSceneSave } from '@/services/workbench/sceneSyncBus';
 import {
@@ -16,6 +19,9 @@ import {
 
 type UseWorkbenchConnectionHandlersOptions = {
     workbenchNodes: WorkbenchNode[];
+    connections: WorkbenchConnection[];
+    commands?: SceneDocCommands | null;
+    removeConnectionFromStore: (id: string) => void;
     addConnection: (
         fromId: string,
         toId: string,
@@ -26,8 +32,40 @@ type UseWorkbenchConnectionHandlersOptions = {
 
 export function useWorkbenchConnectionHandlers({
     workbenchNodes,
+    connections,
+    commands,
+    removeConnectionFromStore,
     addConnection,
 }: UseWorkbenchConnectionHandlersOptions) {
+    const applyConnection = useCallback((fromId: string, toId: string, sourceHandle?: string | null, targetHandle?: string | null) => {
+        if (!commands) {
+            addConnection(fromId, toId, sourceHandle, targetHandle);
+            return;
+        }
+        const next = addConnectionWithPolicy(connections, workbenchNodes, fromId, toId, sourceHandle, targetHandle);
+        const currentIds = new Set(connections.map(({ id }) => id));
+        const nextIds = new Set(next.map(({ id }) => id));
+        const created = next.find(({ id }) => !currentIds.has(id));
+        const documentConnection: SceneConnectionJson | null = created
+            ? {
+                  id: created.id,
+                  from: created.from,
+                  to: created.to,
+                  sourceHandle: created.sourceHandle ?? null,
+                  targetHandle: created.targetHandle ?? null,
+              }
+            : null;
+        const deleted = connections.filter(({ id }) => !nextIds.has(id)).map(({ id }) => id);
+        if (documentConnection || deleted.length > 0) commands.applyConnectionChanges(documentConnection, deleted);
+    }, [addConnection, commands, connections, workbenchNodes]);
+
+    const removeConnection = useCallback((id: string) => {
+        if (commands) commands.applyConnectionChanges(null, [id]);
+        else {
+            removeConnectionFromStore(id);
+            requestImmediateSceneSave();
+        }
+    }, [commands, removeConnectionFromStore]);
     const connectionStart = useRef<ConnectionStartRef>(null);
 
     const logEdgeDebug = useCallback((event: string, payload: Record<string, unknown>) => {
@@ -52,14 +90,13 @@ export function useWorkbenchConnectionHandlers({
                 sourceHandle: params.sourceHandle ?? null,
                 targetHandle: params.targetHandle ?? null,
             });
-            addConnection(
+            applyConnection(
                 params.source,
                 params.target,
                 params.sourceHandle ?? null,
-                params.targetHandle ?? null
+                params.targetHandle ?? null,
             );
-            // Connection was just dropped (mouse released) - sync immediately.
-            requestImmediateSceneSave();
+            if (!commands) requestImmediateSceneSave();
         } else {
             logEdgeDebug('onConnect.ignored', {
                 reason: 'missing source or target',
@@ -67,7 +104,7 @@ export function useWorkbenchConnectionHandlers({
                 target: params.target,
             });
         }
-    }, [addConnection, logEdgeDebug]);
+    }, [applyConnection, commands, logEdgeDebug]);
 
     const onConnectStart: OnConnectStart = useCallback((_, { nodeId, handleType }) => {
         if (!nodeId || !handleType) {
@@ -105,14 +142,13 @@ export function useWorkbenchConnectionHandlers({
             const canonical = getCanonicalConnectionFromDrop(connectionStart.current, targetNodeId, workbenchNodes);
             if (canonical) {
                 logEdgeDebug('onConnectEnd.addCanonicalConnection', canonical);
-                addConnection(
+                applyConnection(
                     canonical.fromId,
                     canonical.toId,
                     canonical.sourceHandle ?? null,
-                    canonical.targetHandle ?? null
+                    canonical.targetHandle ?? null,
                 );
-                // Reverse-drag connection was just dropped (mouse released) - sync immediately.
-                requestImmediateSceneSave();
+                if (!commands) requestImmediateSceneSave();
             } else {
                 logEdgeDebug('onConnectEnd.noCanonicalConnection', {
                     connectionStart: connectionStart.current,
@@ -122,10 +158,12 @@ export function useWorkbenchConnectionHandlers({
         }
 
         connectionStart.current = null;
-    }, [workbenchNodes, addConnection, logEdgeDebug]);
+    }, [workbenchNodes, applyConnection, commands, logEdgeDebug]);
 
     return {
+        createConnection: applyConnection,
         handleConnect,
+        removeConnection,
         onConnectStart,
         onConnectEnd,
     };

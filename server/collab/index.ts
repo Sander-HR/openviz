@@ -5,6 +5,8 @@ import { Server } from '@hocuspocus/server';
 import { Database } from '@hocuspocus/extension-database';
 import { createOnAuthenticate, hasProjectAccessForScene } from './auth';
 import { createDbPersistence, createFetch, createStore } from './persistence';
+import type { CollabAuthContext } from './auth';
+import { createRoomCapacity } from './roomCapacity';
 
 function requireEnv(name: string): string {
     const value = process.env[name];
@@ -25,8 +27,9 @@ const secret = requireEnv('COLLAB_TOKEN_SECRET');
 requireEnv('DATABASE_URL');
 
 const persistence = createDbPersistence();
+const roomCapacity = createRoomCapacity(50);
 
-const server = new Server({
+const server = new Server<CollabAuthContext>({
     port,
     // The collaboration server is reached by browsers outside the container
     // (including remote Tailscale clients), so bind every container interface.
@@ -36,7 +39,12 @@ const server = new Server({
     debounce: 2000,
     maxDebounce: 10_000,
     extensions: [new Database({ fetch: createFetch(persistence), store: createStore(persistence) })],
-    onAuthenticate: createOnAuthenticate({ secret, checkMembership: hasProjectAccessForScene }),
+    onAuthenticate: createOnAuthenticate({
+        secret,
+        checkMembership: hasProjectAccessForScene,
+        reserveConnection: roomCapacity.reserve,
+    }),
+    onDisconnect: ({ documentName, socketId }) => roomCapacity.release(documentName, socketId),
 });
 
 await server.listen();
