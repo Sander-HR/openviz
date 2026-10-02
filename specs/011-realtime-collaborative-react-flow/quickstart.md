@@ -84,3 +84,13 @@ Record and compare:
 - The benchmark harness passed `node --check` and its CLI help check.
 - The 50-client browser run used the local `Live Collab` development fixture, with one Workbench browser session and 49 additional Hocuspocus peers. It ran for 60 seconds at 33 cursor updates/sec per peer and one local graph operation/sec. Results: document-sync p95 52 ms; cursor p95 10 ms; local edit-to-projection p95 36 ms; minimum rolling five-second FPS average 55.03 (minimum one-second bucket 49.94); cursor-only graph DOM mutations 0. All measured targets passed. The benchmark restored the edited node coordinate and removed its temporary metadata field before exit.
 - Focused automated scenarios passed for graph command/convergence and scene rename, per-user Undo/Redo, IndexedDB offline recovery, awareness cleanup/rendering, authorization/room capacity, and server persistence; see the corresponding test files under `src/services/collab/`, `src/components/workbench/`, and `server/collab/`.
+
+## Final convergence validation (2026-10-02)
+
+- All tasks in `tasks.md` are checked complete, including Phase 10 file-limit refactors.
+- `pnpm run lint`: passed.
+- `pnpm exec tsc --noEmit`: passed.
+- `pnpm run test:ci`: passed — 127 test files / 704 tests; coverage 68.26% statements, 57.61% branches, 63.71% functions, 70.95% lines.
+- `pnpm run build`: passed. Next.js reported that it skips type validation during build; the separate `tsc --noEmit` check passed. Non-blocking output included outdated Browserslist data and React test `act(...)` warnings.
+- `git diff --check`: passed; generated `next-env.d.ts` change from the build was reverted.
+- The existing 50-client browser benchmark and its measured thresholds are recorded above; the benchmark was not rerun during this final convergence pass.
