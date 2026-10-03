@@ -12,7 +12,164 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-10-03T20:59:07.660Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-03T21:02:51.473Z"
     }
   ],
-  "telemetryInstanceId": "3e432614-17a7-4d87-a393-f4dd5248d07c"
+  "telemetryInstanceId": "3e432614-17a7-4d87-a393-f4dd5248d07c",
+  "coverage": {
+    "FR-001": {
+      "title": "Expose only task-level controls; backend translates to model-specific parameters",
+      "tasks": [
+        "T001",
+        "T002",
+        "T007"
+      ]
+    },
+    "FR-002": {
+      "title": "Never expose runtime/model internals in any user-facing surface or payload",
+      "tasks": [
+        "T006",
+        "T010"
+      ]
+    },
+    "FR-003": {
+      "title": "Advanced panel exposes exactly quality/steps, prompt adherence, reference resolution with safe defaults",
+      "tasks": [
+        "T010"
+      ]
+    },
+    "FR-004": {
+      "title": "Every generation task supports seed control; lock a seed for exact regeneration",
+      "tasks": [
+        "T002",
+        "T009"
+      ]
+    },
+    "FR-005": {
+      "title": "Modify prompt describes only the change and instructs preservation of all unspecified attributes",
+      "tasks": [
+        "T003"
+      ]
+    },
+    "FR-006": {
+      "title": "Instant Render prompt structures scene into subject/environment/composition/camera/lighting/treatment",
+      "tasks": [
+        "T003"
+      ]
+    },
+    "FR-007": {
+      "title": "Form Variate implemented as controlled edits (direction + magnitude + identity constraints)",
+      "tasks": [
+        "T002",
+        "T003"
+      ]
+    },
+    "FR-008": {
+      "title": "Color Variate MVP: palette + colorway count; only specified palette colors may appear",
+      "tasks": [
+        "T003",
+        "T015"
+      ]
+    },
+    "FR-009": {
+      "title": "New View prompt names target viewpoint and imposes geometry/component-preservation constraints",
+      "tasks": [
+        "T003"
+      ]
+    },
+    "FR-010": {
+      "title": "Animate prompt describes only temporal change; negatives suppress deformation/flicker/duplication",
+      "tasks": [
+        "T003"
+      ]
+    },
+    "FR-012": {
+      "title": "Modify defaults to strong source preservation; fidelity maps monotonically to edit strength",
+      "tasks": [
+        "T002",
+        "T011"
+      ]
+    },
+    "FR-013": {
+      "title": "Instant Render supports aspect-ratio presets 1:1, 4:3, 3:4, 16:9, 9:16, 3:2, 2:3",
+      "tasks": [
+        "T002",
+        "T013"
+      ]
+    },
+    "FR-014": {
+      "title": "Variation batches produce exactly the requested count with unique seeds per output",
+      "tasks": [
+        "T002",
+        "T015"
+      ]
+    },
+    "FR-015": {
+      "title": "Form magnitude maps to bounded edit-strength range; presets map to documented phrasings",
+      "tasks": [
+        "T002",
+        "T003"
+      ]
+    },
+    "FR-016": {
+      "title": "New View requires explicit view selection and at least one connected reference",
+      "tasks": [
+        "T017"
+      ]
+    },
+    "FR-017": {
+      "title": "Animate accepts start frame (required), end frame (optional), duration mapped to frames/fps by backend",
+      "tasks": [
+        "T002",
+        "T019"
+      ]
+    },
+    "FR-018": {
+      "title": "Extract produces structured records (color/material/parts) with hierarchy or region sampling, background excluded",
+      "tasks": [
+        "T022",
+        "T023",
+        "T024"
+      ]
+    },
+    "FR-019": {
+      "title": "Every task surfaces a machine-readable task record for reproducibility and audit",
+      "tasks": [
+        "T004",
+        "T007"
+      ]
+    },
+    "FR-020": {
+      "title": "Backend routes tasks to model classes by capability (t2i, edit, i2v, vision/segmentation)",
+      "tasks": [
+        "T002",
+        "T007"
+      ]
+    },
+    "FR-022": {
+      "title": "One active generation task per user; FIFO queue position visible; queued cancellable, running cancel where supported",
+      "tasks": [
+        "T005",
+        "T009"
+      ]
+    },
+    "FR-023": {
+      "title": "Completed extraction results displayed in node and saved as reusable project assets",
+      "tasks": [
+        "T004",
+        "T024"
+      ]
+    }
+  },
+  "step_summaries": {
+    "tasks": {
+      "summary": "26 tasks across 9 phases: Foundational (types, resolver, prompt registry, Drizzle tables, coordinator, target extension, facade) then one phase per user story (Modify, Instant Render, Variate, New View, Animate, Extract) and Polish; waves mark independent parallel work."
+    }
+  }
 }
