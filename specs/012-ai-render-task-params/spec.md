@@ -8,6 +8,15 @@
 
 **Input**: User description: "Compact PRD — OpenViz AI Render Tasks: Models, Prompts & Parameters. Define the model, prompting strategy and generation parameters behind each OpenViz render task (Modify, Instant Render, Form Variate, Color Variate, New View, Animate, Expression, Extract). Principle: OpenViz exposes task-level controls; the backend translates them into model-specific parameters. Users should never need to understand diffusion steps, guidance, denoising strength or model-specific conditioning."
 
+## Clarifications
+
+### Session 2026-09-24
+
+- Q: For Color Variate at MVP, should the user define colors per product component, or apply a whole-palette recoloring? → A: Palette-level at MVP — user picks a palette + number of colorways; backend distributes the palette across the product while preserving geometry; per-component mapping is a deferred enhancement (likely fed by Parts extraction).
+- Q: Which power-user controls should the advanced panel expose at MVP? → A: Minimal set — seed (core, FR-004), generation quality/steps, prompt adherence, and reference resolution; mask, LoRA selection, control conditioning and upscale are deferred until core tasks are benchmarked.
+- Q: Should benchmark validation (FR-021) be a launch gate for this feature, or an ongoing post-launch process? → A: Launch gate — the feature ships only after a benchmark set of at least 20 product images is reviewed per active task type and defaults are tuned to meet the success-criteria thresholds; tuning then continues post-launch.
+- Q: When extraction completes, what should happen to the structured results? → A: Display + save as project asset — results render in the node and are saved as reusable project assets (palettes, material notes, part lists) referenceable by other tasks; direct auto-apply to other products is deferred.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Edit a Product Image Without Losing the Product (Priority: P1)
@@ -129,7 +138,7 @@ A designer points the node at a reference image and extracts structured data ins
 
 - **FR-001**: The system MUST expose only task-level controls to users (prompt, aspect ratio, variation count, reference fidelity, duration, view selection, extraction type); all model-specific parameters (inference steps, guidance strength, denoising strength, conditioning details, resolution preprocessing) MUST be translated by the backend from those task-level controls.
 - **FR-002**: The system MUST NOT expose runtime/model internals (quantization, offloading, memory mode, attention backend, caching, oversized-tensor allowances, model-specific flow/schedule settings, or dual-stage video guidance values) in any user-facing surface.
-- **FR-003**: An advanced panel MAY expose a bounded set of power-user controls (generation quality/steps, prompt adherence, reference resolution, mask, style adapter, control conditioning, upscale); these MUST be clearly separated from the default task-level UI and MUST have safe defaults.
+- **FR-003**: An advanced panel MUST expose exactly the following power-user controls at MVP: generation quality/steps, prompt adherence, and reference resolution (seed is a core control per FR-004, not advanced-panel-only). These MUST be clearly separated from the default task-level UI and MUST have safe defaults. Mask, LoRA selection, control conditioning and upscale are deferred (see Scope) and MUST NOT appear in the MVP UI.
 - **FR-004**: Every generation task MUST support seed control: random by default, with the ability to lock a seed on a produced result for exact regeneration.
 
 **Prompt strategy (backend behavior)**
@@ -137,7 +146,7 @@ A designer points the node at a reference image and extracts structured data ins
 - **FR-005**: For Modify, the backend prompt MUST describe only the requested change and explicitly instruct preservation of all unspecified attributes (geometry, proportions, components, camera, composition, lighting, background); a negative prompt MUST constrain against exactly those unauthorized changes.
 - **FR-006**: For Instant Render, the backend prompt MUST structure the user's scene description into subject / environment / composition / camera / lighting / treatment and instruct preservation of the referenced product's recognizable geometry and key details; a negative prompt MUST guard against product distortion, missing/duplicated components, malformed surfaces and unwanted text/watermarks.
 - **FR-007**: For Form Variate, the backend MUST implement variations as controlled edits (direction + magnitude + identity constraints), not free generation; results MUST remain the same product concept.
-- **FR-008**: For Color Variate, the backend prompt MUST express explicit component→color mappings and constrain geometry/material preservation; only specified palette colors MAY appear.
+- **FR-008**: For Color Variate at MVP, the user selects a palette (set of swatches) and a colorway count; the backend prompt MUST instruct recoloring the product using only the specified palette while constraining geometry/material preservation. Per-component color assignment is out of MVP scope (see Scope); only specified palette colors MAY appear in results.
 - **FR-009**: For New View, the backend prompt MUST name the target viewpoint explicitly and impose strong geometry/component-preservation constraints, including consistent continuation of surfaces newly revealed by the viewpoint.
 - **FR-010**: For Animate, the backend prompt MUST describe only what changes over time (subject motion, camera motion, temporal progression) without re-describing the product's appearance; a negative prompt MUST suppress deformation, flicker, component duplication and unintended camera movement.
 - **FR-011**: For Expression (deferred — see Scope), the backend prompt MUST target visual/mood transformation while preserving geometry, colors, materials and composition.
@@ -151,12 +160,14 @@ A designer points the node at a reference image and extracts structured data ins
 - **FR-016**: New View MUST require an explicit view selection before generation is enabled, and MUST count connected references (generation requires at least one).
 - **FR-017**: Animate MUST accept a start frame (required) and end frame (optional), a duration choice mapped to frame count/frame rate by the backend, and MUST default all other video parameters to the selected model family's documented defaults.
 - **FR-018**: Extract MUST produce structured data records (not generated pixels): color extraction returns component + representative color + approximate hex + confidence; material extraction returns per-component material attributes with observations separated from inferences; parts extraction returns component name + role + image region. Extraction MUST support sampling by hierarchy or by region and MUST exclude background content.
+- **FR-023**: Completed extraction results MUST be displayed in the node AND saved as reusable project assets (palette, material notes, part list) that other tasks and nodes can reference. Automatically applying extracted data to other products (e.g., one-click palette transfer) is deferred; users reuse assets by explicit selection.
 - **FR-019**: Every task MUST surface a machine-readable task record (task type, resolved parameters, seed, prompt used) so results are reproducible and auditable.
+- **FR-022**: The system MUST enforce one active generation task per user; new submissions while a task is running are queued in submission order with visible queue position. Queued tasks MUST be cancellable before they start; running tasks MUST expose cancel where the backend supports it, producing a clearly labeled partial/aborted result rather than a silent failure.
 
 **Model routing**
 
 - **FR-020**: The backend MUST route tasks to model classes by capability: text-to-image generation for Instant Render; image-editing models for Modify, Form Variate, Color Variate, New View and (deferred) Expression; an image-to-video model family for Animate; and a vision/segmentation pipeline (no generative diffusion) for Extract.
-- **FR-021**: Parameter defaults that are not documented by the model vendor MUST be treated as OpenViz starting values and MUST be validated against an OpenViz benchmark set of product images before becoming production defaults; documented vendor defaults MUST be used where available.
+- **FR-021**: Parameter defaults that are not documented by the model vendor MUST be treated as OpenViz starting values. A benchmark set of at least 20 diverse product images is a **launch gate**: before general availability, each active task type MUST be reviewed against this set and its defaults tuned until the success-criteria thresholds (SC-002, SC-003, SC-005, SC-006, SC-007) are met. Documented vendor defaults MUST be used where available. Benchmark tuning continues post-launch as an ongoing process.
 
 ### Key Entities
 
@@ -164,7 +175,8 @@ A designer points the node at a reference image and extracts structured data ins
 - **Reference Image**: a connected source image with an identity (number/name) usable in @-mentions; has resolution and aspect metadata used by preprocessing.
 - **Generation Result**: an output artifact (image or video) linked to its task record; supports seed locking for regeneration.
 - **Variation Batch**: an ordered set of generation results from one task, each with a unique seed.
-- **Extraction Record**: structured per-component data (color/hex/confidence, material attributes, or name/role/region) produced by the analysis pipeline.
+- **Extraction Record**: structured per-component data (color/hex/confidence, material attributes, or name/role/region) produced by the analysis pipeline; persisted as a project asset reusable by other tasks.
+- **Project Asset**: a saved, referenceable unit of design data (palette, material notes, part list) created from an Extraction Record.
 - **View Definition**: a named camera viewpoint selectable in New View (e.g., front, three-quarter, top).
 
 ## Success Criteria *(mandatory)*
@@ -180,15 +192,16 @@ A designer points the node at a reference image and extracts structured data ins
 - **SC-007**: Extraction results on the benchmark set achieve ≥ 90% component-level accuracy for color (hex within perceptual tolerance) and parts identification, with background content excluded in 100% of records.
 - **SC-008**: Any produced result can be regenerated exactly (same seed + same inputs → visually identical output) — verified on all image tasks.
 - **SC-009**: Time from task submission to visible progress feedback is under 2 seconds for every task type; failed tasks surface a retryable error within the session rather than silently dropping.
+- **SC-010**: Launch gate — before general availability, every active task type has completed benchmark review on a set of ≥ 20 diverse product images with defaults tuned to meet SC-002/SC-003/SC-005/SC-006/SC-007; no task type ships on unvalidated starting values.
 
 ## Assumptions
 
 - A backend inference service capable of serving text-to-image, image-editing, image-to-video and vision/segmentation workloads is available (or being delivered in parallel); this feature defines OpenViz's contract with it, not the service itself.
 - Specific model selections named in the PRD (current-generation Qwen image edit / text-to-image models; Wan2.2 or LTX-class video models) are implementation choices for the planning phase; the spec binds behavior, not vendor model names.
-- Parameter ranges cited in the PRD (e.g., edit-strength bands per task) are OpenViz starting values, not vendor-documented optimums; they require benchmark validation before production defaults (FR-021).
+- Parameter ranges cited in the PRD (e.g., edit-strength bands per task) are OpenViz starting values, not vendor-documented optimums; benchmark validation on ≥ 20 product images is a launch gate per task type (FR-021, SC-010 — confirmed in Clarifications, 2026-09-24).
 - **Expression mode is deferred**: it remains a visible-but-disabled ("Soon") option in the UI until product-drift validation passes; its prompt strategy is specified (FR-011) so implementation can begin immediately after un-deferral.
 - OpenViz does not yet own authoritative 3D geometry for products at this stage; AI new views are the primary path. If real 3D assets are introduced later, a renderer-based new view becomes preferred and AI becomes the fallback (tracked as a future concern, out of scope here).
-- Color Variate at MVP uses palette-level prompting; per-component color assignment (potentially fed by Parts extraction) is a likely near-term enhancement, not an MVP requirement.
+- Color Variate at MVP uses palette-level prompting (confirmed in Clarifications, 2026-09-24); per-component color assignment (potentially fed by Parts extraction) is a deferred enhancement, not an MVP requirement.
 - Single connected reference per task is the MVP shape (matching the current node mockup); multi-reference conditioning is out of scope for this feature.
 - The existing generation-lab mockup interactions (prompt editor with @-mentions, template chips, view picker, form-morph slider, palette swatches, extraction segmented control) are the reference UI; this feature makes them real against the backend rather than status-message stubs.
 
@@ -196,4 +209,4 @@ A designer points the node at a reference image and extracts structured data ins
 
 **In scope**: task-level control model and backend parameter translation for Modify, Instant Render, Form Variate, Color Variate, New View, Animate and Extract; prompt/negative-prompt strategies per task; seed and reproducibility behavior; structured extraction outputs; benchmarking contract for non-documented defaults.
 
-**Out of scope**: Expression mode activation (deferred); 3D-renderer-based new views; multi-reference conditioning; fine-tuning/LoRA authoring workflows (advanced LoRA *selection* may exist per FR-003, but creating adapters is excluded); billing/queue economics; the inference service implementation itself.
+**Out of scope**: Expression mode activation (deferred); per-component color assignment in Color Variate (deferred enhancement, likely fed by Parts extraction); 3D-renderer-based new views; multi-reference conditioning; advanced-panel controls beyond the MVP set — mask editing, LoRA selection, control conditioning, upscale (deferred per FR-003; fine-tuning/LoRA authoring is excluded entirely); auto-apply of extracted data to other products (e.g., one-click palette transfer — reuse is by explicit selection per FR-023); billing/queue economics; the inference service implementation itself.
