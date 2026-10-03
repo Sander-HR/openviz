@@ -1,5 +1,6 @@
 installed:
 - assess
+- companion
 - git
 settings:
   auto_execute_hooks: true
@@ -103,6 +104,15 @@ hooks:
     prompt: Commit specification changes?
     description: Auto-commit after specification
     condition: null
+  - extension: companion
+    command: speckit.companion.after-specify
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.companion.after-specify?
+    description: Record specify completion (currentStep=specify, status=specified)
+      into .spec-context.json
+    condition: null
   after_clarify:
   - extension: git
     command: speckit.git.commit
@@ -121,6 +131,14 @@ hooks:
     prompt: Commit plan changes?
     description: Auto-commit after implementation planning
     condition: null
+  - extension: companion
+    command: speckit.companion.after-plan
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.companion.after-plan?
+    description: Record plan completion (currentStep=plan, status=planned) into .spec-context.json
+    condition: null
   after_tasks:
   - extension: git
     command: speckit.git.commit
@@ -130,6 +148,15 @@ hooks:
     prompt: Commit task changes?
     description: Auto-commit after task generation
     condition: null
+  - extension: companion
+    command: speckit.companion.after-tasks
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.companion.after-tasks?
+    description: Record tasks completion (currentStep=tasks, status=ready-to-implement)
+      into .spec-context.json
+    condition: null
   after_implement:
   - extension: git
     command: speckit.git.commit
@@ -138,6 +165,15 @@ hooks:
     priority: 10
     prompt: Commit implementation changes?
     description: Auto-commit after implementation
+    condition: null
+  - extension: companion
+    command: speckit.companion.after-implement
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.companion.after-implement?
+    description: Per-task journaling on implement (currentStep=implement; status=implemented
+      when all tasks checked)
     condition: null
   after_checklist:
   - extension: git
@@ -165,4 +201,24 @@ hooks:
     priority: 10
     prompt: Commit after syncing issues?
     description: Auto-commit after tasks-to-issues conversion
+    condition: null
+  before_converge:
+  - extension: companion
+    command: speckit.companion.before-converge
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.companion.before-converge?
+    description: Record converge start (currentStep=converge, status unchanged) into
+      .spec-context.json
+    condition: null
+  after_converge:
+  - extension: companion
+    command: speckit.companion.after-converge
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.companion.after-converge?
+    description: Record converge finish (currentStep=converge, status unchanged) into
+      .spec-context.json
     condition: null
