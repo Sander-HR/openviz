@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openviz/task-record.schema.json",
+  "title": "TaskRecord",
+  "description": "FR-019 machine-readable task record; SC-008 reproducibility source. Persisted in task_records (JSONB for request/resolved).",
+  "type": "object",
+  "required": ["id", "kind", "request", "resolved", "protocol", "status", "seeds", "createdAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "projectId": { "type": ["string", "null"] },
+    "kind": {
+      "enum": ["modify", "instant-render", "form-variate", "color-variate", "new-view", "animate", "extract"]
+    },
+    "request": { "$ref": "render-task-request.schema.json" },
+    "resolved": {
+      "type": "object",
+      "required": ["workflow", "prompt", "seeds", "benchmarkStatus"],
+      "properties": {
+        "workflow": { "enum": ["edit", "reference", "video", "extract"] },
+        "prompt": { "type": "string" },
+        "negativePrompt": { "type": ["string", "null"] },
+        "width": { "type": "integer", "minimum": 16, "multipleOf": 16 },
+        "height": { "type": "integer", "minimum": 16, "multipleOf": 16 },
+        "strength": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "steps": { "type": "integer", "minimum": 1 },
+        "guidance": { "type": ["number", "null"] },
+        "referenceResolution": { "enum": [512, 1024, 2048] },
+        "seeds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+        },
+        "firstFrame": { "type": ["string", "null"] },
+        "lastFrame": { "type": ["string", "null"] },
+        "numFrames": { "type": ["integer", "null"], "minimum": 1 },
+        "fps": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "benchmarkStatus": { "enum": ["starting", "validated"] }
+      }
+    },
+    "protocol": { "enum": ["openai-image", "comfyui"] },
+    "modelFamily": { "type": ["string", "null"] },
+    "status": {
+      "enum": ["queued", "active", "completed", "partial", "failed", "cancelled", "interrupted"]
+    },
+    "queuePositionAtSubmit": { "type": ["integer", "null"], "minimum": 1 },
+    "error": { "type": ["string", "null"] },
+    "outputIds": { "type": "array", "items": { "type": "string" } },
+    "createdAt": { "type": "integer" },
+    "updatedAt": { "type": "integer" }
+  }
+}

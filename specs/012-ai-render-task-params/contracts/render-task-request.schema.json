@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openviz/render-task-request.schema.json",
+  "title": "RenderTaskRequest",
+  "description": "Task-level user-facing request for one OpenViz render task (spec FR-001..FR-023). The backend resolver translates this into model-specific parameters; no diffusion internals appear here.",
+  "type": "object",
+  "required": ["kind"],
+  "properties": {
+    "kind": {
+      "enum": ["modify", "instant-render", "form-variate", "color-variate", "new-view", "animate", "extract"]
+    },
+    "prompt": { "type": "string", "maxLength": 2000 },
+    "referenceImageId": { "type": "string" },
+    "endFrameImageId": { "type": "string" },
+    "aspectRatio": { "enum": ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"] },
+    "referenceFidelity": { "type": "number", "minimum": 0, "maximum": 1 },
+    "variationCount": { "enum": [2, 4, 8] },
+    "formDirection": {
+      "type": "object",
+      "required": ["preset", "magnitude"],
+      "properties": {
+        "preset": { "enum": ["balanced", "soft-sculpt", "geometric", "organic"] },
+        "magnitude": { "type": "number", "minimum": 0, "maximum": 1 },
+        "axisLabels": {
+          "type": "object",
+          "properties": {
+            "top": { "type": "string" },
+            "bottom": { "type": "string" },
+            "left": { "type": "string" },
+            "right": { "type": "string" }
+          }
+        }
+      }
+    },
+    "palette": {
+      "type": "object",
+      "required": ["swatches"],
+      "properties": {
+        "name": { "type": "string" },
+        "swatches": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+        }
+      }
+    },
+    "targetView": { "type": "string", "description": "A ViewName from src/types (e.g. 'Front view', 'Rear Right 3/4 view')" },
+    "duration": { "enum": ["2s", "4s", "8s"] },
+    "extractKind": { "enum": ["color", "material", "parts"] },
+    "sampleBy": { "enum": ["hierarchy", "region"] },
+    "seed": { "type": "integer", "minimum": 0, "maximum": 4294967295, "description": "Locked seed for exact regeneration; implies single output" },
+    "advanced": {
+      "type": "object",
+      "description": "FR-003 MVP advanced set only. Mask/LoRA/control/upscale are NOT part of the MVP contract.",
+      "properties": {
+        "steps": { "type": "integer", "minimum": 1 },
+        "guidance": { "type": "number", "exclusiveMinimum": 0 },
+        "referenceResolution": { "enum": [512, 1024, 2048] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "enum": ["modify", "instant-render", "animate"] } } },
+      "then": { "required": ["prompt", "referenceImageId"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "form-variate" } } },
+      "then": { "required": ["referenceImageId", "variationCount", "formDirection"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "color-variate" } } },
+      "then": { "required": ["referenceImageId", "variationCount", "palette"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "new-view" } } },
+      "then": { "required": ["referenceImageId", "targetView"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "extract" } } },
+      "then": { "required": ["referenceImageId", "extractKind", "sampleBy"] }
+    }
+  ]
+}
