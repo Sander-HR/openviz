@@ -38,7 +38,7 @@
         "benchmarkStatus": { "enum": ["starting", "validated"] }
       }
     },
-    "protocol": { "enum": ["openai-image", "comfyui"] },
+    "protocol": { "enum": ["openai-compatible", "comfyui"] },
     "modelFamily": { "type": ["string", "null"] },
     "status": {
       "enum": ["queued", "active", "completed", "partial", "failed", "cancelled", "interrupted"]

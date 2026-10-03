@@ -160,9 +160,9 @@ A designer points the node at a reference image and extracts structured data ins
 - **FR-016**: New View MUST require an explicit view selection before generation is enabled, and MUST count connected references (generation requires at least one).
 - **FR-017**: Animate MUST accept a start frame (required) and end frame (optional), a duration choice mapped to frame count/frame rate by the backend, and MUST default all other video parameters to the selected model family's documented defaults.
 - **FR-018**: Extract MUST produce structured data records (not generated pixels): color extraction returns component + representative color + approximate hex + confidence; material extraction returns per-component material attributes with observations separated from inferences; parts extraction returns component name + role + image region. Extraction MUST support sampling by hierarchy or by region and MUST exclude background content.
-- **FR-023**: Completed extraction results MUST be displayed in the node AND saved as reusable project assets (palette, material notes, part list) that other tasks and nodes can reference. Automatically applying extracted data to other products (e.g., one-click palette transfer) is deferred; users reuse assets by explicit selection.
 - **FR-019**: Every task MUST surface a machine-readable task record (task type, resolved parameters, seed, prompt used) so results are reproducible and auditable.
 - **FR-022**: The system MUST enforce one active generation task per user; new submissions while a task is running are queued in submission order with visible queue position. Queued tasks MUST be cancellable before they start; running tasks MUST expose cancel where the backend supports it, producing a clearly labeled partial/aborted result rather than a silent failure.
+- **FR-023**: Completed extraction results MUST be displayed in the node AND saved as reusable project assets (palette, material notes, part list) that other tasks and nodes can reference. Automatically applying extracted data to other products (e.g., one-click palette transfer) is deferred; users reuse assets by explicit selection.
 
 **Model routing**
 

@@ -64,7 +64,7 @@ The FR-019 machine-readable record; also the SC-008 reproducibility source.
 | `kind` | `RenderTaskKind` | |
 | `request` | JSONB (full `RenderTaskRequest`) | user-level inputs, verbatim |
 | `resolved` | JSONB (`ResolvedRenderParameters`) | exact backend parameters used |
-| `protocol` | `'openai-image' \| 'comfyui'` | active protocol at submission |
+| `protocol` | `'openai-compatible' \| 'comfyui'` | active protocol at submission (serves image and video) |
 | `modelFamily` | string? | e.g. `qwen-image-edit-2511`, `wan-2.2` (informational; not user-facing) |
 | `seeds` | number[] | one per output |
 | `status` | `queued \| active \| completed \| partial \| failed \| cancelled \| interrupted` | state machine below |

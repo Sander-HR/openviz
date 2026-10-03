@@ -7,7 +7,7 @@ Runnable validation scenarios proving the feature works end-to-end. Implementati
 ## Prerequisites
 
 - `pnpm install`
-- A reachable image endpoint configured in AI Compute Settings — either an Unsloth-compatible server (`http://host:port/v1`, Qwen image edit + text-to-image models loaded) or a ComfyUI instance for video tasks.
+- A reachable image endpoint configured in AI Compute Settings — either an Unsloth-compatible server (`http://host:port/v1`, Qwen image edit + text-to-image models loaded) or a ComfyUI instance (fallback backend for image and video tasks).
 - For mock/offline runs: `NEXT_PUBLIC_USE_MOCK_RENDER=true` (existing mock protocol).
 - Postgres running with Drizzle migrations applied (task_records, extraction_records, project_assets).
 
@@ -48,7 +48,7 @@ Configure endpoint + model in Settings → AI Compute. Verify "AI ready" indicat
 ## Scenario 5 — Animate (P3, spec US5)
 
 1. With a ComfyUI endpoint active: start frame connected, duration `4s`, turntable motion → video of correct length, stable product (SC-006).
-2. With the OpenAI-image protocol active: capability error "video requires a ComfyUI endpoint" — no silent mis-routing.
+2. With the OpenAI-compatible protocol active: video routes to the OpenAI video endpoint (`POST /v1/videos`, per [openai-api.json](../../docs/architecture/openai-api.json)) and returns a `VideoJob` (fields `seconds`, `size`, `model`, `status`, `progress`) — no capability error, no silent mis-routing.
 
 ## Scenario 6 — Extract (P3, spec US6)
 

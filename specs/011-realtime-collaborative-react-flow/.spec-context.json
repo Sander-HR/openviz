@@ -1,0 +1,18 @@
+{
+  "workflow": "companion",
+  "specName": "011-realtime-collaborative-react-flow",
+  "branch": "011-realtime-collaborative-react-flow",
+  "selectedAt": "2026-10-03T21:08:46.960Z",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-03T21:52:39.589Z"
+    }
+  ],
+  "telemetryInstanceId": "abc016a8-62df-45fc-b004-b1b5ac1f4c6e"
+}

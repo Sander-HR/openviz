@@ -3,7 +3,7 @@
   "specName": "012-ai-render-task-params",
   "branch": "012-ai-render-task-params",
   "selectedAt": "2026-10-03T20:47:07.560Z",
-  "currentStep": "tasks",
+  "currentStep": "analyze",
   "status": "tasking",
   "history": [
     {
@@ -19,6 +19,20 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-03T21:02:51.473Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-03T21:03:05.557Z"
+    },
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-03T21:29:41.268Z"
     }
   ],
   "telemetryInstanceId": "3e432614-17a7-4d87-a393-f4dd5248d07c",
@@ -171,5 +185,43 @@
     "tasks": {
       "summary": "26 tasks across 9 phases: Foundational (types, resolver, prompt registry, Drizzle tables, coordinator, target extension, facade) then one phase per user story (Modify, Instant Render, Variate, New View, Animate, Extract) and Polish; waves mark independent parallel work."
     }
-  }
+  },
+  "reviewComments": [
+    {
+      "id": "ref-1791061523277-j3cpc",
+      "doc": "contracts/unsloth-image-api-mapping",
+      "anchor": {
+        "heading": "Never emitted (FR-002)",
+        "blockText": "## Video (Animate)",
+        "line": 32
+      },
+      "comment": "The openai compatible endpoint also provides video generation. look at the docs/ openai-api.json specifications for specific unsloth endpoint video generation capabilities.",
+      "status": "applied",
+      "createdAt": "2026-10-03T21:05:23.284Z"
+    },
+    {
+      "id": "ref-1791061680191-7zzp7",
+      "doc": "quickstart",
+      "anchor": {
+        "heading": "Scenario 5 — Animate (P3, spec US5)",
+        "blockText": "",
+        "line": 49
+      },
+      "comment": "OpenAI endpoint also supports video generation. we have to look into the specificaations in docs/ openai-api.json specs.",
+      "status": "applied",
+      "createdAt": "2026-10-03T21:08:00.194Z"
+    },
+    {
+      "id": "ref-1791061970850-ok5no",
+      "doc": "contracts/unsloth-image-api-mapping",
+      "anchor": {
+        "heading": "Contract: Unsloth / OpenAI-Compatible Image API Mapping",
+        "blockText": "## Endpoint",
+        "line": 7
+      },
+      "comment": "look at the specs in docs/ openai-api.json for more detailed endpoint capabilties. review this for this whole document",
+      "status": "applied",
+      "createdAt": "2026-10-03T21:12:50.856Z"
+    }
+  ]
 }

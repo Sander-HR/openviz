@@ -8,16 +8,20 @@ Phase 0 output — resolves the technical unknowns from `plan.md` Technical Cont
 
 ## R1. Animate routing: which protocol serves image-to-video?
 
-**Decision**: Route Animate to the **ComfyUI protocol** with a `wan-2.2` model-family workflow (the `ProductModelFamily` union already includes `'wan-2.2'` and `ProductWorkflowDefinition.type: 'video'` exists). The Unsloth OpenAI-compatible image API (`/v1/images/generations`) is image-only — the prior plan (`unsloth-openai-image-api-plan.md`) explicitly kept "video generation … ComfyUI-only".
+**Decision**: Route Animate to the **active protocol's video route**. The Unsloth OpenAI-compatible endpoint is **not** image-only — per [docs/architecture/openai-api.json](../../docs/architecture/openai-api.json) it also serves video generation:
+- **OpenAI-compatible** `POST /v1/videos` → returns a `VideoJob` (`status` ∈ queued/in_progress/completed/failed, `progress`, `size`, `seconds`, `expires_at`); companion routes for list/retrieve/delete/content.
+- **Native** `POST /api/inference/video/generate` (`VideoGenerateRequest`) — the richer surface: `prompt`, `negative_prompt`, `model`, `width`/`height`, `num_frames` (must lie on the family's temporal lattice), `fps`, `steps`, `guidance`, `guidance_2` (dual-expert MoE families, e.g. Wan2.2-A14B), `seed`, `first_frame` / `last_frame` (image-to-video, base64/data-URL), `reference_images` (≤9), `reference_videos` (≤3), `flow_shift`. Progress/cancel are out-of-band (`/api/inference/video/generate-progress`, `/generate/cancel`).
+
+The native route is preferred when capability probing reports it (mirroring the image-route fallback in `openAIImageTarget.ts`); ComfyUI's `wan-2.2` workflow remains a supported fallback backend, not the only one. The prior plan (`unsloth-openai-image-api-plan.md`) predates the video routes and its "video generation … ComfyUI-only" note is superseded.
 
 **Rationale**:
-- `RenderService.capabilities()` already gates operations per backend; `openAIImageRenderService.animate()` currently returns an explicit unsupported error. Keep that contract: the task coordinator checks capabilities and surfaces "video requires a ComfyUI endpoint" when the active protocol is `openai-image`.
-- `src/services/ai/productAnimationGeneration.ts` already exists for the product-design flow; the render-task facade reuses it (or its underlying workflow submission) instead of duplicating video logic.
-- Duration → frames/fps resolution happens in the resolver: duration choice {2s, 4s, 8s} × model-family default fps → `num_frames`; width/height from the family's documented resolution preset.
+- `RenderService.capabilities()` already gates operations per backend; extend the capability probe to report video-route support so the coordinator routes Animate to whichever active protocol serves it, and surfaces a capability error only when **no** active protocol supports video (never silent mis-routing).
+- `src/services/ai/productAnimationGeneration.ts` already exists for the product-design flow; the render-task facade reuses its ComfyUI submission path as the fallback branch instead of duplicating video logic.
+- Duration → frames/fps resolution happens in the resolver: duration choice {2s, 4s, 8s} × model-family default fps → `num_frames` (snapped to the family's temporal lattice on the native route); width/height from the family's documented resolution preset.
 
 **Alternatives considered**:
-- *LTX via Unsloth*: not exposed by the current OpenAI-compatible image route; would require a new protocol adapter — rejected for MVP (spec FR-020 only requires "an image-to-video model family").
-- *Dual video routing with auto-fallback*: adds capability-probe complexity for a single supported path; revisit if a second video backend lands.
+- *ComfyUI-only video routing* (prior decision): rejected — the OpenAI-compatible endpoint now exposes first-class video routes, so gating Animate behind a ComfyUI endpoint would needlessly block users on Unsloth-only setups.
+- *LTX via Unsloth*: not exposed by the current video routes; would require a new model family — deferred (spec FR-020 only requires "an image-to-video model family").
 
 ## R2. Extraction pipeline architecture (FR-018, FR-023)
 
@@ -101,7 +105,7 @@ Edit-workflow tasks (Modify, Variates, New View) keep the **source image's** dim
 
 ## R8. Benchmark gate mechanics (FR-021, SC-010)
 
-**Decision**: The benchmark set is a **curated asset collection** (≥ 20 diverse product images) stored as project assets with a `benchmark: true` flag; a developer-run evaluation script/hook submits each task type across the set with current defaults and records human-rated outcomes against SC-002/003/005/006/007 thresholds. Defaults carry `benchmarkStatus`; general availability is blocked (feature-flag or settings gate) until every active task type flips to `'validated'`. This is an operational process + data flag, not new runtime infrastructure — the quickstart documents the runbook.
+**Decision**: The benchmark set is a **curated asset collection** (≥ 20 diverse product images) stored as project assets with a `benchmark: true` flag; a developer-run evaluation script/hook submits each task type across the set with current defaults and records human-rated outcomes against SC-002/003/005/006/007 thresholds. Defaults carry `benchmarkStatus`; general availability is blocked by a `benchmarkGateEnabled` setting in `aiComputeSlice.computeSettings` (default `true`) until every active task type flips to `'validated'`. This is an operational process + data flag, not new runtime infrastructure — the quickstart documents the runbook.
 
 **Rationale**: Satisfies the launch-gate requirement with minimal code (status flag + gating check in the coordinator) while keeping tuning continuous post-launch.
 
