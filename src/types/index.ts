@@ -411,3 +411,30 @@ export type {
     BackgroundHandling,
 } from './workbenchParity.types';
 export { VIEW_NAMES } from './workbenchParity.types';
+export type {
+    RenderTaskKind,
+    RenderTaskAspectRatio,
+    RenderTaskSeed,
+    FormDirectionAxisLabels,
+    FormDirection,
+    RenderTaskPalette,
+    RenderTaskAdvancedSettings,
+    RenderTaskRequest,
+    RenderWorkflow,
+    BenchmarkStatus,
+    ResolvedRenderParameters,
+    RenderTaskStatus,
+    RenderTaskProtocol,
+    TaskRecord,
+    ExtractionRegion,
+    ExtractionColor,
+    ExtractionMaterial,
+    ExtractionComponent,
+    ExtractionRecord,
+    ProjectAssetKind,
+    PaletteAssetPayload,
+    MaterialNotesAssetPayload,
+    PartListAssetPayload,
+    ProjectAsset,
+} from './renderTask.types';
+export { RENDER_TASK_STATUS_TRANSITIONS, isRenderTaskStatusTerminal } from './renderTask.types';
