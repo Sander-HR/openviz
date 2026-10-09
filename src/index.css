@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Inter";
+  src:
+    local("Inter Variable"),
+    local("Inter"),
+    url("/fonts/Inter-Variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src:
+    local("Inter Italic Variable"),
+    local("Inter Italic"),
+    local("Inter"),
+    url("/fonts/Inter-Italic-Variable.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  /* OpenViz workbench palette */
+  --ov-bg: #161616;
+  --ov-fg: #fafafa;
+  --ov-accent: #4c4cef;
+  --ov-accent-strong: #3f3fd9;
+  --ov-panel: #242425;
+  --ov-panel-border: #3c3c3e;
+  --ov-muted: #808085;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sans);
+  --font-note: "Comic Sans MS", "Bradley Hand", "Segoe Print", "Chalkboard SE", cursive;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: var(--ov-fg);
+  background-color: var(--ov-bg);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1200px 400px at 20% -20%, rgba(76, 76, 239, 0.1), transparent 50%),
+    var(--ov-bg);
+  color: var(--ov-fg);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+#root {
+  width: 100%;
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .checkerboard {
+    background-image: linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+      linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+      linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px 4px, 4px 0;
+    background-color: #ffffff;
+  }
+
+  .font-note {
+    font-family: var(--font-note);
+  }
+
+  .resize-handle {
+    @apply bg-white;
+  }
+
+  .react-flow.dark .resize-handle {
+    @apply bg-viz-surface;
+  }
+}
+
+/* Agentation toolbar defaults to bottom-right via a shadow-DOM :host rule.
+   The consumer className lands on the <agentation-toolbar> host element, so
+   this external class (higher specificity than :host) overrides it — see the
+   agentation docs for the className prop. No !important: when the user drags
+   the toolbar, agentation sets inline left/top styles that must keep winning. */
+.agentation-bottom-left {
+  position: fixed;
+  top: auto;
+  left: 1.25rem;
+  right: auto;
+  bottom: 1.25rem;
+}

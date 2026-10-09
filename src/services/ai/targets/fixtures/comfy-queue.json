@@ -1,0 +1,4 @@
+{
+  "queue_running": [["prompt-1", { "prompt": {}, "extra_data": {} }]],
+  "queue_pending": []
+}

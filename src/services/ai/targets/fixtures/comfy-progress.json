@@ -1,0 +1,4 @@
+{
+  "type": "progress",
+  "data": { "prompt_id": "prompt-1", "node": "sampler", "value": 4, "max": 10 }
+}

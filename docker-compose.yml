@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: openviz-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-openviz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openviz}
+      POSTGRES_DB: ${POSTGRES_DB:-openviz}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - openviz_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-openviz} -d ${POSTGRES_DB:-openviz}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: openviz-redis
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - openviz_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Local S3-compatible object store (SeaweedFS). Used for image/asset storage
+  # so node state holds small URL refs instead of inline base64. The app runs on
+  # the host, so it reaches it at http://localhost:${S3_HOST_PORT}. Data persists
+  # in the openviz_s3_data volume. SeaweedFS accepts any credentials; its S3 API
+  # listens on :8333 inside the container (mapped to ${S3_HOST_PORT}).
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: openviz-s3
+    command: server -s3 -dir=/data
+    ports:
+      - "${S3_HOST_PORT:-4566}:8333"
+    volumes:
+      - openviz_s3_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8333/"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: openviz-app
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - openviz_node_modules:/workspace/node_modules
+      - openviz_pnpm_store:/root/.local/share/pnpm
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://openviz:openviz@postgres:5432/openviz}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # Inside the compose network the app reaches SeaweedFS by service name.
+      S3_ENDPOINT: http://seaweedfs:8333
+      S3_ACCESS_KEY_ID: test
+      S3_SECRET_ACCESS_KEY: test
+      S3_BUCKET: ${S3_BUCKET:-openviz-assets}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-docker-dev-secret-change-me}
+      DEV_ADMIN_ID: ${DEV_ADMIN_ID:-00000000-0000-0000-0000-000000000000}
+      DEV_ADMIN_EMAIL: ${DEV_ADMIN_EMAIL:-admin@example.com}
+      DEV_ADMIN_NAME: ${DEV_ADMIN_NAME:-Demo Admin}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-openviz-demo-password}
+      NEXT_PUBLIC_DEMO_PASSWORD: ${NEXT_PUBLIC_DEMO_PASSWORD:-openviz-demo-password}
+      NEXT_PUBLIC_DEV_ADMIN_EMAIL: ${NEXT_PUBLIC_DEV_ADMIN_EMAIL:-admin@example.com}
+      VITE_USE_MOCK_RENDER: ${VITE_USE_MOCK_RENDER:-true}
+      NEXT_PUBLIC_USE_MOCK_RENDER: ${NEXT_PUBLIC_USE_MOCK_RENDER:-true}
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${APP_HOST_PORT:-3000}:3000"
+      # The collaboration server runs beside Next.js in the dev container.
+      # Publish it so remote browsers (for example over Tailscale) can open
+      # the WebSocket directly.
+      - "${COLLAB_HOST_PORT:-1234}:1234"
+    command: ["bash", "scripts/dev-container.sh"]
+
+volumes:
+  openviz_postgres_data:
+  openviz_redis_data:
+  openviz_s3_data:
+  openviz_node_modules:
+  openviz_pnpm_store:

@@ -1,0 +1,134 @@
+{
+    "product_concept": {
+        "source": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+        "dependencies": [
+            {
+                "kind": "diffusion-model",
+                "name": "qwen_image_2.1",
+                "locations": ["models/diffusion_models"],
+                "required": true,
+                "licenseUrl": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/blob/main/LICENSE"
+            },
+            {
+                "kind": "text-encoder",
+                "name": "qwen_2.5_vl_7b",
+                "locations": ["models/clip"],
+                "required": true
+            },
+            {
+                "kind": "vae",
+                "name": "qwen_image_vae",
+                "locations": ["models/vae"],
+                "required": true
+            }
+        ]
+    },
+    "product_edit": {
+        "source": "https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI",
+        "dependencies": [
+            {
+                "kind": "diffusion-model",
+                "name": "qwen_image_edit_2511",
+                "locations": ["models/diffusion_models"],
+                "required": true,
+                "licenseUrl": "https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI/blob/main/LICENSE"
+            },
+            {
+                "kind": "text-encoder",
+                "name": "qwen_2.5_vl_7b",
+                "locations": ["models/clip"],
+                "required": true
+            },
+            {
+                "kind": "vae",
+                "name": "qwen_image_vae",
+                "locations": ["models/vae"],
+                "required": true
+            },
+            {
+                "kind": "diffusion-model",
+                "name": "flux1-dev-kontext",
+                "locations": ["models/diffusion_models"],
+                "required": false,
+                "licenseUrl": "https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev"
+            },
+            {
+                "kind": "text-encoder",
+                "name": "clip_l",
+                "locations": ["models/text_encoders"],
+                "required": false
+            },
+            {
+                "kind": "text-encoder",
+                "name": "t5xxl",
+                "locations": ["models/text_encoders"],
+                "required": false
+            },
+            {
+                "kind": "vae",
+                "name": "ae.safetensors",
+                "locations": ["models/vae"],
+                "required": false
+            }
+        ]
+    },
+    "flux_kontext": {
+        "source": "https://huggingface.co/Comfy-Org/flux1-kontext-dev_ComfyUI",
+        "dependencies": [
+            {
+                "kind": "diffusion-model",
+                "name": "flux1-dev-kontext",
+                "locations": ["models/diffusion_models"],
+                "required": true,
+                "licenseUrl": "https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev/blob/main/LICENSE.md"
+            },
+            {
+                "kind": "text-encoder",
+                "name": "clip_l",
+                "locations": ["models/clip"],
+                "required": true
+            },
+            {
+                "kind": "text-encoder",
+                "name": "t5xxl",
+                "locations": ["models/clip"],
+                "required": true
+            },
+            {
+                "kind": "vae",
+                "name": "ae.safetensors",
+                "locations": ["models/vae"],
+                "required": true
+            }
+        ]
+    },
+    "product_animation": {
+        "source": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+        "dependencies": [
+            {
+                "kind": "diffusion-model",
+                "name": "wan2.2_i2v_high_noise_14B",
+                "locations": ["models/diffusion_models"],
+                "required": true
+            },
+            {
+                "kind": "diffusion-model",
+                "name": "wan2.2_i2v_low_noise_14B",
+                "locations": ["models/diffusion_models"],
+                "required": true
+            },
+            {
+                "kind": "text-encoder",
+                "name": "umt5_xxl",
+                "locations": ["models/clip"],
+                "required": true
+            },
+            {
+                "kind": "vae",
+                "name": "wan_2.1_vae",
+                "locations": ["models/vae"],
+                "required": true
+            }
+        ]
+    }
+}

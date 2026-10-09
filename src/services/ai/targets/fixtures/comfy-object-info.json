@@ -1,0 +1,55 @@
+{
+  "CheckpointLoaderSimple": { "input": { "required": { "ckpt_name": [["sd_xl_base_1.0.safetensors"]] } } },
+  "UNETLoader": {
+    "input": {
+      "required": {
+        "unet_name": [
+          ["qwen_image_2.1_bf16.safetensors", "qwen_image_edit_2511_bf16.safetensors", "flux1-dev-kontext_fp8_scaled.safetensors", "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"]
+        ]
+      }
+    }
+  },
+  "CLIPLoader": {
+    "input": {
+      "required": {
+        "clip_name": [["qwen_2.5_vl_7b_fp8_scaled.safetensors", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"]]
+      }
+    }
+  },
+  "DualCLIPLoader": {
+    "input": {
+      "required": {
+        "clip_name1": [["clip_l.safetensors"]],
+        "clip_name2": [["t5xxl_fp8_e4m3fn_scaled.safetensors"]]
+      }
+    }
+  },
+  "VAELoader": {
+    "input": {
+      "required": {
+        "vae_name": [["qwen_image_vae.safetensors", "ae.safetensors", "wan_2.1_vae.safetensors"]]
+      }
+    }
+  },
+  "CLIPTextEncode": { "input": {} },
+  "TextEncodeQwenImageEditPlus": { "input": {} },
+  "KSampler": { "input": {} },
+  "KSamplerAdvanced": { "input": {} },
+  "EmptySD3LatentImage": { "input": {} },
+  "LoadImage": { "input": {} },
+  "VAEDecode": { "input": {} },
+  "VAEEncode": { "input": {} },
+  "SaveImage": { "input": {} },
+  "SaveVideo": { "input": {} },
+  "CreateVideo": { "input": {} },
+  "ModelSamplingAuraFlow": { "input": {} },
+  "ModelSamplingSD3": { "input": {} },
+  "CFGNorm": { "input": {} },
+  "FluxGuidance": { "input": {} },
+  "ReferenceLatent": { "input": {} },
+  "FluxKontextImageScale": { "input": {} },
+  "FluxKontextMultiReferenceLatentMethod": { "input": {} },
+  "SetLatentNoiseMask": { "input": {} },
+  "WanImageToVideo": { "input": {} },
+  "ConditioningZeroOut": { "input": {} }
+}

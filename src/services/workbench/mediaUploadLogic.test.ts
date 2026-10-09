@@ -1,0 +1,127 @@
+import { describe, expect, it } from 'vitest';
+
+// T020: pure media-upload logic (FR-012, C-4.4). Module under test:
+// src/services/workbench/mediaUploadLogic.ts (T023 implements it).
+
+describe('isImageFile (FR-012 image-only validation)', () => {
+    it('accepts common image mime types', async () => {
+        const { isImageFile } = await import('./mediaUploadLogic');
+        expect(isImageFile({ type: 'image/png' })).toBe(true);
+        expect(isImageFile({ type: 'image/jpeg' })).toBe(true);
+        expect(isImageFile({ type: 'image/webp' })).toBe(true);
+    });
+
+    it('rejects non-image and missing mime types', async () => {
+        const { isImageFile } = await import('./mediaUploadLogic');
+        expect(isImageFile({ type: 'video/mp4' })).toBe(false);
+        expect(isImageFile({ type: 'application/pdf' })).toBe(false);
+        expect(isImageFile({ type: '' })).toBe(false);
+        expect(isImageFile({})).toBe(false);
+    });
+});
+
+describe('buildImageNode (uploaded image node)', () => {
+    it('produces an editable image node centered on the viewport point', async () => {
+        const { buildImageNode } = await import('./mediaUploadLogic');
+        const node = buildImageNode({
+            src: 'data:image/png;base64,abc',
+            fileName: 'pic.png',
+            mimeType: 'image/png',
+            centerPoint: { x: 500, y: 300 },
+        });
+
+        expect(node.type).toBe('image');
+        expect(node.project.layers[0].image).toBe('data:image/png;base64,abc');
+        expect(node.name).toBe('pic.png');
+        expect(node.width).toBe(260);
+        expect(node.height).toBe(195);
+        expect(node.x).toBe(500 - 130);
+        expect(node.y).toBe(300 - 97.5);
+    });
+
+    it('falls back to a generic alt when the file has no name', async () => {
+        const { buildImageNode } = await import('./mediaUploadLogic');
+        const node = buildImageNode({
+            src: 'data:image/jpeg;base64,xyz',
+            fileName: '',
+            mimeType: 'image/jpeg',
+            centerPoint: { x: 10, y: 20 },
+        });
+        expect(node.name).toBe('Uploaded image');
+    });
+
+    it('stores a thumbnail variant on project.thumbnail while the layer keeps full resolution (Sprint 3)', async () => {
+        const { buildImageNode } = await import('./mediaUploadLogic');
+        const node = buildImageNode({
+            src: '/api/assets/full-token',
+            thumbnail: '/api/assets/thumb-token',
+            fileName: 'pic.png',
+            mimeType: 'image/png',
+            centerPoint: { x: 500, y: 300 },
+        });
+
+        expect(node.project.thumbnail).toBe('/api/assets/thumb-token');
+        expect(node.project.layers[0].image).toBe('/api/assets/full-token');
+    });
+
+    it('stores the ≤1024px preview variant on project.previewUrl (3-tier pipeline)', async () => {
+        const { buildImageNode } = await import('./mediaUploadLogic');
+        const node = buildImageNode({
+            src: '/api/assets/full-token',
+            thumbnail: '/api/assets/thumb-token',
+            preview: '/api/assets/preview-token',
+            fileName: 'pic.png',
+            mimeType: 'image/png',
+            centerPoint: { x: 100, y: 100 },
+        });
+
+        expect(node.project.previewUrl).toBe('/api/assets/preview-token');
+        expect(node.project.thumbnail).toBe('/api/assets/thumb-token');
+        expect(node.project.layers[0].image).toBe('/api/assets/full-token');
+    });
+
+    it('leaves previewUrl unset when no preview variant is available', async () => {
+        const { buildImageNode } = await import('./mediaUploadLogic');
+        const node = buildImageNode({
+            src: '/api/assets/full-token',
+            thumbnail: null,
+            preview: null,
+            fileName: 'pic.png',
+            mimeType: 'image/png',
+            centerPoint: { x: 100, y: 100 },
+        });
+
+        expect(node.project.previewUrl).toBeUndefined();
+    });
+
+    it('falls back to src for the display thumbnail when none is provided', async () => {
+        const { buildImageNode } = await import('./mediaUploadLogic');
+        const node = buildImageNode({
+            src: '/api/assets/full-token',
+            thumbnail: null,
+            fileName: 'pic.png',
+            mimeType: 'image/png',
+            centerPoint: { x: 500, y: 300 },
+        });
+
+        expect(node.project.thumbnail).toBe('/api/assets/full-token');
+    });
+});
+
+describe('resolveCenterFlowPoint (viewport-center placement)', () => {
+    it('maps the wrapper rect center into flow coordinates', async () => {
+        const { resolveCenterFlowPoint } = await import('./mediaUploadLogic');
+        const screenToFlowPosition = (p: { x: number; y: number }) => ({
+            x: p.x * 2,
+            y: p.y * 2,
+        });
+        const rect = { left: 100, top: 50, width: 800, height: 600 } as DOMRect;
+        // Center (500, 350) -> flow (1000, 700)
+        expect(resolveCenterFlowPoint(rect, screenToFlowPosition)).toEqual({ x: 1000, y: 700 });
+    });
+
+    it('falls back to a default canvas point when no wrapper rect is available', async () => {
+        const { resolveCenterFlowPoint } = await import('./mediaUploadLogic');
+        expect(resolveCenterFlowPoint(null, (p) => p)).toEqual({ x: 200, y: 200 });
+    });
+});

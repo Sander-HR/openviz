@@ -1,0 +1,32 @@
+{
+    "unet": { "class_type": "UNETLoader", "inputs": { "unet_name": "flux1-dev-kontext_fp8_scaled.safetensors", "weight_dtype": "default" } },
+    "clip": {
+        "class_type": "DualCLIPLoader",
+        "inputs": { "clip_name1": "clip_l.safetensors", "clip_name2": "t5xxl_fp8_e4m3fn_scaled.safetensors", "type": "flux" }
+    },
+    "vae": { "class_type": "VAELoader", "inputs": { "vae_name": "ae.safetensors" } },
+    "reference": { "class_type": "LoadImage", "inputs": { "image": "" } },
+    "scale": { "class_type": "FluxKontextImageScale", "inputs": { "image": ["reference", 0] } },
+    "encode": { "class_type": "VAEEncode", "inputs": { "pixels": ["scale", 0], "vae": ["vae", 0] } },
+    "positive": { "class_type": "CLIPTextEncode", "inputs": { "text": "", "clip": ["clip", 0] } },
+    "negative_zero": { "class_type": "ConditioningZeroOut", "inputs": { "conditioning": ["positive", 0] } },
+    "ref_latent": { "class_type": "ReferenceLatent", "inputs": { "conditioning": ["positive", 0], "latent": ["encode", 0] } },
+    "guidance": { "class_type": "FluxGuidance", "inputs": { "conditioning": ["ref_latent", 0], "guidance": 2.5 } },
+    "sampler": {
+        "class_type": "KSampler",
+        "inputs": {
+            "model": ["unet", 0],
+            "positive": ["guidance", 0],
+            "negative": ["negative_zero", 0],
+            "latent_image": ["encode", 0],
+            "seed": 0,
+            "steps": 20,
+            "cfg": 1.0,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "denoise": 1.0
+        }
+    },
+    "decode": { "class_type": "VAEDecode", "inputs": { "samples": ["sampler", 0], "vae": ["vae", 0] } },
+    "save": { "class_type": "SaveImage", "inputs": { "images": ["decode", 0], "filename_prefix": "product_edit" } }
+}

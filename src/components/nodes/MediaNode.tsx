@@ -1,0 +1,99 @@
+import React, { useLayoutEffect, useState } from 'react';
+import { Image as ImageIcon, ImageOff } from 'lucide-react';
+import { NodeResizer, useStore } from '@xyflow/react';
+
+import { MediaWorkbenchNode } from '@/types';
+import { nodeCardClass, NodeCardHeader, resizeHandleClassName } from './nodeUi';
+
+interface MediaNodeData extends MediaWorkbenchNode {
+    onResize?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
+    onResizeEnd?: (nodeId: string, width: number, height: number, x?: number, y?: number) => void;
+}
+
+interface MediaNodeProps {
+    id: string;
+    data: MediaNodeData;
+    selected: boolean;
+    width?: number;
+    height?: number;
+}
+
+export const MediaNode = React.memo(({ id, data, selected, width, height }: MediaNodeProps) => {
+    const internalSelected = useStore((state) => state.nodeLookup.get(id)?.selected === true);
+    const isSelected = selected || internalSelected;
+    const [nodeSize, setNodeSize] = useState({ width: width || 260, height: height || 180 });
+    const [loadError, setLoadError] = useState(false);
+    const src = data.data?.src;
+    const alt = data.data?.alt ?? 'Uploaded media';
+
+    // useLayoutEffect: during a snap-corrected resize the prop size updates
+    // every frame and must win over the raw onResize write before paint.
+    useLayoutEffect(() => {
+        if (width && height && width > 0 && height > 0) {
+            setNodeSize({ width, height });
+        }
+    }, [width, height]);
+
+    return (
+        <div style={{ width: nodeSize.width, height: nodeSize.height }} className={`${nodeCardClass(isSelected, 'rounded')} flex flex-col`}>
+            <NodeCardHeader icon={ImageIcon} label="Media" />
+
+            <div className="relative min-h-0 flex-1 bg-white">
+            {src && !loadError ? (
+                <img
+                    src={src}
+                    alt={alt}
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                    onError={() => setLoadError(true)}
+                />
+            ) : (
+                // C-5.4 / FR-013: clear fallback for missing or failed loads —
+                // never a broken-image glyph.
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-sm text-slate-500">
+                    <ImageOff size={28} strokeWidth={1.75} />
+                    <span>{src ? alt : 'Media unavailable'}</span>
+                </div>
+            )}
+            </div>
+
+            <NodeResizer
+                isVisible={isSelected}
+                minWidth={120}
+                minHeight={80}
+                color="#4C4CEF"
+                handleClassName={resizeHandleClassName}
+                handleStyle={{
+                    width: 12,
+                    height: 12,
+                    borderWidth: '2px',
+                    borderRadius: 3,
+                }}
+                onResize={(_event, resizeParams) => {
+                    const newWidth = Number.isFinite(resizeParams.width) ? resizeParams.width : nodeSize.width;
+                    const newHeight = Number.isFinite(resizeParams.height) ? resizeParams.height : nodeSize.height;
+                    const newX = Number.isFinite(resizeParams.x) ? resizeParams.x : undefined;
+                    const newY = Number.isFinite(resizeParams.y) ? resizeParams.y : undefined;
+
+                    if (newWidth > 0 && newHeight > 0) {
+                        setNodeSize({ width: newWidth, height: newHeight });
+                        data.onResize?.(id, newWidth, newHeight, newX, newY);
+                    }
+                }}
+                onResizeEnd={(_event, resizeParams) => {
+                    const newWidth = Number.isFinite(resizeParams.width) ? resizeParams.width : nodeSize.width;
+                    const newHeight = Number.isFinite(resizeParams.height) ? resizeParams.height : nodeSize.height;
+                    const newX = Number.isFinite(resizeParams.x) ? resizeParams.x : undefined;
+                    const newY = Number.isFinite(resizeParams.y) ? resizeParams.y : undefined;
+
+                    if (newWidth > 0 && newHeight > 0) {
+                        setNodeSize({ width: newWidth, height: newHeight });
+                        data.onResizeEnd?.(id, newWidth, newHeight, newX, newY);
+                    }
+                }}
+            />
+        </div>
+    );
+});
+
+MediaNode.displayName = 'MediaNode';

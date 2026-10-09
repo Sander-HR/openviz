@@ -1,0 +1,65 @@
+# Ignore ALL hidden directories by default
+.*/
+.github/skills/
+
+# EXCEPTIONS: These hidden directories MUST be tracked in Git
+!.github/
+
+# ==============================================================================
+# NODE.JS / WEB APPLICATION
+# ==============================================================================
+node_modules/
+dist/
+dist-ssr/
+.next/
+coverage/
+.tsbuildinfo
+*.local
+
+# ==============================================================================
+# LOGS AND CACHES
+# ==============================================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==============================================================================
+# SYSTEM & EDITOR FILES (Individual files)
+# ==============================================================================
+.DS_Store
+*.code-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ==============================================================================
+# DEPLOYMENT STATE & OUTPUTS
+# ==============================================================================
+specs/
+plans/
+AGENTS/
+.run/
+docs/performance/runs/
+
+# ==============================================================================
+# ENVIRONMENT VARIABLES AND SECRETS (Crucial for security)
+# ==============================================================================
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Private keys and credential files
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
+credentials/

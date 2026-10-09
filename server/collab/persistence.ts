@@ -1,0 +1,152 @@
+import * as Y from 'yjs';
+import type { fetchPayload, storePayload } from '@hocuspocus/server';
+import { eq, sql } from 'drizzle-orm';
+import type { SceneDataJson } from '../../src/types/collab.types';
+import { createSceneDoc, extractSceneFromDoc, getSceneName, seedSceneFromJson, setSceneName } from '../../src/services/collab/sceneDocMapping';
+import { scenes } from '../../src/lib/db/schema';
+import { getDb } from './db';
+
+/**
+ * A `scenes` row narrowed to what the persistence layer needs. `data` is null
+ * on the fast path (a stored ydoc is authoritative, so the JSONB column is
+ * never read) and populated on the seed path.
+ */
+export interface SceneRow {
+    id: string;
+    name: string;
+    data: SceneDataJson | null;
+    ydoc: Uint8Array | null;
+}
+
+export interface SaveSceneInput {
+    sceneId: string;
+    name: string | null;
+    data: SceneDataJson;
+    ydoc: Uint8Array;
+    /** Last editor derived from the transaction origin, when known. */
+    updatedBy: string | null;
+}
+
+export interface PersistenceDependencies {
+    getScene: (sceneId: string) => Promise<SceneRow | null>;
+    saveScene: (input: SaveSceneInput) => Promise<void>;
+    log?: (message: string, error?: unknown) => void;
+}
+
+/** Extracts the user id from local client origins (`user:<id>`); null otherwise. */
+export function parseOriginUser(origin: unknown): string | null {
+    if (typeof origin !== 'string' || !origin.startsWith('user:')) return null;
+    // Origin format: `user:<userId>[:<clientID>]` — the client suffix isolates
+    // concurrent tabs of one user; attribution only needs the userId segment.
+    const userId = origin.slice('user:'.length).split(':')[0];
+    return userId.length > 0 ? userId : null;
+}
+
+/**
+ * Hocuspocus `fetch` hook: prefers the lossless encoded document, else seeds
+ * a fresh document from saved scene JSON (lazy import — SC-007), else null.
+ */
+export function createFetch(deps: PersistenceDependencies) {
+    return async (payload: fetchPayload): Promise<Uint8Array | null> => {
+        const row = await deps.getScene(payload.documentName);
+        if (!row) return null;
+
+        if (row.ydoc && row.ydoc.byteLength > 0) {
+            const stored = createSceneDoc();
+            Y.applyUpdate(stored, row.ydoc);
+            if (!getSceneName(stored)) setSceneName(stored, row.name, 'collab-seed');
+            const update = Y.encodeStateAsUpdate(stored);
+            stored.destroy();
+            return update;
+        }
+
+        const data = row.data ?? { nodes: [], connections: [] };
+        const seeded = createSceneDoc();
+        seedSceneFromJson(seeded, data);
+        setSceneName(seeded, row.name, 'collab-seed');
+        const update = Y.encodeStateAsUpdate(seeded);
+        seeded.destroy();
+        return update;
+    };
+}
+
+/**
+ * Hocuspocus `store` hook (debounced by the server). Extracts converged JSON,
+ * persists it together with the encoded document, and bumps the scene version.
+ * Failures are logged and swallowed: live collaboration must never be blocked,
+ * and the next save trigger retries.
+ */
+export function createStore(deps: PersistenceDependencies) {
+    return async (payload: storePayload): Promise<void> => {
+        const data = extractSceneFromDoc(payload.document);
+        const input: SaveSceneInput = {
+            sceneId: payload.documentName,
+            name: getSceneName(payload.document) ?? null,
+            data,
+            ydoc: new Uint8Array(payload.state),
+            updatedBy: parseOriginUser(payload.lastTransactionOrigin),
+        };
+
+        try {
+            await deps.saveScene(input);
+        } catch (error) {
+            deps.log?.('collab scene save failed — will retry on next trigger', error);
+        }
+    };
+}
+
+/** A Drizzle client compatible with the queries below (test seam). */
+type SceneDb = ReturnType<typeof getDb>;
+
+/**
+ * Loads a scene row for room creation. Fast path: when an encoded ydoc exists
+ * it is authoritative, so the multi-MB `data` JSONB column is never read.
+ * Seed path (legacy JSON-only rows): one extra query loads the full row.
+ */
+export async function loadSceneRow(db: SceneDb, sceneId: string): Promise<SceneRow | null> {
+    const probe = await db
+        .select({ id: scenes.id, name: scenes.name, ydoc: scenes.ydoc })
+        .from(scenes)
+        .where(eq(scenes.id, sceneId))
+        .limit(1);
+    const [probeRow] = probe;
+    if (!probeRow) return null;
+
+    if (probeRow.ydoc && probeRow.ydoc.byteLength > 0) {
+        return { id: probeRow.id, name: probeRow.name, data: null, ydoc: new Uint8Array(probeRow.ydoc) };
+    }
+
+    const full = await db.select().from(scenes).where(eq(scenes.id, sceneId)).limit(1);
+    const [row] = full;
+    if (!row) return null;
+    return {
+        id: row.id,
+        name: row.name,
+        data: (row.data as SceneDataJson | null) ?? { nodes: [], connections: [] },
+        ydoc: row.ydoc ? new Uint8Array(row.ydoc) : null,
+    };
+}
+
+/** Default dependencies wired to Postgres via Drizzle. */
+export function createDbPersistence(getDbFn: () => SceneDb = getDb): PersistenceDependencies {
+    return {
+        getScene: async (sceneId) => loadSceneRow(getDbFn(), sceneId),
+        saveScene: async ({ sceneId, name, data, ydoc, updatedBy }) => {
+            const db = getDb();
+            await db
+                .update(scenes)
+                .set({
+                    ...(name === null ? {} : { name }),
+                    data,
+                    ydoc,
+                    version: sql`${scenes.version} + 1`,
+                    updatedBy,
+                    updatedAt: new Date(),
+                })
+                .where(eq(scenes.id, sceneId));
+        },
+        log: (message, error) => {
+            console.error(`[collab] ${message}`, error ?? '');
+        },
+    };
+}

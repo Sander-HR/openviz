@@ -1,0 +1,67 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+import { Server } from '@hocuspocus/server';
+import { Database } from '@hocuspocus/extension-database';
+import { createOnAuthenticate, hasProjectAccessForScene } from './auth';
+import { createDbPersistence, createFetch, createStore } from './persistence';
+import type { CollabAuthContext } from './auth';
+import { createRoomCapacity } from './roomCapacity';
+
+function requireEnv(name: string): string {
+    const value = process.env[name];
+    if (!value) {
+        console.error(`[collab] Missing required environment variable: ${name}`);
+        process.exit(1);
+    }
+    return value;
+}
+
+const port = Number(process.env.COLLAB_PORT ?? 1234);
+if (!Number.isInteger(port) || port <= 0) {
+    console.error(`[collab] COLLAB_PORT must be a positive integer, got: ${process.env.COLLAB_PORT}`);
+    process.exit(1);
+}
+
+const secret = requireEnv('COLLAB_TOKEN_SECRET');
+requireEnv('DATABASE_URL');
+
+const persistence = createDbPersistence();
+const roomCapacity = createRoomCapacity(50);
+
+const server = new Server<CollabAuthContext>({
+    port,
+    // The collaboration server is reached by browsers outside the container
+    // (including remote Tailscale clients), so bind every container interface.
+    address: process.env.COLLAB_ADDRESS ?? '0.0.0.0',
+    // ~2 s debounced saves per the persistence contract; hard cap so a busy
+    // room still flushes regularly.
+    debounce: 2000,
+    maxDebounce: 10_000,
+    extensions: [new Database({ fetch: createFetch(persistence), store: createStore(persistence) })],
+    onAuthenticate: createOnAuthenticate({
+        secret,
+        checkMembership: hasProjectAccessForScene,
+        reserveConnection: roomCapacity.reserve,
+    }),
+    onDisconnect: ({ documentName, socketId }) => roomCapacity.release(documentName, socketId),
+});
+
+await server.listen();
+console.log(`[collab] Hocuspocus listening on ws://localhost:${port}`);
+
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[collab] ${signal} received — flushing pending stores before exit`);
+    try {
+        await server.hocuspocus.flushPendingStores();
+    } finally {
+        await server.destroy();
+        process.exit(0);
+    }
+}
+
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
